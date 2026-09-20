@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "types": ["vite/client"],
+    "outDir": "../../dist/out-tsc",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@quizzer/shared": ["../../libs/shared/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/**/*.spec.ts", "src/**/*.spec.tsx", "src/**/*.test.ts", "src/**/*.test.tsx", "src/test-setup.ts"]
+}

@@ -1,0 +1,107 @@
+{
+  "questions": [
+    {
+      "id": "q1",
+      "question": "How many teeth does an adult dog typically have?",
+      "answers": [
+        { "id": "a", "text": "28", "correct": false },
+        { "id": "b", "text": "32", "correct": false },
+        { "id": "c", "text": "42", "correct": true },
+        { "id": "d", "text": "48", "correct": false }
+      ]
+    },
+    {
+      "id": "q2",
+      "question": "Which sense do dogs rely on most?",
+      "answers": [
+        { "id": "a", "text": "Sight", "correct": false },
+        { "id": "b", "text": "Smell", "correct": true },
+        { "id": "c", "text": "Hearing", "correct": false },
+        { "id": "d", "text": "Taste", "correct": false }
+      ]
+    },
+    {
+      "id": "q3",
+      "question": "About how many scent receptors does a typical dog nose have?",
+      "answers": [
+        { "id": "a", "text": "About 5 million", "correct": false },
+        { "id": "b", "text": "About 50 million", "correct": false },
+        { "id": "c", "text": "About 300 million", "correct": true },
+        { "id": "d", "text": "About 1 billion", "correct": false }
+      ],
+      "multiplier": 2
+    },
+    {
+      "id": "q4",
+      "question": "Dogs sweat primarily through which part of their body?",
+      "answers": [
+        { "id": "a", "text": "Their tongue", "correct": false },
+        { "id": "b", "text": "Their paw pads", "correct": true },
+        { "id": "c", "text": "Their ears", "correct": false },
+        { "id": "d", "text": "Their back", "correct": false }
+      ]
+    },
+    {
+      "id": "q5",
+      "question": "Which dog breed is widely recognized as the fastest?",
+      "answers": [
+        { "id": "a", "text": "Greyhound", "correct": true },
+        { "id": "b", "text": "Border Collie", "correct": false },
+        { "id": "c", "text": "Dalmatian", "correct": false },
+        { "id": "d", "text": "German Shepherd", "correct": false }
+      ]
+    },
+    {
+      "id": "q6",
+      "question": "What is a dog's normal resting heart rate range (beats per minute) for most adults?",
+      "answers": [
+        { "id": "a", "text": "20–40", "correct": false },
+        { "id": "b", "text": "60–140", "correct": true },
+        { "id": "c", "text": "160–220", "correct": false },
+        { "id": "d", "text": "240–300", "correct": false }
+      ],
+      "multiplier": 3
+    },
+    {
+      "id": "q7",
+      "question": "Puppies are born unable to do which of these?",
+      "answers": [
+        { "id": "a", "text": "Hear and see", "correct": true },
+        { "id": "b", "text": "Smell", "correct": false },
+        { "id": "c", "text": "Feel warmth", "correct": false },
+        { "id": "d", "text": "Wriggle", "correct": false }
+      ]
+    },
+    {
+      "id": "q8",
+      "question": "Basenjis are famous among dog breeds for what unusual trait?",
+      "answers": [
+        { "id": "a", "text": "They cannot bark (they yodel)", "correct": true },
+        { "id": "b", "text": "They have no fur", "correct": false },
+        { "id": "c", "text": "They cannot swim", "correct": false },
+        { "id": "d", "text": "They sleep standing up", "correct": false }
+      ]
+    },
+    {
+      "id": "q9",
+      "question": "A dog's nose print is unique — similar to what human identifier?",
+      "answers": [
+        { "id": "a", "text": "Blood type", "correct": false },
+        { "id": "b", "text": "Fingerprint", "correct": true },
+        { "id": "c", "text": "Voice", "correct": false },
+        { "id": "d", "text": "Eye color", "correct": false }
+      ]
+    },
+    {
+      "id": "q10",
+      "question": "Which of these can dogs generally taste less well than humans?",
+      "answers": [
+        { "id": "a", "text": "Sweet flavors", "correct": true },
+        { "id": "b", "text": "Salty flavors", "correct": false },
+        { "id": "c", "text": "Bitter flavors", "correct": false },
+        { "id": "d", "text": "Sour flavors", "correct": false }
+      ],
+      "score": 1200
+    }
+  ]
+}

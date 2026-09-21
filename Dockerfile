@@ -1,4 +1,6 @@
-# Multi-stage production image for Quizzer
+# Multi-stage production image for Quizzer (official Node images from Docker Hub)
+# Serves Express + Socket.IO API and the built React client on port 8080.
+
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./

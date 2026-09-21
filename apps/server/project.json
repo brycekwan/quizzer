@@ -1,0 +1,34 @@
+{
+  "name": "server",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/server/src",
+  "projectType": "application",
+  "tags": ["scope:server"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/server"],
+      "options": {
+        "command": "esbuild apps/server/src/main.ts --bundle --platform=node --target=node22 --outfile=dist/apps/server/main.js --external:express --external:cors --external:socket.io --alias:@quizzer/shared=./libs/shared/src/index.ts --loader:.json=json --format=cjs"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx watch --tsconfig apps/server/tsconfig.app.json apps/server/src/main.ts"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint 'apps/server/**/*.{ts,tsx,js,jsx}' --no-error-on-unmatched-pattern"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config apps/server/vite.config.ts"
+      }
+    }
+  }
+}

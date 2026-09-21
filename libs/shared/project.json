@@ -1,0 +1,21 @@
+{
+  "name": "@quizzer/shared",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/src",
+  "projectType": "library",
+  "tags": ["scope:shared"],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint 'libs/shared/**/*.{ts,tsx,js,jsx}' --no-error-on-unmatched-pattern"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config libs/shared/vite.config.ts"
+      }
+    }
+  }
+}

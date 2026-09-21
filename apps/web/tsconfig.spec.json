@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "../../dist/out-tsc",
+    "types": ["vitest/globals", "vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@quizzer/shared": ["../../libs/shared/src/index.ts"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/test-setup.ts",
+    "vite.config.ts"
+  ]
+}

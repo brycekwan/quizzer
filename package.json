@@ -3,13 +3,18 @@
   "version": "0.0.0",
   "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brycekwan/quizzer.git"
+  },
   "scripts": {
     "dev": "nx run-many -t serve --projects=web,server --parallel=2",
     "build": "nx run-many -t build --projects=web,server",
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",
     "serve:web": "nx serve web",
-    "serve:server": "nx serve server"
+    "serve:server": "nx serve server",
+    "release": "semantic-release"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -39,6 +44,13 @@
     "@nx/vite": "20.8.1",
     "@nx/web": "20.8.1",
     "@nx/workspace": "20.8.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.6",
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.1.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -60,6 +72,7 @@
     "jsdom": "^26.1.0",
     "nx": "20.8.1",
     "postcss": "^8.5.4",
+    "semantic-release": "^24.2.9",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.19.4",

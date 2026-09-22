@@ -1,0 +1,107 @@
+{
+  "questions": [
+    {
+      "id": "cat1",
+      "question": "How many hours a day do cats typically sleep?",
+      "answers": [
+        { "id": "a", "text": "8–10 hours", "correct": false },
+        { "id": "b", "text": "12–16 hours", "correct": true },
+        { "id": "c", "text": "18–20 hours", "correct": false },
+        { "id": "d", "text": "4–6 hours", "correct": false }
+      ]
+    },
+    {
+      "id": "cat2",
+      "question": "A group of cats is commonly called a…",
+      "answers": [
+        { "id": "a", "text": "Pack", "correct": false },
+        { "id": "b", "text": "Herd", "correct": false },
+        { "id": "c", "text": "Clowder", "correct": true },
+        { "id": "d", "text": "Flock", "correct": false }
+      ]
+    },
+    {
+      "id": "cat3",
+      "question": "Which sense do cats rely on most when hunting at night?",
+      "answers": [
+        { "id": "a", "text": "Taste", "correct": false },
+        { "id": "b", "text": "Hearing", "correct": true },
+        { "id": "c", "text": "Smell", "correct": false },
+        { "id": "d", "text": "Touch only", "correct": false }
+      ],
+      "multiplier": 2
+    },
+    {
+      "id": "cat4",
+      "question": "Why do cats often knead with their paws?",
+      "answers": [
+        { "id": "a", "text": "To sharpen claws only", "correct": false },
+        { "id": "b", "text": "A leftover kitten comfort behavior", "correct": true },
+        { "id": "c", "text": "To measure distance", "correct": false },
+        { "id": "d", "text": "To cool their paws", "correct": false }
+      ]
+    },
+    {
+      "id": "cat5",
+      "question": "Approximately how many muscles control a cat’s ear?",
+      "answers": [
+        { "id": "a", "text": "About 6", "correct": false },
+        { "id": "b", "text": "About 12", "correct": false },
+        { "id": "c", "text": "About 32", "correct": true },
+        { "id": "d", "text": "About 100", "correct": false }
+      ]
+    },
+    {
+      "id": "cat6",
+      "question": "What is a cat’s unique nose print similar to in humans?",
+      "answers": [
+        { "id": "a", "text": "A fingerprint", "correct": true },
+        { "id": "b", "text": "A voice print", "correct": false },
+        { "id": "c", "text": "Blood type", "correct": false },
+        { "id": "d", "text": "Eye color", "correct": false }
+      ],
+      "multiplier": 3
+    },
+    {
+      "id": "cat7",
+      "question": "Which taste can cats generally not detect well?",
+      "answers": [
+        { "id": "a", "text": "Salty", "correct": false },
+        { "id": "b", "text": "Bitter", "correct": false },
+        { "id": "c", "text": "Sweet", "correct": true },
+        { "id": "d", "text": "Sour", "correct": false }
+      ]
+    },
+    {
+      "id": "cat8",
+      "question": "Domestic cats are descendants of which wild ancestor?",
+      "answers": [
+        { "id": "a", "text": "African wildcat", "correct": true },
+        { "id": "b", "text": "Snow leopard", "correct": false },
+        { "id": "c", "text": "Bobcat", "correct": false },
+        { "id": "d", "text": "Cheetah", "correct": false }
+      ]
+    },
+    {
+      "id": "cat9",
+      "question": "What does a slowly blinking cat usually mean toward a human?",
+      "answers": [
+        { "id": "a", "text": "Anger", "correct": false },
+        { "id": "b", "text": "Fear", "correct": false },
+        { "id": "c", "text": "Trust / affection", "correct": true },
+        { "id": "d", "text": "Hunger only", "correct": false }
+      ]
+    },
+    {
+      "id": "cat10",
+      "question": "On average, how many whiskers does a cat have on each side of its face?",
+      "answers": [
+        { "id": "a", "text": "4", "correct": false },
+        { "id": "b", "text": "12", "correct": true },
+        { "id": "c", "text": "24", "correct": false },
+        { "id": "d", "text": "40", "correct": false }
+      ],
+      "score": 1200
+    }
+  ]
+}

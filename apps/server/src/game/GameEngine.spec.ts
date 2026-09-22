@@ -206,8 +206,75 @@ describe('GameEngine', () => {
 
     engine.reset();
     expect(engine.getStatus()).toBe('waiting');
-    expect(engine.getPlayer(join.player.id)?.score).toBe(0);
-    expect(engine.getPlayer(join.player.id)?.name).toBe('Buddy');
+    expect(engine.getPlayer(join.player.id)).toBeUndefined();
+    expect(engine.getSnapshot().players).toHaveLength(0);
+  });
+
+  it('kicks connected sockets on reset so players must rejoin', () => {
+    const engine = createEngine();
+    const join = engine.join('Buddy', 's1');
+    expect(join.ok).toBe(true);
+    const result = engine.reset();
+    expect(result.socketIds).toEqual(['s1']);
+  });
+
+  it('shows final leaderboard only to players who finished the round', () => {
+    const engine = createEngine();
+    const buddy = engine.join('Buddy', 's1');
+    expect(buddy.ok).toBe(true);
+    if (!buddy.ok) return;
+
+    engine.start();
+    const cycle = 30_000 + REVEAL_DURATION_MS + LEADERBOARD_DURATION_MS;
+    vi.advanceTimersByTime(cycle);
+    vi.advanceTimersByTime(cycle);
+    expect(engine.getStatus()).toBe('finished');
+    expect(
+      engine.getSnapshot('player', buddy.player.id).viewerFinishedGame
+    ).toBe(true);
+
+    const late = engine.join('Late', 's2');
+    expect(late.ok).toBe(true);
+    if (!late.ok) return;
+    expect(
+      engine.getSnapshot('player', late.player.id).viewerFinishedGame
+    ).toBe(false);
+    expect(
+      engine.getSnapshot('player', buddy.player.id).viewerFinishedGame
+    ).toBe(true);
+  });
+
+  it('rejects stale player ids after reset', () => {
+    const engine = createEngine();
+    const join = engine.join('Buddy', 's1');
+    expect(join.ok).toBe(true);
+    if (!join.ok) return;
+    engine.reset();
+    expect(engine.join('Buddy', 's2', join.player.id).ok).toBe(false);
+    expect(engine.join('Buddy', 's2').ok).toBe(true);
+  });
+
+  it('switches question sets while waiting', () => {
+    const engine = createEngine();
+    const next: Question[] = [
+      {
+        id: 'n1',
+        question: 'Next?',
+        answers: [
+          { id: 'a', text: 'A', correct: true },
+          { id: 'b', text: 'B', correct: false },
+          { id: 'c', text: 'C', correct: false },
+          { id: 'd', text: 'D', correct: false },
+        ],
+      },
+    ];
+    expect(engine.setQuestions('canada', next).ok).toBe(true);
+    expect(engine.getSnapshot().questionSetId).toBe('canada');
+    expect(engine.getSnapshot().totalQuestions).toBe(1);
+
+    engine.join('Buddy', 's1');
+    engine.start();
+    expect(engine.setQuestions('dog-facts', next).ok).toBe(false);
   });
 
   it('rejects pause during answering and accepts on leaderboard', () => {

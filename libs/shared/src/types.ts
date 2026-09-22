@@ -27,6 +27,11 @@ export interface QuestionsFile {
   questions: Question[];
 }
 
+export interface QuestionSetInfo {
+  id: string;
+  label: string;
+}
+
 export interface GameConfig {
   timeLimitSeconds: number;
   defaultScore: number;
@@ -97,6 +102,15 @@ export interface GameStateSnapshot {
   waitingPlayerCount: number;
   answeredPlayerCount: number;
   totalPlayerCount: number;
+  /** Filename-based id of the active question pack (e.g. `dog-facts`). */
+  questionSetId: string;
+  /** Available packs for the admin dropdown. */
+  questionSets: QuestionSetInfo[];
+  /**
+   * True when the viewer played this round and the game is finished.
+   * Newcomers joining after the game ends get false and should wait for the next game.
+   */
+  viewerFinishedGame: boolean;
 }
 
 export interface JoinResult {

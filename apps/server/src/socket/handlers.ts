@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import type { GameConfig } from '@quizzer/shared';
 import { GameEngine } from '../game/GameEngine';
+import { listQuestionSets, loadQuestionSet } from '../questions/questionSets';
 
 export function registerSocketHandlers(io: Server, engine: GameEngine): void {
   const snapshotFor = (socket: Socket) => {
@@ -84,13 +85,48 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
     });
 
     socket.on('admin:reset', (_payload: unknown, ack?: (result: unknown) => void) => {
-      ack?.(engine.reset());
+      const result = engine.reset();
+      for (const socketId of result.socketIds) {
+        const target = io.sockets.sockets.get(socketId);
+        if (!target) {
+          continue;
+        }
+        delete target.data.playerId;
+        target.emit('game:reset', { reason: 'Game was reset — please sign in again' });
+        target.disconnect(true);
+      }
+      ack?.(result);
     });
 
     socket.on(
       'admin:config',
       (payload: Partial<GameConfig>, ack?: (result: unknown) => void) => {
         ack?.(engine.updateConfig(payload ?? {}));
+      }
+    );
+
+    socket.on(
+      'admin:questionSet',
+      (
+        payload: { questionSetId?: string },
+        ack?: (result: unknown) => void
+      ) => {
+        const id = payload?.questionSetId?.trim();
+        if (!id) {
+          ack?.({ ok: false, error: 'questionSetId is required' });
+          return;
+        }
+
+        // Refresh the dropdown list in case files were added on disk.
+        engine.setQuestionSets(listQuestionSets());
+
+        const loaded = loadQuestionSet(id);
+        if (!loaded.ok) {
+          ack?.(loaded);
+          return;
+        }
+
+        ack?.(engine.setQuestions(id, loaded.questions));
       }
     );
 

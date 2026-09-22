@@ -24,7 +24,7 @@ export function AnswerGrid({
   onSelect,
 }: AnswerGridProps) {
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
       {answers.map((answer, index) => {
         const isSelected = selectedId === answer.id;
         const isCorrect = answer.correct === true;
@@ -38,7 +38,7 @@ export function AnswerGrid({
             disabled={disabled}
             onClick={() => onSelect?.(answer.id)}
             className={cn(
-              'relative flex min-h-[4.5rem] items-center justify-center rounded-3xl px-4 py-3 text-center font-extrabold shadow-pop transition-transform active:translate-y-1 active:shadow-none disabled:opacity-70 sm:min-h-[5.5rem] sm:text-lg',
+              'relative flex min-h-[3.25rem] items-center justify-center rounded-2xl px-3 py-2 text-center text-sm font-extrabold leading-snug shadow-pop transition-transform active:translate-y-1 active:shadow-none disabled:opacity-70 sm:min-h-[5.5rem] sm:rounded-3xl sm:px-4 sm:py-3 sm:text-lg',
               ANSWER_STYLES[index % ANSWER_STYLES.length],
               showAsCorrect &&
                 'z-10 scale-[1.03] ring-4 ring-emerald-400 ring-offset-2 ring-offset-cream brightness-110',

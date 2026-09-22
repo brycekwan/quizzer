@@ -38,12 +38,22 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
       socket.emit(
         'player:join',
         { name, playerId: id },
-        (result: { ok: boolean; playerId?: string; name?: string }) => {
+        (result: {
+          ok: boolean;
+          playerId?: string;
+          name?: string;
+          error?: string;
+        }) => {
           if (result.ok && result.playerId && result.name) {
             localStorage.setItem(PLAYER_ID_KEY, result.playerId);
             localStorage.setItem(PLAYER_NAME_KEY, result.name);
             setPlayerId(result.playerId);
             setPlayerName(result.name);
+          } else {
+            localStorage.removeItem(PLAYER_ID_KEY);
+            localStorage.removeItem(PLAYER_NAME_KEY);
+            setPlayerId(null);
+            setPlayerName(null);
           }
         }
       );
@@ -67,6 +77,15 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
       localStorage.removeItem(PLAYER_NAME_KEY);
       setPlayerId(null);
       setPlayerName(null);
+    });
+    socket.on('game:reset', () => {
+      // Host cleared the room — drop local session so the player must sign in again.
+      setKicked(false);
+      localStorage.removeItem(PLAYER_ID_KEY);
+      localStorage.removeItem(PLAYER_NAME_KEY);
+      setPlayerId(null);
+      setPlayerName(null);
+      setError(null);
     });
 
     return () => {
@@ -131,6 +150,14 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
       kick: (id: string) =>
         new Promise((resolve) =>
           socketRef.current?.emit('admin:kick', { playerId: id }, resolve)
+        ),
+      setQuestionSet: (questionSetId: string) =>
+        new Promise((resolve) =>
+          socketRef.current?.emit(
+            'admin:questionSet',
+            { questionSetId },
+            resolve
+          )
         ),
     }),
     []

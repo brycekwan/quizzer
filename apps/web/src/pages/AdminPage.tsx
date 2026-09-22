@@ -16,8 +16,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export function AdminPage() {
-  const { connected, state, start, pause, resume, reset, config, kick } =
-    useGameSocket('admin');
+  const {
+    connected,
+    state,
+    start,
+    pause,
+    resume,
+    reset,
+    config,
+    kick,
+    setQuestionSet,
+  } = useGameSocket('admin');
   const [message, setMessage] = useState<string | null>(null);
   const [form, setForm] = useState<GameConfig | null>(null);
 
@@ -59,6 +68,18 @@ export function AdminPage() {
     if (!form) return;
     const result = (await config(form)) as { ok?: boolean; error?: string };
     setMessage(result?.ok === false ? result.error ?? 'Invalid config' : 'Config saved');
+  };
+
+  const changeQuestionSet = async (questionSetId: string) => {
+    const result = (await setQuestionSet(questionSetId)) as {
+      ok?: boolean;
+      error?: string;
+    };
+    setMessage(
+      result?.ok === false
+        ? result.error ?? 'Could not change question set'
+        : 'Question set updated'
+    );
   };
 
   if (!state) {
@@ -158,6 +179,32 @@ export function AdminPage() {
             <h2 className="font-display text-2xl font-bold sm:col-span-2">
               Game config
             </h2>
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="question-set">Question set</Label>
+              <select
+                id="question-set"
+                className="flex h-12 w-full rounded-2xl border-4 border-ink/15 bg-white px-4 text-base font-bold text-ink shadow-pop-sm outline-none focus-visible:ring-4 focus-visible:ring-sun/70 disabled:opacity-50"
+                value={state.questionSetId}
+                disabled={state.status !== 'waiting'}
+                onChange={(e) => void changeQuestionSet(e.target.value)}
+              >
+                {state.questionSets.map((set) => (
+                  <option key={set.id} value={set.id}>
+                    {set.label}
+                  </option>
+                ))}
+              </select>
+              {state.status !== 'waiting' ? (
+                <p className="text-sm font-semibold text-ink/55">
+                  Reset the game to change the question set.
+                </p>
+              ) : (
+                <p className="text-sm font-semibold text-ink/55">
+                  Packs are loaded from JSON files on the server (
+                  {state.totalQuestions} questions in this set).
+                </p>
+              )}
+            </div>
             {form ? (
               <>
                 <Field

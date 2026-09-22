@@ -54,4 +54,6 @@ On each new version it:
 
 - Server owns timers; late joiners only get remaining question time.
 - Pause only after a question (leaderboard phase); clients stay on the leaderboard with a paused banner.
-- Scores are a running sum; reset zeros totals and returns to waiting.
+- Reset clears scores, kicks every player, and returns everyone to the sign-in screen.
+- Question packs live in `apps/server/questions/*.json`; the host picks one from the admin dropdown.
+- After a game ends, only players who finished that round see the final leaderboard; newcomers wait for the next start.

@@ -1,0 +1,107 @@
+{
+  "questions": [
+    {
+      "id": "geo1",
+      "question": "What is the largest country in the world by land area?",
+      "answers": [
+        { "id": "a", "text": "Canada", "correct": false },
+        { "id": "b", "text": "China", "correct": false },
+        { "id": "c", "text": "Russia", "correct": true },
+        { "id": "d", "text": "United States", "correct": false }
+      ]
+    },
+    {
+      "id": "geo2",
+      "question": "Which river is widely considered the longest in the world?",
+      "answers": [
+        { "id": "a", "text": "Amazon", "correct": false },
+        { "id": "b", "text": "Nile", "correct": true },
+        { "id": "c", "text": "Yangtze", "correct": false },
+        { "id": "d", "text": "Mississippi", "correct": false }
+      ]
+    },
+    {
+      "id": "geo3",
+      "question": "What is the capital of Australia?",
+      "answers": [
+        { "id": "a", "text": "Sydney", "correct": false },
+        { "id": "b", "text": "Melbourne", "correct": false },
+        { "id": "c", "text": "Canberra", "correct": true },
+        { "id": "d", "text": "Brisbane", "correct": false }
+      ],
+      "multiplier": 2
+    },
+    {
+      "id": "geo4",
+      "question": "Mount Everest sits on the border of Nepal and which country?",
+      "answers": [
+        { "id": "a", "text": "India", "correct": false },
+        { "id": "b", "text": "China", "correct": true },
+        { "id": "c", "text": "Bhutan", "correct": false },
+        { "id": "d", "text": "Pakistan", "correct": false }
+      ]
+    },
+    {
+      "id": "geo5",
+      "question": "Which desert is the largest hot desert on Earth?",
+      "answers": [
+        { "id": "a", "text": "Gobi", "correct": false },
+        { "id": "b", "text": "Arabian", "correct": false },
+        { "id": "c", "text": "Sahara", "correct": true },
+        { "id": "d", "text": "Kalahari", "correct": false }
+      ]
+    },
+    {
+      "id": "geo6",
+      "question": "Which ocean is the deepest?",
+      "answers": [
+        { "id": "a", "text": "Atlantic", "correct": false },
+        { "id": "b", "text": "Indian", "correct": false },
+        { "id": "c", "text": "Arctic", "correct": false },
+        { "id": "d", "text": "Pacific", "correct": true }
+      ],
+      "multiplier": 3
+    },
+    {
+      "id": "geo7",
+      "question": "Istanbul bridges which two continents?",
+      "answers": [
+        { "id": "a", "text": "Europe and Asia", "correct": true },
+        { "id": "b", "text": "Africa and Europe", "correct": false },
+        { "id": "c", "text": "Asia and Africa", "correct": false },
+        { "id": "d", "text": "North and South America", "correct": false }
+      ]
+    },
+    {
+      "id": "geo8",
+      "question": "Which country has the most time zones?",
+      "answers": [
+        { "id": "a", "text": "United States", "correct": false },
+        { "id": "b", "text": "Russia", "correct": false },
+        { "id": "c", "text": "France", "correct": true },
+        { "id": "d", "text": "China", "correct": false }
+      ]
+    },
+    {
+      "id": "geo9",
+      "question": "What is the smallest country in the world by area?",
+      "answers": [
+        { "id": "a", "text": "Monaco", "correct": false },
+        { "id": "b", "text": "Vatican City", "correct": true },
+        { "id": "c", "text": "San Marino", "correct": false },
+        { "id": "d", "text": "Liechtenstein", "correct": false }
+      ]
+    },
+    {
+      "id": "geo10",
+      "question": "Which African country is completely surrounded by South Africa?",
+      "answers": [
+        { "id": "a", "text": "Eswatini", "correct": false },
+        { "id": "b", "text": "Botswana", "correct": false },
+        { "id": "c", "text": "Lesotho", "correct": true },
+        { "id": "d", "text": "Namibia", "correct": false }
+      ],
+      "score": 1200
+    }
+  ]
+}

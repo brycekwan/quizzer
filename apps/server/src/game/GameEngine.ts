@@ -16,6 +16,7 @@ import {
   type LeaderboardEntry,
   type Question,
   type QuestionPublic,
+  type QuestionSetInfo,
 } from '@quizzer/shared';
 
 export interface Player {
@@ -34,8 +35,16 @@ interface PendingAnswer {
 
 type Listener = () => void;
 
+export interface GameEngineOptions {
+  now?: () => number;
+  questionSetId?: string;
+  questionSets?: QuestionSetInfo[];
+}
+
 export class GameEngine {
   private players = new Map<string, Player>();
+  /** Players who joined before/during this round — they see final scores when finished. */
+  private participants = new Set<string>();
   private config: GameConfig = { ...DEFAULT_GAME_CONFIG };
   private status: GameStatus = 'waiting';
   private phase: GamePhase = null;
@@ -47,12 +56,17 @@ export class GameEngine {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<Listener>();
   private nowFn: () => number;
+  private questions: Question[];
+  private questionSetId: string;
+  private questionSets: QuestionSetInfo[];
 
-  constructor(
-    private readonly questions: Question[],
-    options?: { now?: () => number }
-  ) {
+  constructor(questions: Question[], options?: GameEngineOptions) {
+    this.questions = questions;
     this.nowFn = options?.now ?? (() => Date.now());
+    this.questionSetId = options?.questionSetId ?? 'default';
+    this.questionSets = options?.questionSets ?? [
+      { id: this.questionSetId, label: this.questionSetId },
+    ];
   }
 
   onChange(listener: Listener): () => void {
@@ -99,6 +113,31 @@ export class GameEngine {
     return this.players.get(playerId);
   }
 
+  setQuestionSets(sets: QuestionSetInfo[]): void {
+    this.questionSets = sets;
+    this.emit();
+  }
+
+  setQuestions(
+    questionSetId: string,
+    questions: Question[]
+  ): { ok: true } | { ok: false; error: string } {
+    if (this.status !== 'waiting') {
+      return {
+        ok: false,
+        error: 'Question set can only be changed while waiting',
+      };
+    }
+    if (questions.length === 0) {
+      return { ok: false, error: 'Question set is empty' };
+    }
+    this.questionSetId = questionSetId;
+    this.questions = questions;
+    this.questionIndex = -1;
+    this.emit();
+    return { ok: true };
+  }
+
   join(
     name: string,
     socketId: string,
@@ -118,6 +157,8 @@ export class GameEngine {
         this.emit();
         return { ok: true, player: existing };
       }
+      // After reset/kick the old id is gone — force a fresh sign-in.
+      return { ok: false, error: 'Session expired — please join again' };
     }
 
     const names = [...this.players.values()].map((p) => p.name);
@@ -134,6 +175,12 @@ export class GameEngine {
       socketId,
     };
     this.players.set(id, player);
+
+    // Finishers stay in participants; post-game newcomers wait for the next round.
+    if (this.status !== 'finished') {
+      this.participants.add(id);
+    }
+
     this.emit();
     return { ok: true, player };
   }
@@ -158,6 +205,7 @@ export class GameEngine {
     const socketId = player.socketId;
     this.players.delete(playerId);
     this.answers.delete(playerId);
+    this.participants.delete(playerId);
     this.emit();
     return { ok: true, socketId };
   }
@@ -191,8 +239,10 @@ export class GameEngine {
     }
     this.clearTimer();
     this.answers.clear();
+    this.participants.clear();
     for (const player of this.players.values()) {
       player.score = 0;
+      this.participants.add(player.id);
     }
     this.status = 'active';
     this.questionIndex = -1;
@@ -226,8 +276,17 @@ export class GameEngine {
     return { ok: true };
   }
 
-  reset(): { ok: true } {
+  /** Clears the room and returns connected socket ids so clients can be forced to re-sign-in. */
+  reset(): { ok: true; socketIds: string[] } {
     this.clearTimer();
+    const socketIds: string[] = [];
+    for (const player of this.players.values()) {
+      if (player.socketId) {
+        socketIds.push(player.socketId);
+      }
+    }
+    this.players.clear();
+    this.participants.clear();
     this.status = 'waiting';
     this.phase = null;
     this.questionIndex = -1;
@@ -235,11 +294,8 @@ export class GameEngine {
     this.questionEndsAt = null;
     this.phaseEndsAt = null;
     this.answers.clear();
-    for (const player of this.players.values()) {
-      player.score = 0;
-    }
     this.emit();
-    return { ok: true };
+    return { ok: true, socketIds };
   }
 
   submitAnswer(
@@ -515,6 +571,10 @@ export class GameEngine {
     }
 
     const counts = this.getAnswerCounts();
+    const viewerFinishedGame =
+      this.status === 'finished' &&
+      Boolean(viewerPlayerId) &&
+      this.participants.has(viewerPlayerId!);
 
     return {
       status: this.status,
@@ -536,6 +596,9 @@ export class GameEngine {
       questionIndex: this.questionIndex,
       totalQuestions: this.questions.length,
       viewerAnswer,
+      questionSetId: this.questionSetId,
+      questionSets: this.questionSets.map((s) => ({ ...s })),
+      viewerFinishedGame,
       ...counts,
     };
   }

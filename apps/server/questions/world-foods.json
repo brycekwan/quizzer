@@ -1,0 +1,107 @@
+{
+  "questions": [
+    {
+      "id": "food1",
+      "question": "Sushi originated in which country?",
+      "answers": [
+        { "id": "a", "text": "China", "correct": false },
+        { "id": "b", "text": "Korea", "correct": false },
+        { "id": "c", "text": "Japan", "correct": true },
+        { "id": "d", "text": "Thailand", "correct": false }
+      ]
+    },
+    {
+      "id": "food2",
+      "question": "Which cheese is traditionally used on a classic Margherita pizza?",
+      "answers": [
+        { "id": "a", "text": "Cheddar", "correct": false },
+        { "id": "b", "text": "Mozzarella", "correct": true },
+        { "id": "c", "text": "Gouda", "correct": false },
+        { "id": "d", "text": "Feta", "correct": false }
+      ]
+    },
+    {
+      "id": "food3",
+      "question": "Pad Thai is most closely associated with which cuisine?",
+      "answers": [
+        { "id": "a", "text": "Vietnamese", "correct": false },
+        { "id": "b", "text": "Thai", "correct": true },
+        { "id": "c", "text": "Malaysian", "correct": false },
+        { "id": "d", "text": "Indonesian", "correct": false }
+      ],
+      "multiplier": 2
+    },
+    {
+      "id": "food4",
+      "question": "What is the main ingredient in traditional hummus?",
+      "answers": [
+        { "id": "a", "text": "Lentils", "correct": false },
+        { "id": "b", "text": "Chickpeas", "correct": true },
+        { "id": "c", "text": "Black beans", "correct": false },
+        { "id": "d", "text": "Peas", "correct": false }
+      ]
+    },
+    {
+      "id": "food5",
+      "question": "Croissants are most famously associated with which country?",
+      "answers": [
+        { "id": "a", "text": "Belgium", "correct": false },
+        { "id": "b", "text": "Switzerland", "correct": false },
+        { "id": "c", "text": "France", "correct": true },
+        { "id": "d", "text": "Italy", "correct": false }
+      ]
+    },
+    {
+      "id": "food6",
+      "question": "Which spice gives many Indian curries their yellow color?",
+      "answers": [
+        { "id": "a", "text": "Paprika", "correct": false },
+        { "id": "b", "text": "Saffron", "correct": false },
+        { "id": "c", "text": "Turmeric", "correct": true },
+        { "id": "d", "text": "Cumin", "correct": false }
+      ],
+      "multiplier": 3
+    },
+    {
+      "id": "food7",
+      "question": "Tacos are a traditional dish from which country?",
+      "answers": [
+        { "id": "a", "text": "Spain", "correct": false },
+        { "id": "b", "text": "Mexico", "correct": true },
+        { "id": "c", "text": "Peru", "correct": false },
+        { "id": "d", "text": "Argentina", "correct": false }
+      ]
+    },
+    {
+      "id": "food8",
+      "question": "What fermented cabbage dish is a staple of Korean cuisine?",
+      "answers": [
+        { "id": "a", "text": "Sauerkraut", "correct": false },
+        { "id": "b", "text": "Kimchi", "correct": true },
+        { "id": "c", "text": "Pickles", "correct": false },
+        { "id": "d", "text": "Coleslaw", "correct": false }
+      ]
+    },
+    {
+      "id": "food9",
+      "question": "Espresso was invented in which country?",
+      "answers": [
+        { "id": "a", "text": "France", "correct": false },
+        { "id": "b", "text": "Austria", "correct": false },
+        { "id": "c", "text": "Italy", "correct": true },
+        { "id": "d", "text": "Turkey", "correct": false }
+      ]
+    },
+    {
+      "id": "food10",
+      "question": "Which fruit is the main ingredient in guacamole?",
+      "answers": [
+        { "id": "a", "text": "Tomato", "correct": false },
+        { "id": "b", "text": "Avocado", "correct": true },
+        { "id": "c", "text": "Mango", "correct": false },
+        { "id": "d", "text": "Cucumber", "correct": false }
+      ],
+      "score": 1200
+    }
+  ]
+}

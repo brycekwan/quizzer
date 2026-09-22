@@ -3,17 +3,13 @@ import cors from 'cors';
 import path from 'path';
 import http from 'http';
 import { Server } from 'socket.io';
-import {
-  questionsData,
-  validateQuestionsFile,
-} from '@quizzer/shared';
 import { GameEngine } from './game/GameEngine';
 import { registerSocketHandlers } from './socket/handlers';
-
-const validationError = validateQuestionsFile(questionsData);
-if (validationError) {
-  throw new Error(`Invalid questions.json: ${validationError}`);
-}
+import {
+  listQuestionSets,
+  loadDefaultQuestionSet,
+  resolveQuestionsDir,
+} from './questions/questionSets';
 
 export function createApp(staticDir?: string) {
   const app = express();
@@ -53,7 +49,17 @@ export function createServer(options?: { staticDir?: string }) {
     cors: { origin: '*' },
   });
 
-  const engine = new GameEngine(questionsData.questions);
+  const questionsDir = resolveQuestionsDir();
+  const questionSets = listQuestionSets(questionsDir);
+  if (questionSets.length === 0) {
+    throw new Error(`No question sets found in ${questionsDir}`);
+  }
+
+  const { id, questions } = loadDefaultQuestionSet(questionsDir);
+  const engine = new GameEngine(questions, {
+    questionSetId: id,
+    questionSets,
+  });
   registerSocketHandlers(io, engine);
 
   return { app, server, io, engine };

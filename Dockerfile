@@ -25,7 +25,10 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist/apps/server/main.js ./main.js
+COPY --from=build /app/dist/apps/server/questions ./questions
 COPY --from=build /app/dist/apps/web ./public
+
+ENV QUESTIONS_DIR=/app/questions
 
 USER quizzer
 EXPOSE 8080

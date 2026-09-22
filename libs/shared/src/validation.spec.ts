@@ -1,10 +1,16 @@
+import fs from 'fs';
+import path from 'path';
 import { describe, expect, it } from 'vitest';
 import {
   validateGameConfig,
   validateQuestionsFile,
 } from './validation';
-import questionsData from './questions.json';
-import type { Question } from './types';
+import type { Question, QuestionsFile } from './types';
+
+const questionsDir = path.resolve(
+  __dirname,
+  '../../../apps/server/questions'
+);
 
 describe('validateGameConfig', () => {
   it('accepts a valid config', () => {
@@ -52,7 +58,25 @@ describe('validateGameConfig', () => {
 });
 
 describe('validateQuestionsFile', () => {
-  it('validates the seed dog-fact questions', () => {
+  it('validates every shipped question pack', () => {
+    const files = fs
+      .readdirSync(questionsDir)
+      .filter((file) => file.endsWith('.json'));
+    expect(files.length).toBeGreaterThanOrEqual(5);
+
+    for (const file of files) {
+      const data = JSON.parse(
+        fs.readFileSync(path.join(questionsDir, file), 'utf8')
+      ) as QuestionsFile;
+      expect(validateQuestionsFile(data), file).toBeNull();
+      expect(data.questions.length).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it('validates the seed dog-fact multipliers', () => {
+    const questionsData = JSON.parse(
+      fs.readFileSync(path.join(questionsDir, 'dog-facts.json'), 'utf8')
+    ) as QuestionsFile;
     expect(validateQuestionsFile(questionsData)).toBeNull();
     expect(questionsData.questions).toHaveLength(10);
     expect(questionsData.questions[2].multiplier).toBe(2);

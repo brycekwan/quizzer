@@ -130,39 +130,27 @@ export function PlayPage() {
 
   if (state.status === 'waiting') {
     return (
-      <Shell>
-        <div className="mx-auto mb-4 h-16 w-16 animate-pulseGlow rounded-full bg-sun" />
-        <h1 className="mt-2 font-display text-4xl font-bold text-ink">
-          Waiting for game to start
-        </h1>
-        <p className="mt-2 text-lg font-bold text-ink/70">
-          You&apos;re in as <span className="text-grape">{playerName}</span>
-        </p>
-        <p className="mt-4 text-sm font-semibold text-ink/50">
-          {state.players.length} player{state.players.length === 1 ? '' : 's'} connected
-        </p>
-        {joinUrl ? (
-          <div className="mt-6 flex flex-col items-center gap-3">
-            <p className="text-sm font-extrabold uppercase tracking-wide text-ink/60">
-              Scan to join
-            </p>
-            <div className="rounded-3xl border-4 border-ink/10 bg-white p-4 shadow-pop-sm">
-              <QRCodeSVG
-                value={joinUrl}
-                size={180}
-                aria-label="QR code to join the game"
-              />
-            </div>
-            <p className="max-w-[16rem] break-all text-xs font-semibold text-ink/45">
-              {joinUrl}
-            </p>
-          </div>
-        ) : null}
-      </Shell>
+      <WaitingShell
+        playerName={playerName}
+        playerCount={state.players.length}
+        joinUrl={joinUrl}
+      />
     );
   }
 
   if (state.status === 'finished') {
+    if (!state.viewerFinishedGame) {
+      return (
+        <WaitingShell
+          playerName={playerName}
+          playerCount={state.players.length}
+          joinUrl={joinUrl}
+          title="Waiting for a new game"
+          subtitle="The last round already finished. Hang tight until the host starts again."
+        />
+      );
+    }
+
     const rows = buildFinalLeaderboard(state.leaderboard, playerId).rows;
     return (
       <Shell>
@@ -224,7 +212,7 @@ export function PlayPage() {
         <p className="mb-2 text-sm font-extrabold uppercase text-ink/60">
           Question {state.currentQuestion.index + 1}/{state.currentQuestion.total}
         </p>
-        <h1 className="mb-4 font-display text-2xl font-bold leading-tight text-ink sm:text-3xl">
+        <h1 className="mb-4 font-display text-[1.65rem] font-bold leading-snug text-ink sm:text-3xl">
           {state.currentQuestion.question}
         </h1>
         <p
@@ -267,7 +255,7 @@ export function PlayPage() {
                 {playerName} · Q{state.currentQuestion.index + 1}/
                 {state.currentQuestion.total}
               </p>
-              <h1 className="font-display text-xl font-bold leading-tight text-ink sm:text-3xl">
+              <h1 className="font-display text-[1.65rem] font-bold leading-snug text-ink sm:text-3xl">
                 {state.currentQuestion.question}
               </h1>
               {state.currentQuestion.multiplier &&
@@ -331,6 +319,53 @@ export function PlayPage() {
   return (
     <Shell>
       <p className="font-bold text-ink">Get ready…</p>
+    </Shell>
+  );
+}
+
+function WaitingShell({
+  playerName,
+  playerCount,
+  joinUrl,
+  title = 'Waiting for game to start',
+  subtitle,
+}: {
+  playerName: string;
+  playerCount: number;
+  joinUrl: string;
+  title?: string;
+  subtitle?: string;
+}) {
+  return (
+    <Shell>
+      <div className="mx-auto mb-4 h-16 w-16 animate-pulseGlow rounded-full bg-sun" />
+      <h1 className="mt-2 font-display text-4xl font-bold text-ink">{title}</h1>
+      <p className="mt-2 text-lg font-bold text-ink/70">
+        You&apos;re in as <span className="text-grape">{playerName}</span>
+      </p>
+      {subtitle ? (
+        <p className="mt-3 text-base font-semibold text-ink/60">{subtitle}</p>
+      ) : null}
+      <p className="mt-4 text-sm font-semibold text-ink/50">
+        {playerCount} player{playerCount === 1 ? '' : 's'} connected
+      </p>
+      {joinUrl ? (
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <p className="text-sm font-extrabold uppercase tracking-wide text-ink/60">
+            Scan to join
+          </p>
+          <div className="rounded-3xl border-4 border-ink/10 bg-white p-4 shadow-pop-sm">
+            <QRCodeSVG
+              value={joinUrl}
+              size={180}
+              aria-label="QR code to join the game"
+            />
+          </div>
+          <p className="max-w-[16rem] break-all text-xs font-semibold text-ink/45">
+            {joinUrl}
+          </p>
+        </div>
+      ) : null}
     </Shell>
   );
 }

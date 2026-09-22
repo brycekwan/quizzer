@@ -1,0 +1,107 @@
+{
+  "questions": [
+    {
+      "id": "can1",
+      "question": "What is the capital city of Canada?",
+      "answers": [
+        { "id": "a", "text": "Toronto", "correct": false },
+        { "id": "b", "text": "Vancouver", "correct": false },
+        { "id": "c", "text": "Ottawa", "correct": true },
+        { "id": "d", "text": "Montreal", "correct": false }
+      ]
+    },
+    {
+      "id": "can2",
+      "question": "How many provinces does Canada have?",
+      "answers": [
+        { "id": "a", "text": "8", "correct": false },
+        { "id": "b", "text": "10", "correct": true },
+        { "id": "c", "text": "12", "correct": false },
+        { "id": "d", "text": "13", "correct": false }
+      ]
+    },
+    {
+      "id": "can3",
+      "question": "Which animal appears on the Canadian five-cent coin?",
+      "answers": [
+        { "id": "a", "text": "Moose", "correct": false },
+        { "id": "b", "text": "Beaver", "correct": true },
+        { "id": "c", "text": "Loon", "correct": false },
+        { "id": "d", "text": "Polar bear", "correct": false }
+      ],
+      "multiplier": 2
+    },
+    {
+      "id": "can4",
+      "question": "What are Canada’s two official languages?",
+      "answers": [
+        { "id": "a", "text": "English and Spanish", "correct": false },
+        { "id": "b", "text": "English and French", "correct": true },
+        { "id": "c", "text": "French and German", "correct": false },
+        { "id": "d", "text": "English and Inuktitut", "correct": false }
+      ]
+    },
+    {
+      "id": "can5",
+      "question": "Which sport is often called Canada’s national winter sport?",
+      "answers": [
+        { "id": "a", "text": "Curling", "correct": false },
+        { "id": "b", "text": "Skiing", "correct": false },
+        { "id": "c", "text": "Ice hockey", "correct": true },
+        { "id": "d", "text": "Lacrosse", "correct": false }
+      ]
+    },
+    {
+      "id": "can6",
+      "question": "The maple leaf on Canada’s flag has how many points?",
+      "answers": [
+        { "id": "a", "text": "7", "correct": false },
+        { "id": "b", "text": "9", "correct": false },
+        { "id": "c", "text": "11", "correct": true },
+        { "id": "d", "text": "13", "correct": false }
+      ],
+      "multiplier": 3
+    },
+    {
+      "id": "can7",
+      "question": "Which Canadian city hosted the 2010 Winter Olympics?",
+      "answers": [
+        { "id": "a", "text": "Calgary", "correct": false },
+        { "id": "b", "text": "Montreal", "correct": false },
+        { "id": "c", "text": "Vancouver", "correct": true },
+        { "id": "d", "text": "Quebec City", "correct": false }
+      ]
+    },
+    {
+      "id": "can8",
+      "question": "Poutine traditionally consists of fries, cheese curds, and…",
+      "answers": [
+        { "id": "a", "text": "Ketchup", "correct": false },
+        { "id": "b", "text": "Gravy", "correct": true },
+        { "id": "c", "text": "Mayonnaise", "correct": false },
+        { "id": "d", "text": "Maple syrup", "correct": false }
+      ]
+    },
+    {
+      "id": "can9",
+      "question": "Which territory is Canada’s largest by land area?",
+      "answers": [
+        { "id": "a", "text": "Yukon", "correct": false },
+        { "id": "b", "text": "Nunavut", "correct": true },
+        { "id": "c", "text": "Northwest Territories", "correct": false },
+        { "id": "d", "text": "Labrador", "correct": false }
+      ]
+    },
+    {
+      "id": "can10",
+      "question": "What is the name of Canada’s national police force?",
+      "answers": [
+        { "id": "a", "text": "FBI", "correct": false },
+        { "id": "b", "text": "RCMP (Mounties)", "correct": true },
+        { "id": "c", "text": "CIA", "correct": false },
+        { "id": "d", "text": "Scotland Yard", "correct": false }
+      ],
+      "score": 1200
+    }
+  ]
+}

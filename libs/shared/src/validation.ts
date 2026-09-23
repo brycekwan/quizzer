@@ -1,5 +1,19 @@
 import type { GameConfig, Question, QuestionsFile } from './types';
-import { MIN_TIME_LIMIT_SECONDS } from './types';
+import {
+  MAX_LEADERBOARD_DURATION_MS,
+  MAX_REVEAL_DURATION_MS,
+  MIN_LEADERBOARD_DURATION_MS,
+  MIN_REVEAL_DURATION_MS,
+  MIN_TIME_LIMIT_SECONDS,
+} from './types';
+
+function isPositiveFinite(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function isNonNegativeFinite(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
 
 export function validateGameConfig(
   config: Partial<GameConfig>
@@ -8,6 +22,8 @@ export function validateGameConfig(
   const defaultScore = config.defaultScore;
   const minScore = config.minScore;
   const scaleMs = config.scaleMs;
+  const revealDurationMs = config.revealDurationMs;
+  const leaderboardDurationMs = config.leaderboardDurationMs;
 
   if (
     typeof timeLimitSeconds !== 'number' ||
@@ -20,19 +36,11 @@ export function validateGameConfig(
     };
   }
 
-  if (
-    typeof defaultScore !== 'number' ||
-    !Number.isFinite(defaultScore) ||
-    defaultScore < 0
-  ) {
+  if (!isNonNegativeFinite(defaultScore)) {
     return { ok: false, error: 'defaultScore must be a non-negative number' };
   }
 
-  if (
-    typeof minScore !== 'number' ||
-    !Number.isFinite(minScore) ||
-    minScore < 0
-  ) {
+  if (!isNonNegativeFinite(minScore)) {
     return { ok: false, error: 'minScore must be a non-negative number' };
   }
 
@@ -40,8 +48,32 @@ export function validateGameConfig(
     return { ok: false, error: 'minScore cannot exceed defaultScore' };
   }
 
-  if (typeof scaleMs !== 'number' || !Number.isFinite(scaleMs) || scaleMs <= 0) {
+  if (!isPositiveFinite(scaleMs)) {
     return { ok: false, error: 'scaleMs must be a positive number (milliseconds)' };
+  }
+
+  if (
+    typeof revealDurationMs !== 'number' ||
+    !Number.isFinite(revealDurationMs) ||
+    revealDurationMs < MIN_REVEAL_DURATION_MS ||
+    revealDurationMs > MAX_REVEAL_DURATION_MS
+  ) {
+    return {
+      ok: false,
+      error: `revealDurationMs must be between ${MIN_REVEAL_DURATION_MS} and ${MAX_REVEAL_DURATION_MS}`,
+    };
+  }
+
+  if (
+    typeof leaderboardDurationMs !== 'number' ||
+    !Number.isFinite(leaderboardDurationMs) ||
+    leaderboardDurationMs < MIN_LEADERBOARD_DURATION_MS ||
+    leaderboardDurationMs > MAX_LEADERBOARD_DURATION_MS
+  ) {
+    return {
+      ok: false,
+      error: `leaderboardDurationMs must be between ${MIN_LEADERBOARD_DURATION_MS} and ${MAX_LEADERBOARD_DURATION_MS}`,
+    };
   }
 
   return {
@@ -51,6 +83,8 @@ export function validateGameConfig(
       defaultScore,
       minScore,
       scaleMs,
+      revealDurationMs,
+      leaderboardDurationMs,
     },
   };
 }

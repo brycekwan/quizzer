@@ -1,8 +1,6 @@
 import {
   DEFAULT_GAME_CONFIG,
-  LEADERBOARD_DURATION_MS,
   MULTIPLIER_SPLASH_DURATION_MS,
-  REVEAL_DURATION_MS,
   computeQuestionScore,
   isNameTaken,
   isValidPlayerName,
@@ -17,6 +15,7 @@ import {
   type Question,
   type QuestionPublic,
   type QuestionSetInfo,
+  type QuestionSetMode,
 } from '@quizzer/shared';
 
 export interface Player {
@@ -38,6 +37,8 @@ type Listener = () => void;
 export interface GameEngineOptions {
   now?: () => number;
   questionSetId?: string;
+  questionSetIds?: string[];
+  questionSetMode?: QuestionSetMode;
   questionSets?: QuestionSetInfo[];
 }
 
@@ -52,18 +53,24 @@ export class GameEngine {
   private questionStartedAt: number | null = null;
   private questionEndsAt: number | null = null;
   private phaseEndsAt: number | null = null;
+  private scheduledStartAt: number | null = null;
   private answers = new Map<string, PendingAnswer>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private scheduleTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<Listener>();
   private nowFn: () => number;
   private questions: Question[];
   private questionSetId: string;
+  private questionSetIds: string[];
+  private questionSetMode: QuestionSetMode;
   private questionSets: QuestionSetInfo[];
 
   constructor(questions: Question[], options?: GameEngineOptions) {
     this.questions = questions;
     this.nowFn = options?.now ?? (() => Date.now());
     this.questionSetId = options?.questionSetId ?? 'default';
+    this.questionSetIds = options?.questionSetIds ?? [this.questionSetId];
+    this.questionSetMode = options?.questionSetMode ?? 'single';
     this.questionSets = options?.questionSets ?? [
       { id: this.questionSetId, label: this.questionSetId },
     ];
@@ -91,6 +98,13 @@ export class GameEngine {
     }
   }
 
+  private clearScheduleTimer(): void {
+    if (this.scheduleTimer) {
+      clearTimeout(this.scheduleTimer);
+      this.scheduleTimer = null;
+    }
+  }
+
   private schedule(ms: number, fn: () => void): void {
     this.clearTimer();
     const delay = Math.max(0, ms);
@@ -113,14 +127,25 @@ export class GameEngine {
     return this.players.get(playerId);
   }
 
+  private findPlayerByName(name: string): Player | undefined {
+    const target = normalizePlayerName(name).toLowerCase();
+    for (const player of this.players.values()) {
+      if (normalizePlayerName(player.name).toLowerCase() === target) {
+        return player;
+      }
+    }
+    return undefined;
+  }
+
   setQuestionSets(sets: QuestionSetInfo[]): void {
     this.questionSets = sets;
     this.emit();
   }
 
   setQuestions(
-    questionSetId: string,
-    questions: Question[]
+    questionSetIds: string[],
+    questions: Question[],
+    mode: QuestionSetMode = 'single'
   ): { ok: true } | { ok: false; error: string } {
     if (this.status !== 'waiting') {
       return {
@@ -128,10 +153,18 @@ export class GameEngine {
         error: 'Question set can only be changed while waiting',
       };
     }
+    if (questionSetIds.length === 0) {
+      return { ok: false, error: 'Select at least one question set' };
+    }
+    if (mode === 'single' && questionSetIds.length !== 1) {
+      return { ok: false, error: 'Single mode requires exactly one question set' };
+    }
     if (questions.length === 0) {
       return { ok: false, error: 'Question set is empty' };
     }
-    this.questionSetId = questionSetId;
+    this.questionSetMode = mode;
+    this.questionSetIds = [...questionSetIds];
+    this.questionSetId = questionSetIds[0];
     this.questions = questions;
     this.questionIndex = -1;
     this.emit();
@@ -142,7 +175,9 @@ export class GameEngine {
     name: string,
     socketId: string,
     playerId?: string
-  ): { ok: true; player: Player } | { ok: false; error: string } {
+  ):
+    | { ok: true; player: Player; replacedSocketId: string | null }
+    | { ok: false; error: string } {
     if (!isValidPlayerName(name)) {
       return { ok: false, error: 'Name must be 1–24 characters' };
     }
@@ -152,13 +187,43 @@ export class GameEngine {
     if (playerId) {
       const existing = this.players.get(playerId);
       if (existing) {
+        const replacedSocketId =
+          existing.socketId && existing.socketId !== socketId
+            ? existing.socketId
+            : null;
         existing.socketId = socketId;
         existing.connected = true;
+        if (this.status !== 'finished') {
+          this.participants.add(existing.id);
+        }
         this.emit();
-        return { ok: true, player: existing };
+        return { ok: true, player: existing, replacedSocketId };
       }
       // After reset/kick the old id is gone — force a fresh sign-in.
       return { ok: false, error: 'Session expired — please join again' };
+    }
+
+    const byName = this.findPlayerByName(normalized);
+    if (byName) {
+      if (byName.connected) {
+        return {
+          ok: false,
+          error: 'That name is already in use by another player',
+        };
+      }
+
+      // Disconnected player reclaiming their seat (score intact).
+      const replacedSocketId =
+        byName.socketId && byName.socketId !== socketId
+          ? byName.socketId
+          : null;
+      byName.socketId = socketId;
+      byName.connected = true;
+      if (this.status !== 'finished') {
+        this.participants.add(byName.id);
+      }
+      this.emit();
+      return { ok: true, player: byName, replacedSocketId };
     }
 
     const names = [...this.players.values()].map((p) => p.name);
@@ -166,7 +231,7 @@ export class GameEngine {
       return { ok: false, error: 'That name is already taken' };
     }
 
-    const id = playerId ?? `p_${Math.random().toString(36).slice(2, 10)}`;
+    const id = `p_${Math.random().toString(36).slice(2, 10)}`;
     const player: Player = {
       id,
       name: normalized,
@@ -182,12 +247,16 @@ export class GameEngine {
     }
 
     this.emit();
-    return { ok: true, player };
+    return { ok: true, player, replacedSocketId: null };
   }
 
   markDisconnected(socketId: string): void {
     const player = this.getPlayerBySocket(socketId);
     if (!player) {
+      return;
+    }
+    // Ignore stale disconnects after a socket takeover.
+    if (player.socketId !== socketId) {
       return;
     }
     player.connected = false;
@@ -230,13 +299,58 @@ export class GameEngine {
     return { ok: true };
   }
 
-  start(): { ok: true } | { ok: false; error: string } {
+  /**
+   * Start immediately, or schedule a start after `delayMinutes`.
+   * Pass `delayMinutes: 0` / omit for immediate start.
+   */
+  start(options?: {
+    delayMinutes?: number;
+  }): { ok: true } | { ok: false; error: string } {
     if (this.status !== 'waiting' && this.status !== 'finished') {
       return { ok: false, error: 'Game can only start from waiting' };
     }
     if (this.questions.length === 0) {
       return { ok: false, error: 'No questions loaded' };
     }
+
+    const delayMinutes = options?.delayMinutes ?? 0;
+    if (delayMinutes > 0) {
+      if (!Number.isFinite(delayMinutes) || delayMinutes < 1 || delayMinutes > 180) {
+        return {
+          ok: false,
+          error: 'delayMinutes must be between 1 and 180',
+        };
+      }
+      this.clearScheduleTimer();
+      this.scheduledStartAt = this.now() + delayMinutes * 60_000;
+      this.emit();
+      this.scheduleTimer = setTimeout(() => {
+        this.scheduleTimer = null;
+        this.beginGame();
+      }, Math.max(0, this.scheduledStartAt - this.now()));
+      return { ok: true };
+    }
+
+    return this.beginGame();
+  }
+
+  cancelScheduledStart(): void {
+    this.clearScheduleTimer();
+    if (this.scheduledStartAt !== null) {
+      this.scheduledStartAt = null;
+      this.emit();
+    }
+  }
+
+  private beginGame(): { ok: true } | { ok: false; error: string } {
+    if (this.status !== 'waiting' && this.status !== 'finished') {
+      return { ok: false, error: 'Game can only start from waiting' };
+    }
+    if (this.questions.length === 0) {
+      return { ok: false, error: 'No questions loaded' };
+    }
+    this.clearScheduleTimer();
+    this.scheduledStartAt = null;
     this.clearTimer();
     this.answers.clear();
     this.participants.clear();
@@ -276,15 +390,13 @@ export class GameEngine {
     return { ok: true };
   }
 
-  /** Clears the room and returns connected socket ids so clients can be forced to re-sign-in. */
   reset(): { ok: true; socketIds: string[] } {
     this.clearTimer();
-    const socketIds: string[] = [];
-    for (const player of this.players.values()) {
-      if (player.socketId) {
-        socketIds.push(player.socketId);
-      }
-    }
+    this.clearScheduleTimer();
+    this.scheduledStartAt = null;
+    const socketIds = [...this.players.values()]
+      .map((p) => p.socketId)
+      .filter((id): id is string => Boolean(id));
     this.players.clear();
     this.participants.clear();
     this.status = 'waiting';
@@ -316,10 +428,7 @@ export class GameEngine {
     }
 
     const now = this.now();
-    if (
-      this.questionEndsAt !== null &&
-      now >= this.questionEndsAt
-    ) {
+    if (this.questionEndsAt !== null && now >= this.questionEndsAt) {
       return { ok: false, error: 'Time is up' };
     }
 
@@ -357,12 +466,15 @@ export class GameEngine {
     return { ok: true, points };
   }
 
-  /** Every joined player must answer (timeout still advances via the question timer). */
+  /** Connected players (plus anyone who already answered) must answer. */
   private allPlayersAnswered(): boolean {
-    if (this.players.size === 0) {
+    const relevant = [...this.players.values()].filter(
+      (p) => p.connected || this.answers.has(p.id)
+    );
+    if (relevant.length === 0) {
       return false;
     }
-    return [...this.players.values()].every((p) => this.answers.has(p.id));
+    return relevant.every((p) => this.answers.has(p.id));
   }
 
   private getAnswerCounts(): {
@@ -467,10 +579,11 @@ export class GameEngine {
     this.finalizeMissingAnswers();
     this.applyPendingScores();
     this.phase = 'reveal';
-    this.phaseEndsAt = this.now() + REVEAL_DURATION_MS;
+    const duration = this.config.revealDurationMs;
+    this.phaseEndsAt = this.now() + duration;
     // Broadcast once with fully updated scores before anyone sees the leaderboard.
     this.emit();
-    this.schedule(REVEAL_DURATION_MS, () => this.enterLeaderboard());
+    this.schedule(duration, () => this.enterLeaderboard());
   }
 
   private enterLeaderboard(): void {
@@ -479,9 +592,10 @@ export class GameEngine {
     }
     this.clearTimer();
     this.phase = 'leaderboard';
-    this.phaseEndsAt = this.now() + LEADERBOARD_DURATION_MS;
+    const duration = this.config.leaderboardDurationMs;
+    this.phaseEndsAt = this.now() + duration;
     this.emit();
-    this.schedule(LEADERBOARD_DURATION_MS, () => this.advanceAfterLeaderboard());
+    this.schedule(duration, () => this.advanceAfterLeaderboard());
   }
 
   private advanceAfterLeaderboard(): void {
@@ -540,6 +654,9 @@ export class GameEngine {
     ) {
       return Math.max(0, this.phaseEndsAt - now);
     }
+    if (this.status === 'waiting' && this.scheduledStartAt !== null) {
+      return Math.max(0, this.scheduledStartAt - now);
+    }
     return 0;
   }
 
@@ -573,8 +690,7 @@ export class GameEngine {
     const counts = this.getAnswerCounts();
     const viewerFinishedGame =
       this.status === 'finished' &&
-      Boolean(viewerPlayerId) &&
-      this.participants.has(viewerPlayerId!);
+      Boolean(viewerPlayerId && this.participants.has(viewerPlayerId));
 
     return {
       status: this.status,
@@ -596,10 +712,13 @@ export class GameEngine {
       questionIndex: this.questionIndex,
       totalQuestions: this.questions.length,
       viewerAnswer,
-      questionSetId: this.questionSetId,
-      questionSets: this.questionSets.map((s) => ({ ...s })),
-      viewerFinishedGame,
       ...counts,
+      questionSetId: this.questionSetId,
+      questionSetIds: [...this.questionSetIds],
+      questionSetMode: this.questionSetMode,
+      questionSets: [...this.questionSets],
+      viewerFinishedGame,
+      scheduledStartAt: this.scheduledStartAt,
     };
   }
 

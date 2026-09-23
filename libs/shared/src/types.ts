@@ -7,6 +7,8 @@ export type GamePhase =
   | 'leaderboard'
   | null;
 
+export type QuestionSetMode = 'single' | 'continuous';
+
 export interface AnswerOption {
   id: string;
   text: string;
@@ -37,21 +39,38 @@ export interface GameConfig {
   defaultScore: number;
   minScore: number;
   scaleMs: number;
+  /** How long the correct answer is shown before the leaderboard. */
+  revealDurationMs: number;
+  /** How long the leaderboard is shown before the next question. */
+  leaderboardDurationMs: number;
 }
 
 /** Minimum configurable seconds per question. */
 export const MIN_TIME_LIMIT_SECONDS = 10;
+
+export const MIN_REVEAL_DURATION_MS = 500;
+export const MAX_REVEAL_DURATION_MS = 30_000;
+export const MIN_LEADERBOARD_DURATION_MS = 500;
+export const MAX_LEADERBOARD_DURATION_MS = 60_000;
+
+/** Scheduled start delay bounds (minutes). */
+export const MIN_SCHEDULE_DELAY_MINUTES = 1;
+export const MAX_SCHEDULE_DELAY_MINUTES = 180;
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   timeLimitSeconds: 30,
   defaultScore: 1000,
   minScore: 100,
   scaleMs: 100,
+  revealDurationMs: 2_000,
+  leaderboardDurationMs: 3_000,
 };
 
 export const MULTIPLIER_SPLASH_DURATION_MS = 5_000;
-export const REVEAL_DURATION_MS = 2_000;
-export const LEADERBOARD_DURATION_MS = 3_000;
+/** Default reveal duration (also used by tests that advance timers). */
+export const REVEAL_DURATION_MS = DEFAULT_GAME_CONFIG.revealDurationMs;
+/** Default leaderboard duration (also used by tests that advance timers). */
+export const LEADERBOARD_DURATION_MS = DEFAULT_GAME_CONFIG.leaderboardDurationMs;
 
 export interface PlayerPublic {
   id: string;
@@ -102,8 +121,11 @@ export interface GameStateSnapshot {
   waitingPlayerCount: number;
   answeredPlayerCount: number;
   totalPlayerCount: number;
-  /** Filename-based id of the active question pack (e.g. `dog-facts`). */
+  /** Primary / first selected question pack id. */
   questionSetId: string;
+  /** Selected pack ids in play order (one for single mode). */
+  questionSetIds: string[];
+  questionSetMode: QuestionSetMode;
   /** Available packs for the admin dropdown. */
   questionSets: QuestionSetInfo[];
   /**
@@ -111,6 +133,8 @@ export interface GameStateSnapshot {
    * Newcomers joining after the game ends get false and should wait for the next game.
    */
   viewerFinishedGame: boolean;
+  /** When set, the game will auto-start at this server timestamp. */
+  scheduledStartAt: number | null;
 }
 
 export interface JoinResult {

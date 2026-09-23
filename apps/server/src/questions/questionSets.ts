@@ -80,6 +80,32 @@ export function loadQuestionSet(
   return { ok: true, questions: (raw as QuestionsFile).questions };
 }
 
+/** Load one or more packs in order; question ids are prefixed to avoid collisions. */
+export function loadQuestionSetsInOrder(
+  ids: string[],
+  dir = resolveQuestionsDir()
+): { ok: true; questions: Question[] } | { ok: false; error: string } {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { ok: false, error: 'At least one question set is required' };
+  }
+
+  const questions: Question[] = [];
+  for (const id of ids) {
+    const loaded = loadQuestionSet(id, dir);
+    if (!loaded.ok) {
+      return loaded;
+    }
+    for (const question of loaded.questions) {
+      questions.push({
+        ...question,
+        id: `${id}:${question.id}`,
+      });
+    }
+  }
+
+  return { ok: true, questions };
+}
+
 export function loadDefaultQuestionSet(
   dir = resolveQuestionsDir()
 ): { id: string; questions: Question[] } {
@@ -90,7 +116,7 @@ export function loadDefaultQuestionSet(
 
   const preferred =
     sets.find((s) => s.id === 'dog-facts') ?? sets[0];
-  const loaded = loadQuestionSet(preferred.id, dir);
+  const loaded = loadQuestionSetsInOrder([preferred.id], dir);
   if (!loaded.ok) {
     throw new Error(loaded.error);
   }

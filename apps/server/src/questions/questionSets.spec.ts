@@ -3,6 +3,7 @@ import {
   labelFromQuestionSetId,
   listQuestionSets,
   loadQuestionSet,
+  loadQuestionSetsInOrder,
   resolveQuestionsDir,
 } from './questionSets';
 
@@ -33,6 +34,16 @@ describe('questionSets', () => {
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
     expect(loaded.questions.length).toBeGreaterThan(0);
+  });
+
+  it('loads multiple packs in order with prefixed ids', () => {
+    const loaded = loadQuestionSetsInOrder(['dog-facts', 'cat-facts']);
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.questions[0].id.startsWith('dog-facts:')).toBe(true);
+    expect(
+      loaded.questions.some((q) => q.id.startsWith('cat-facts:'))
+    ).toBe(true);
   });
 
   it('rejects unknown packs', () => {

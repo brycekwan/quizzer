@@ -1,4 +1,4 @@
-import type { LeaderboardEntry } from '@quizzer/shared';
+import type { LeaderboardEntry } from '@party/shared';
 import { cn } from '@/lib/utils';
 
 interface LeaderboardProps {

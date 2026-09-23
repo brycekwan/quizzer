@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import { io as ioc, type Socket as ClientSocket } from 'socket.io-client';
 import { GameEngine } from '../game/GameEngine';
 import { registerSocketHandlers } from './handlers';
-import type { GameStateSnapshot, Question } from '@quizzer/shared';
+import type { GameStateSnapshot, Question } from '@party/shared';
 
 const questions: Question[] = [
   {
@@ -62,6 +62,30 @@ describe('socket handlers', () => {
     clients.push(client);
     return client;
   }
+
+  it('logs in via session:login then joins the quiz', async () => {
+    engine.reset();
+    const player = connect();
+    await waitForEvent(player, 'game:state');
+
+    const login = await new Promise<{
+      ok: boolean;
+      playerId?: string;
+      name?: string;
+    }>((resolve) => {
+      player.emit('session:login', { name: 'Maple' }, resolve);
+    });
+    expect(login.ok).toBe(true);
+
+    const join = await new Promise<{ ok: boolean }>((resolve) => {
+      player.emit(
+        'player:join',
+        { name: login.name, playerId: login.playerId },
+        resolve
+      );
+    });
+    expect(join.ok).toBe(true);
+  });
 
   it('rejects duplicate join names and accepts unique ones', async () => {
     const a = connect();

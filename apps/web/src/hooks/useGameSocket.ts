@@ -1,22 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { GameConfig, GameStateSnapshot, QuestionSetMode } from '@quizzer/shared';
-
-const PLAYER_ID_KEY = 'quizzer.playerId';
-const PLAYER_NAME_KEY = 'quizzer.playerName';
+import type { GameConfig, GameStateSnapshot, QuestionSetMode } from '@party/shared';
+import {
+  clearStoredSession,
+  readStoredSession,
+  writeStoredSession,
+} from '@/lib/sessionStorage';
 
 export function useGameSocket(role: 'player' | 'admin' = 'player') {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [state, setState] = useState<GameStateSnapshot | null>(null);
-  const [playerId, setPlayerId] = useState<string | null>(() =>
-    typeof window !== 'undefined' ? localStorage.getItem(PLAYER_ID_KEY) : null
-  );
-  const [playerName, setPlayerName] = useState<string | null>(() =>
-    typeof window !== 'undefined' ? localStorage.getItem(PLAYER_NAME_KEY) : null
-  );
+  const stored = readStoredSession();
+  const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
+  const [playerName, setPlayerName] = useState<string | null>(stored.playerName);
   const [kicked, setKicked] = useState(false);
+  const [gameReset, setGameReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [joinedQuizzer, setJoinedQuizzer] = useState(false);
   const playerIdRef = useRef(playerId);
   playerIdRef.current = playerId;
   const playerNameRef = useRef(playerName);
@@ -30,40 +31,61 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     socketRef.current = socket;
 
     const clearSession = () => {
-      localStorage.removeItem(PLAYER_ID_KEY);
-      localStorage.removeItem(PLAYER_NAME_KEY);
+      clearStoredSession();
       setPlayerId(null);
       setPlayerName(null);
+      setJoinedQuizzer(false);
     };
 
-    const rejoinIfNeeded = () => {
+    const ensureSessionThenJoinQuiz = () => {
       const id = playerIdRef.current;
       const name = playerNameRef.current;
       if (role !== 'player' || !id || !name) {
         return;
       }
       socket.emit(
-        'player:join',
+        'session:login',
         { name, playerId: id },
-        (result: {
+        (loginResult: {
           ok: boolean;
           playerId?: string;
           name?: string;
           error?: string;
         }) => {
-          if (result.ok && result.playerId && result.name) {
-            localStorage.setItem(PLAYER_ID_KEY, result.playerId);
-            localStorage.setItem(PLAYER_NAME_KEY, result.name);
-            setPlayerId(result.playerId);
-            setPlayerName(result.name);
-            setError(null);
-          } else {
-            // Session gone (reset/kick) — clear so the player can sign in again.
+          if (!loginResult.ok || !loginResult.playerId || !loginResult.name) {
             clearSession();
-            if (result.error) {
-              setError(result.error);
+            if (loginResult.error) {
+              setError(loginResult.error);
             }
+            return;
           }
+          writeStoredSession(loginResult.playerId, loginResult.name);
+          setPlayerId(loginResult.playerId);
+          setPlayerName(loginResult.name);
+          socket.emit(
+            'player:join',
+            { name: loginResult.name, playerId: loginResult.playerId },
+            (joinResult: {
+              ok: boolean;
+              playerId?: string;
+              name?: string;
+              error?: string;
+            }) => {
+              if (joinResult.ok && joinResult.playerId && joinResult.name) {
+                writeStoredSession(joinResult.playerId, joinResult.name);
+                setPlayerId(joinResult.playerId);
+                setPlayerName(joinResult.name);
+                setJoinedQuizzer(true);
+                setGameReset(false);
+                setError(null);
+              } else {
+                setJoinedQuizzer(false);
+                if (joinResult.error) {
+                  setError(joinResult.error);
+                }
+              }
+            }
+          );
         }
       );
     };
@@ -73,7 +95,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
       if (role === 'admin') {
         socket.emit('admin:subscribe');
       } else {
-        rejoinIfNeeded();
+        ensureSessionThenJoinQuiz();
       }
     });
     socket.on('disconnect', () => setConnected(false));
@@ -85,9 +107,9 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
       clearSession();
     });
     socket.on('game:reset', () => {
-      clearSession();
-      setKicked(false);
-      setError('Game was reset — join again with your name.');
+      setJoinedQuizzer(false);
+      setGameReset(true);
+      setError('Game was reset — back to the menu.');
     });
 
     return () => {
@@ -102,30 +124,55 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
         new Promise<{ ok: true; playerId: string; name: string } | { ok: false; error: string }>(
           (resolve) => {
             socketRef.current?.emit(
-              'player:join',
+              'session:login',
               { name, playerId: playerIdRef.current ?? undefined },
-              (result: {
+              (loginResult: {
                 ok: boolean;
                 playerId?: string;
                 name?: string;
                 error?: string;
               }) => {
-                if (result.ok && result.playerId && result.name) {
-                  localStorage.setItem(PLAYER_ID_KEY, result.playerId);
-                  localStorage.setItem(PLAYER_NAME_KEY, result.name);
-                  setPlayerId(result.playerId);
-                  setPlayerName(result.name);
-                  setKicked(false);
-                  setError(null);
-                  resolve({
-                    ok: true,
-                    playerId: result.playerId,
-                    name: result.name,
-                  });
-                } else {
-                  setError(result.error ?? 'Could not join');
-                  resolve({ ok: false, error: result.error ?? 'Could not join' });
+                if (!loginResult.ok || !loginResult.playerId || !loginResult.name) {
+                  const message = loginResult.error ?? 'Could not log in';
+                  setError(message);
+                  resolve({ ok: false, error: message });
+                  return;
                 }
+                writeStoredSession(loginResult.playerId, loginResult.name);
+                setPlayerId(loginResult.playerId);
+                setPlayerName(loginResult.name);
+                socketRef.current?.emit(
+                  'player:join',
+                  {
+                    name: loginResult.name,
+                    playerId: loginResult.playerId,
+                  },
+                  (joinResult: {
+                    ok: boolean;
+                    playerId?: string;
+                    name?: string;
+                    error?: string;
+                  }) => {
+                    if (joinResult.ok && joinResult.playerId && joinResult.name) {
+                      writeStoredSession(joinResult.playerId, joinResult.name);
+                      setPlayerId(joinResult.playerId);
+                      setPlayerName(joinResult.name);
+                      setJoinedQuizzer(true);
+                      setKicked(false);
+                      setGameReset(false);
+                      setError(null);
+                      resolve({
+                        ok: true,
+                        playerId: joinResult.playerId,
+                        name: joinResult.name,
+                      });
+                    } else {
+                      const message = joinResult.error ?? 'Could not join';
+                      setError(message);
+                      resolve({ ok: false, error: message });
+                    }
+                  }
+                );
               }
             );
           }
@@ -173,6 +220,8 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     playerId,
     playerName,
     kicked,
+    gameReset,
+    joinedQuizzer,
     error,
     setError,
     ...api,

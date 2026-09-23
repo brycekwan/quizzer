@@ -9,7 +9,7 @@
       "executor": "nx:run-commands",
       "outputs": ["{workspaceRoot}/dist/apps/server"],
       "options": {
-        "command": "esbuild apps/server/src/main.ts --bundle --platform=node --target=node26 --outfile=dist/apps/server/main.js --external:express --external:cors --external:socket.io --alias:@quizzer/shared=./libs/shared/src/index.ts --loader:.json=json --format=cjs && mkdir -p dist/apps/server/questions && cp -R apps/server/questions/. dist/apps/server/questions/"
+        "command": "esbuild apps/server/src/main.ts --bundle --platform=node --target=node26 --outfile=dist/apps/server/main.js --external:express --external:cors --external:socket.io --alias:@party/shared=./libs/shared/src/index.ts --loader:.json=json --format=cjs && mkdir -p dist/apps/server/questions && cp -R apps/server/questions/. dist/apps/server/questions/"
       }
     },
     "serve": {

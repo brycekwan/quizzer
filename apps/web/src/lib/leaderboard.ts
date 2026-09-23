@@ -1,4 +1,4 @@
-import type { LeaderboardEntry } from '@quizzer/shared';
+import type { LeaderboardEntry } from '@party/shared';
 
 export interface FinalLeaderboardView {
   rows: Array<LeaderboardEntry & { highlight: boolean }>;

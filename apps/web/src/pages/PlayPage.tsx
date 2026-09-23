@@ -1,33 +1,30 @@
-import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import {
-  MULTIPLIER_SPLASH_DURATION_MS,
-  isValidPlayerName,
-} from '@quizzer/shared';
+import { MULTIPLIER_SPLASH_DURATION_MS } from '@party/shared';
 import { useGameSocket, useSyncedCountdown } from '@/hooks/useGameSocket';
 import { AnswerGrid } from '@/components/AnswerGrid';
 import { Countdown } from '@/components/Countdown';
 import { Leaderboard } from '@/components/Leaderboard';
 import { WinnerConfetti } from '@/components/WinnerConfetti';
+import { PageShell } from '@/components/PageShell';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { buildFinalLeaderboard } from '@/lib/leaderboard';
+import { readStoredSession } from '@/lib/sessionStorage';
 
 export function PlayPage() {
+  const stored = readStoredSession();
   const {
     connected,
     state,
     playerId,
     playerName,
     kicked,
+    gameReset,
     error,
     setError,
-    join,
     answer,
   } = useGameSocket('player');
-  const [name, setName] = useState('');
-  const [joining, setJoining] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
 
@@ -35,7 +32,7 @@ export function PlayPage() {
     if (typeof window === 'undefined') {
       return '';
     }
-    return `${window.location.origin}/play`;
+    return `${window.location.origin}/login`;
   }, []);
 
   const questionId = state?.currentQuestion?.id;
@@ -53,16 +50,6 @@ export function PlayPage() {
         : (state?.phaseEndsAt ?? null);
   const remainingMs = useSyncedCountdown(endsAt, state?.serverNow);
 
-  const handleJoin = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!isValidPlayerName(name)) {
-      setError('Enter a name between 1 and 24 characters');
-      return;
-    }
-    setJoining(true);
-    await join(name);
-    setJoining(false);
-  };
 
   const handleAnswer = async (answerId: string) => {
     if (locked || state?.phase !== 'answering') {
@@ -78,56 +65,49 @@ export function PlayPage() {
     }
   };
 
+  if (!stored.playerId || !stored.playerName) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (gameReset) {
+    return <Navigate to="/" replace />;
+  }
+
   if (kicked) {
     return (
-      <Shell>
+      <PageShell>
         <h1 className="font-display text-4xl font-bold text-ink">You were removed</h1>
         <p className="mt-2 text-ink/70">The host kicked you from this game.</p>
-      </Shell>
+        <Button asChild size="lg" className="mt-8 w-full">
+          <Link to="/login">Back to login</Link>
+        </Button>
+      </PageShell>
     );
   }
 
   if (!playerId || !playerName) {
     return (
-      <Shell>
-        <p className="mb-2 text-sm font-extrabold uppercase tracking-widest text-grape">
-          Quizzer
+      <PageShell>
+        <p className="font-bold text-ink">
+          {connected ? 'Joining quiz…' : 'Connecting…'}
         </p>
-        <h1 className="font-display text-4xl font-bold text-ink sm:text-5xl">
-          Join the game
-        </h1>
-        <p className="mt-2 text-ink/70">Pick a unique name and wait for the fun.</p>
-        <form onSubmit={handleJoin} className="mt-8 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Display name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={24}
-              placeholder="e.g. Captain Bark"
-              autoComplete="off"
-              aria-invalid={Boolean(error)}
-            />
-          </div>
-          {error ? (
-            <p role="alert" className="font-bold text-coral">
-              {error}
-            </p>
-          ) : null}
-          <Button type="submit" size="lg" className="w-full" disabled={joining || !connected}>
-            {joining ? 'Joining…' : 'Join game'}
-          </Button>
-        </form>
-      </Shell>
+        {error ? (
+          <p role="alert" className="mt-4 font-bold text-coral">
+            {error}
+          </p>
+        ) : null}
+        <Button asChild size="lg" className="mt-8 w-full">
+          <Link to="/">Back to menu</Link>
+        </Button>
+      </PageShell>
     );
   }
 
   if (!state) {
     return (
-      <Shell>
+      <PageShell>
         <p className="font-bold text-ink">Connecting…</p>
-      </Shell>
+      </PageShell>
     );
   }
 
@@ -166,7 +146,7 @@ export function PlayPage() {
     const rows = buildFinalLeaderboard(state.leaderboard, playerId).rows;
     const isWinner = state.leaderboard[0]?.id === playerId;
     return (
-      <Shell>
+      <PageShell>
         <WinnerConfetti active={isWinner} />
         <h1 className="mb-2 font-display text-4xl font-bold text-ink">
           Final scores
@@ -177,13 +157,16 @@ export function PlayPage() {
           </p>
         ) : null}
         <Leaderboard entries={rows} title="Top of the board" />
-      </Shell>
+        <Button asChild size="lg" className="mt-6 w-full">
+          <Link to="/">Back to menu</Link>
+        </Button>
+      </PageShell>
     );
   }
 
   if (state.status === 'paused' || state.phase === 'leaderboard') {
     return (
-      <Shell tight>
+      <PageShell tight>
         <Leaderboard
           entries={state.leaderboard.map((e) => ({
             ...e,
@@ -192,7 +175,7 @@ export function PlayPage() {
           paused={state.status === 'paused'}
           title={state.status === 'paused' ? 'Paused standings' : 'Live standings'}
         />
-      </Shell>
+      </PageShell>
     );
   }
 
@@ -200,7 +183,7 @@ export function PlayPage() {
     const mult = state.currentQuestion.multiplier;
     const splashTotalMs = MULTIPLIER_SPLASH_DURATION_MS;
     return (
-      <Shell>
+      <PageShell>
         <p className="text-sm font-extrabold uppercase tracking-widest text-grape">
           Bonus round
         </p>
@@ -220,7 +203,7 @@ export function PlayPage() {
             label="Question starts in"
           />
         </div>
-      </Shell>
+      </PageShell>
     );
   }
 
@@ -229,7 +212,7 @@ export function PlayPage() {
     const gotItRight = viewer?.correct === true;
     const didAnswer = Boolean(viewer);
     return (
-      <Shell tight>
+      <PageShell tight>
         <p className="mb-2 text-sm font-extrabold uppercase text-ink/60">
           Question {state.currentQuestion.index + 1}/{state.currentQuestion.total}
         </p>
@@ -257,7 +240,7 @@ export function PlayPage() {
           selectedId={viewer?.answerId ?? selectedId}
           reveal
         />
-      </Shell>
+      </PageShell>
     );
   }
 
@@ -338,9 +321,9 @@ export function PlayPage() {
   }
 
   return (
-    <Shell>
+    <PageShell>
       <p className="font-bold text-ink">Get ready…</p>
-    </Shell>
+    </PageShell>
   );
 }
 
@@ -358,7 +341,7 @@ function WaitingShell({
   subtitle?: string;
 }) {
   return (
-    <Shell>
+    <PageShell>
       <div className="mx-auto mb-4 h-16 w-16 animate-pulseGlow rounded-full bg-sun" />
       <h1 className="mt-2 font-display text-4xl font-bold text-ink">{title}</h1>
       <p className="mt-2 text-lg font-bold text-ink/70">
@@ -387,26 +370,9 @@ function WaitingShell({
           </p>
         </div>
       ) : null}
-    </Shell>
-  );
-}
-
-function Shell({
-  children,
-  tight = false,
-}: {
-  children: ReactNode;
-  tight?: boolean;
-}) {
-  return (
-    <div className="min-h-[100dvh] bg-playfield px-4 py-8">
-      <div
-        className={`mx-auto w-full max-w-xl rounded-[2rem] border-4 border-white/50 bg-white/70 p-6 shadow-pop backdrop-blur ${
-          tight ? '' : 'text-center'
-        }`}
-      >
-        {children}
-      </div>
-    </div>
+      <Button asChild size="lg" variant="outline" className="mt-6 w-full">
+        <Link to="/">Back to menu</Link>
+      </Button>
+    </PageShell>
   );
 }

@@ -15,7 +15,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@quizzer/shared": ["libs/shared/src/index.ts"]
+      "@party/shared": ["libs/shared/src/index.ts"]
     },
     "strict": true,
     "esModuleInterop": true,

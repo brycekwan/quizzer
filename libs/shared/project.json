@@ -1,5 +1,5 @@
 {
-  "name": "@quizzer/shared",
+  "name": "@party/shared",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/shared/src",
   "projectType": "library",

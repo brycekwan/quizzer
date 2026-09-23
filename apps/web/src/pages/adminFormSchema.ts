@@ -7,7 +7,7 @@ import {
   MIN_REVEAL_DURATION_MS,
   MIN_SCHEDULE_DELAY_MINUTES,
   MIN_TIME_LIMIT_SECONDS,
-} from '@quizzer/shared';
+} from '@party/shared';
 
 const positiveInt = (message: string) =>
   z.coerce.number({ invalid_type_error: message }).int().finite();

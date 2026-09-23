@@ -1,12 +1,17 @@
 import type { Server, Socket } from 'socket.io';
-import type { GameConfig, QuestionSetMode } from '@quizzer/shared';
+import type { GameConfig, QuestionSetMode } from '@party/shared';
 import { GameEngine } from '../game/GameEngine';
+import { SessionRegistry } from '../../session/SessionRegistry';
 import {
   listQuestionSets,
   loadQuestionSetsInOrder,
 } from '../questions/questionSets';
 
-export function registerSocketHandlers(io: Server, engine: GameEngine): void {
+export function registerSocketHandlers(
+  io: Server,
+  engine: GameEngine,
+  sessions: SessionRegistry = new SessionRegistry()
+): SessionRegistry {
   const snapshotFor = (socket: Socket) => {
     const role = (socket.data.role as 'player' | 'admin') ?? 'player';
     const playerId = socket.data.playerId as string | undefined;
@@ -28,6 +33,7 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
       return;
     }
     delete target.data.playerId;
+    delete target.data.inQuizzer;
     target.emit('player:kicked', {
       reason: 'Signed in from another device',
     });
@@ -47,20 +53,73 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
     });
 
     socket.on(
-      'player:join',
+      'session:login',
       (
         payload: { name: string; playerId?: string },
         ack?: (result: unknown) => void
       ) => {
-        const result = engine.join(
+        const result = sessions.login(
           payload?.name ?? '',
           socket.id,
           payload?.playerId
         );
         if (result.ok) {
           displaceSocket(result.replacedSocketId);
+          socket.data.playerId = result.session.id;
+          socket.data.role = 'player';
+          ack?.({
+            ok: true,
+            playerId: result.session.id,
+            name: result.session.name,
+          });
+        } else {
+          ack?.({ ok: false, error: result.error });
+        }
+      }
+    );
+
+    socket.on(
+      'player:join',
+      (
+        payload: { name: string; playerId?: string },
+        ack?: (result: unknown) => void
+      ) => {
+        let sessionPlayerId = socket.data.playerId as string | undefined;
+        let sessionName: string | undefined;
+
+        if (!sessionPlayerId) {
+          const login = sessions.login(
+            payload?.name ?? '',
+            socket.id,
+            payload?.playerId
+          );
+          if (!login.ok) {
+            ack?.({ ok: false, error: login.error });
+            return;
+          }
+          displaceSocket(login.replacedSocketId);
+          sessionPlayerId = login.session.id;
+          sessionName = login.session.name;
+          socket.data.playerId = sessionPlayerId;
+        } else {
+          const session = sessions.get(sessionPlayerId);
+          if (!session) {
+            ack?.({ ok: false, error: 'Log in first' });
+            return;
+          }
+          sessionName = session.name;
+        }
+
+        const result = engine.join(
+          sessionName ?? payload?.name ?? '',
+          socket.id,
+          sessionPlayerId
+        );
+        if (result.ok) {
+          displaceSocket(result.replacedSocketId);
           socket.data.playerId = result.player.id;
           socket.data.role = 'player';
+          socket.data.inQuizzer = true;
           ack?.({
             ok: true,
             playerId: result.player.id,
@@ -116,11 +175,10 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
         if (!target) {
           continue;
         }
-        delete target.data.playerId;
+        delete target.data.inQuizzer;
         target.emit('game:reset', {
-          reason: 'Game was reset — please sign in again',
+          reason: 'Game was reset — back to the menu',
         });
-        target.disconnect(true);
       }
       ack?.(result);
     });
@@ -163,7 +221,6 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
           return;
         }
 
-        // Refresh the dropdown list in case files were added on disk.
         engine.setQuestionSets(listQuestionSets());
 
         const loaded = loadQuestionSetsInOrder(ids);
@@ -183,8 +240,11 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
         ack?: (result: unknown) => void
       ) => {
         const result = engine.kick(payload?.playerId);
+        sessions.remove(payload?.playerId);
         if (result.ok && result.socketId) {
           const target = io.sockets.sockets.get(result.socketId);
+          delete target?.data.playerId;
+          delete target?.data.inQuizzer;
           target?.emit('player:kicked', { reason: 'Removed by admin' });
           target?.disconnect(true);
         }
@@ -194,6 +254,9 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
 
     socket.on('disconnect', () => {
       engine.markDisconnected(socket.id);
+      sessions.markDisconnected(socket.id);
     });
   });
+
+  return sessions;
 }

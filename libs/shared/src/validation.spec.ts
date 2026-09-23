@@ -6,6 +6,7 @@ import {
   validateQuestionsFile,
 } from './validation';
 import type { Question, QuestionsFile } from './types';
+import { DEFAULT_GAME_CONFIG } from './types';
 
 const questionsDir = path.resolve(
   __dirname,
@@ -15,20 +16,16 @@ const questionsDir = path.resolve(
 describe('validateGameConfig', () => {
   it('accepts a valid config', () => {
     const result = validateGameConfig({
+      ...DEFAULT_GAME_CONFIG,
       timeLimitSeconds: 10,
-      defaultScore: 1000,
-      minScore: 100,
-      scaleMs: 100,
     });
     expect(result.ok).toBe(true);
   });
 
   it('rejects timeLimitSeconds below 10', () => {
     const result = validateGameConfig({
+      ...DEFAULT_GAME_CONFIG,
       timeLimitSeconds: 9,
-      defaultScore: 1000,
-      minScore: 100,
-      scaleMs: 100,
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -38,20 +35,33 @@ describe('validateGameConfig', () => {
 
   it('rejects minScore greater than defaultScore', () => {
     const result = validateGameConfig({
-      timeLimitSeconds: 30,
+      ...DEFAULT_GAME_CONFIG,
       defaultScore: 100,
       minScore: 200,
-      scaleMs: 100,
     });
     expect(result.ok).toBe(false);
   });
 
   it('rejects non-positive scaleMs', () => {
     const result = validateGameConfig({
-      timeLimitSeconds: 30,
-      defaultScore: 1000,
-      minScore: 100,
+      ...DEFAULT_GAME_CONFIG,
       scaleMs: 0,
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects revealDurationMs out of range', () => {
+    const result = validateGameConfig({
+      ...DEFAULT_GAME_CONFIG,
+      revealDurationMs: 100,
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects leaderboardDurationMs out of range', () => {
+    const result = validateGameConfig({
+      ...DEFAULT_GAME_CONFIG,
+      leaderboardDurationMs: 100_000,
     });
     expect(result.ok).toBe(false);
   });

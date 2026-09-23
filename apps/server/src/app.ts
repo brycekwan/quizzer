@@ -58,6 +58,8 @@ export function createServer(options?: { staticDir?: string }) {
   const { id, questions } = loadDefaultQuestionSet(questionsDir);
   const engine = new GameEngine(questions, {
     questionSetId: id,
+    questionSetIds: [id],
+    questionSetMode: 'single',
     questionSets,
   });
   registerSocketHandlers(io, engine);

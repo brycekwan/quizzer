@@ -8,6 +8,7 @@ import { useGameSocket, useSyncedCountdown } from '@/hooks/useGameSocket';
 import { AnswerGrid } from '@/components/AnswerGrid';
 import { Countdown } from '@/components/Countdown';
 import { Leaderboard } from '@/components/Leaderboard';
+import { WinnerConfetti } from '@/components/WinnerConfetti';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,7 +48,9 @@ export function PlayPage() {
   const endsAt =
     state?.phase === 'answering'
       ? state.questionEndsAt
-      : state?.phaseEndsAt ?? null;
+      : state?.status === 'waiting' && state.scheduledStartAt
+        ? state.scheduledStartAt
+        : (state?.phaseEndsAt ?? null);
   const remainingMs = useSyncedCountdown(endsAt, state?.serverNow);
 
   const handleJoin = async (event: FormEvent) => {
@@ -129,11 +132,20 @@ export function PlayPage() {
   }
 
   if (state.status === 'waiting') {
+    const scheduled = Boolean(state.scheduledStartAt);
     return (
       <WaitingShell
         playerName={playerName}
         playerCount={state.players.length}
         joinUrl={joinUrl}
+        title={scheduled ? 'Game starting soon' : 'Waiting for game to start'}
+        subtitle={
+          scheduled
+            ? `Hang tight — the host scheduled the start. About ${Math.ceil(
+                remainingMs / 1000
+              )}s left.`
+            : undefined
+        }
       />
     );
   }
@@ -152,10 +164,19 @@ export function PlayPage() {
     }
 
     const rows = buildFinalLeaderboard(state.leaderboard, playerId).rows;
+    const isWinner = state.leaderboard[0]?.id === playerId;
     return (
       <Shell>
-        <h1 className="mb-4 font-display text-4xl font-bold text-ink">Final scores</h1>
-        <Leaderboard entries={rows} title="Top pups" />
+        <WinnerConfetti active={isWinner} />
+        <h1 className="mb-2 font-display text-4xl font-bold text-ink">
+          Final scores
+        </h1>
+        {isWinner ? (
+          <p className="mb-4 animate-popin font-display text-xl font-bold text-grape">
+            You took first place!
+          </p>
+        ) : null}
+        <Leaderboard entries={rows} title="Top of the board" />
       </Shell>
     );
   }
@@ -212,7 +233,7 @@ export function PlayPage() {
         <p className="mb-2 text-sm font-extrabold uppercase text-ink/60">
           Question {state.currentQuestion.index + 1}/{state.currentQuestion.total}
         </p>
-        <h1 className="mb-4 font-display text-[1.65rem] font-bold leading-snug text-ink sm:text-3xl">
+        <h1 className="mb-4 font-display text-2xl font-bold leading-tight text-ink sm:text-3xl">
           {state.currentQuestion.question}
         </h1>
         <p
@@ -255,7 +276,7 @@ export function PlayPage() {
                 {playerName} · Q{state.currentQuestion.index + 1}/
                 {state.currentQuestion.total}
               </p>
-              <h1 className="font-display text-[1.65rem] font-bold leading-snug text-ink sm:text-3xl">
+              <h1 className="font-display text-xl font-bold leading-tight text-ink sm:text-3xl">
                 {state.currentQuestion.question}
               </h1>
               {state.currentQuestion.multiplier &&
@@ -327,13 +348,13 @@ function WaitingShell({
   playerName,
   playerCount,
   joinUrl,
-  title = 'Waiting for game to start',
+  title,
   subtitle,
 }: {
   playerName: string;
   playerCount: number;
   joinUrl: string;
-  title?: string;
+  title: string;
   subtitle?: string;
 }) {
   return (
@@ -344,7 +365,7 @@ function WaitingShell({
         You&apos;re in as <span className="text-grape">{playerName}</span>
       </p>
       {subtitle ? (
-        <p className="mt-3 text-base font-semibold text-ink/60">{subtitle}</p>
+        <p className="mt-2 text-base font-semibold text-ink/60">{subtitle}</p>
       ) : null}
       <p className="mt-4 text-sm font-semibold text-ink/50">
         {playerCount} player{playerCount === 1 ? '' : 's'} connected

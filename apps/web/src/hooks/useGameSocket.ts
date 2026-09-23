@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { GameStateSnapshot } from '@quizzer/shared';
+import type { GameConfig, GameStateSnapshot, QuestionSetMode } from '@quizzer/shared';
 
 const PLAYER_ID_KEY = 'quizzer.playerId';
 const PLAYER_NAME_KEY = 'quizzer.playerName';
@@ -29,6 +29,13 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     });
     socketRef.current = socket;
 
+    const clearSession = () => {
+      localStorage.removeItem(PLAYER_ID_KEY);
+      localStorage.removeItem(PLAYER_NAME_KEY);
+      setPlayerId(null);
+      setPlayerName(null);
+    };
+
     const rejoinIfNeeded = () => {
       const id = playerIdRef.current;
       const name = playerNameRef.current;
@@ -49,11 +56,13 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
             localStorage.setItem(PLAYER_NAME_KEY, result.name);
             setPlayerId(result.playerId);
             setPlayerName(result.name);
+            setError(null);
           } else {
-            localStorage.removeItem(PLAYER_ID_KEY);
-            localStorage.removeItem(PLAYER_NAME_KEY);
-            setPlayerId(null);
-            setPlayerName(null);
+            // Session gone (reset/kick) — clear so the player can sign in again.
+            clearSession();
+            if (result.error) {
+              setError(result.error);
+            }
           }
         }
       );
@@ -73,19 +82,12 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     });
     socket.on('player:kicked', () => {
       setKicked(true);
-      localStorage.removeItem(PLAYER_ID_KEY);
-      localStorage.removeItem(PLAYER_NAME_KEY);
-      setPlayerId(null);
-      setPlayerName(null);
+      clearSession();
     });
     socket.on('game:reset', () => {
-      // Host cleared the room — drop local session so the player must sign in again.
+      clearSession();
       setKicked(false);
-      localStorage.removeItem(PLAYER_ID_KEY);
-      localStorage.removeItem(PLAYER_NAME_KEY);
-      setPlayerId(null);
-      setPlayerName(null);
-      setError(null);
+      setError('Game was reset — join again with your name.');
     });
 
     return () => {
@@ -113,6 +115,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
                   localStorage.setItem(PLAYER_NAME_KEY, result.name);
                   setPlayerId(result.playerId);
                   setPlayerName(result.name);
+                  setKicked(false);
                   setError(null);
                   resolve({
                     ok: true,
@@ -135,15 +138,17 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
             resolve
           );
         }),
-      start: () =>
-        new Promise((resolve) => socketRef.current?.emit('admin:start', {}, resolve)),
+      start: (options?: { delayMinutes?: number }) =>
+        new Promise((resolve) =>
+          socketRef.current?.emit('admin:start', options ?? {}, resolve)
+        ),
       pause: () =>
         new Promise((resolve) => socketRef.current?.emit('admin:pause', {}, resolve)),
       resume: () =>
         new Promise((resolve) => socketRef.current?.emit('admin:resume', {}, resolve)),
       reset: () =>
         new Promise((resolve) => socketRef.current?.emit('admin:reset', {}, resolve)),
-      config: (partial: Record<string, number>) =>
+      config: (partial: Partial<GameConfig>) =>
         new Promise((resolve) =>
           socketRef.current?.emit('admin:config', partial, resolve)
         ),
@@ -151,13 +156,12 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
         new Promise((resolve) =>
           socketRef.current?.emit('admin:kick', { playerId: id }, resolve)
         ),
-      setQuestionSet: (questionSetId: string) =>
+      setQuestionSets: (payload: {
+        mode: QuestionSetMode;
+        questionSetIds: string[];
+      }) =>
         new Promise((resolve) =>
-          socketRef.current?.emit(
-            'admin:questionSet',
-            { questionSetId },
-            resolve
-          )
+          socketRef.current?.emit('admin:questionSet', payload, resolve)
         ),
     }),
     []

@@ -31,7 +31,7 @@ npm run dev
 
 ## Docker
 
-The production image uses official `node:22-alpine` images from Docker Hub. One container serves the Express/Socket.IO API and the built React client on port **8080**.
+The production image uses official `node:26-alpine` images from Docker Hub. One container serves the Express/Socket.IO API and the built React client on port **8080**.
 
 ```bash
 docker build -t quizzer .

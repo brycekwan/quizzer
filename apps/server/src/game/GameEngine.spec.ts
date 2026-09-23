@@ -204,7 +204,9 @@ describe('GameEngine', () => {
     expect(engine.submitAnswer(join.player.id, 'a').ok).toBe(true);
     expect(engine.getPlayer(join.player.id)!.score).toBeGreaterThan(afterQ1);
 
-    engine.reset();
+    const reset = engine.reset();
+    expect(reset.ok).toBe(true);
+    expect(reset.socketIds).toEqual(['s1']);
     expect(engine.getStatus()).toBe('waiting');
     expect(engine.getPlayer(join.player.id)).toBeUndefined();
     expect(engine.getSnapshot().players).toHaveLength(0);
@@ -268,13 +270,14 @@ describe('GameEngine', () => {
         ],
       },
     ];
-    expect(engine.setQuestions('canada', next).ok).toBe(true);
+    expect(engine.setQuestions(['canada'], next).ok).toBe(true);
     expect(engine.getSnapshot().questionSetId).toBe('canada');
+    expect(engine.getSnapshot().questionSetIds).toEqual(['canada']);
     expect(engine.getSnapshot().totalQuestions).toBe(1);
 
     engine.join('Buddy', 's1');
     engine.start();
-    expect(engine.setQuestions('dog-facts', next).ok).toBe(false);
+    expect(engine.setQuestions(['dog-facts'], next).ok).toBe(false);
   });
 
   it('rejects pause during answering and accepts on leaderboard', () => {
@@ -367,5 +370,107 @@ describe('GameEngine', () => {
     engine.submitAnswer(b.player.id, 'a');
     expect(engine.getPhase()).toBe('reveal');
     expect(engine.getPlayer(a.player.id)?.score).toBeGreaterThan(0);
+  });
+
+  it('preserves score when a disconnected player rejoins', () => {
+    const engine = createEngine();
+    const join = engine.join('Buddy', 's1');
+    expect(join.ok).toBe(true);
+    if (!join.ok) return;
+
+    engine.start();
+    expect(engine.submitAnswer(join.player.id, 'b').ok).toBe(true);
+    const score = engine.getPlayer(join.player.id)!.score;
+    expect(score).toBeGreaterThan(0);
+
+    engine.markDisconnected('s1');
+    expect(engine.getPlayer(join.player.id)?.connected).toBe(false);
+
+    const rejoin = engine.join('Buddy', 's2', join.player.id);
+    expect(rejoin.ok).toBe(true);
+    if (!rejoin.ok) return;
+    expect(rejoin.player.score).toBe(score);
+    expect(rejoin.player.connected).toBe(true);
+  });
+
+  it('rejects a second live connection with the same name', () => {
+    const engine = createEngine();
+    expect(engine.join('Buddy', 's1').ok).toBe(true);
+    expect(engine.join('Buddy', 's2').ok).toBe(false);
+  });
+
+  it('takes over an existing session and reports the replaced socket', () => {
+    const engine = createEngine();
+    const join = engine.join('Buddy', 's1');
+    expect(join.ok).toBe(true);
+    if (!join.ok) return;
+
+    const takeover = engine.join('Buddy', 's2', join.player.id);
+    expect(takeover.ok).toBe(true);
+    if (!takeover.ok) return;
+    expect(takeover.replacedSocketId).toBe('s1');
+    expect(engine.getPlayer(join.player.id)?.socketId).toBe('s2');
+  });
+
+  it('schedules a delayed start', () => {
+    const engine = createEngine();
+    engine.join('Buddy', 's1');
+    expect(engine.start({ delayMinutes: 1 }).ok).toBe(true);
+    expect(engine.getStatus()).toBe('waiting');
+    expect(engine.getSnapshot().scheduledStartAt).not.toBeNull();
+
+    vi.advanceTimersByTime(60_000);
+    expect(engine.getStatus()).toBe('active');
+    expect(engine.getSnapshot().scheduledStartAt).toBeNull();
+  });
+
+  it('uses configurable reveal and leaderboard durations', () => {
+    const engine = createEngine();
+    engine.join('Buddy', 's1');
+    expect(
+      engine.updateConfig({
+        timeLimitSeconds: 30,
+        defaultScore: 1000,
+        minScore: 100,
+        scaleMs: 100,
+        revealDurationMs: 1_000,
+        leaderboardDurationMs: 1_500,
+      }).ok
+    ).toBe(true);
+
+    engine.start();
+    vi.advanceTimersByTime(30_000);
+    expect(engine.getPhase()).toBe('reveal');
+    vi.advanceTimersByTime(999);
+    expect(engine.getPhase()).toBe('reveal');
+    vi.advanceTimersByTime(1);
+    expect(engine.getPhase()).toBe('leaderboard');
+    vi.advanceTimersByTime(1_499);
+    expect(engine.getPhase()).toBe('leaderboard');
+    vi.advanceTimersByTime(1);
+    expect(engine.getPhase()).toBe('answering');
+  });
+
+  it('concatenates continuous question sets and keeps a running score', () => {
+    const engine = createEngine();
+    const extra: Question = {
+      id: 'pack2:q1',
+      question: 'Extra?',
+      answers: [
+        { id: 'a', text: 'A', correct: true },
+        { id: 'b', text: 'B', correct: false },
+        { id: 'c', text: 'C', correct: false },
+        { id: 'd', text: 'D', correct: false },
+      ],
+    };
+    expect(
+      engine.setQuestions(
+        ['dog-facts', 'cat-facts'],
+        [...questions, extra],
+        'continuous'
+      ).ok
+    ).toBe(true);
+    expect(engine.getSnapshot().totalQuestions).toBe(3);
+    expect(engine.getSnapshot().questionSetMode).toBe('continuous');
   });
 });

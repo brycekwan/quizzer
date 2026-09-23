@@ -1,7 +1,10 @@
 import type { Server, Socket } from 'socket.io';
-import type { GameConfig } from '@quizzer/shared';
+import type { GameConfig, QuestionSetMode } from '@quizzer/shared';
 import { GameEngine } from '../game/GameEngine';
-import { listQuestionSets, loadQuestionSet } from '../questions/questionSets';
+import {
+  listQuestionSets,
+  loadQuestionSetsInOrder,
+} from '../questions/questionSets';
 
 export function registerSocketHandlers(io: Server, engine: GameEngine): void {
   const snapshotFor = (socket: Socket) => {
@@ -14,6 +17,21 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
     for (const socket of io.sockets.sockets.values()) {
       socket.emit('game:state', snapshotFor(socket));
     }
+  };
+
+  const displaceSocket = (socketId: string | null | undefined) => {
+    if (!socketId) {
+      return;
+    }
+    const target = io.sockets.sockets.get(socketId);
+    if (!target) {
+      return;
+    }
+    delete target.data.playerId;
+    target.emit('player:kicked', {
+      reason: 'Signed in from another device',
+    });
+    target.disconnect(true);
   };
 
   engine.onChange(broadcast);
@@ -40,6 +58,7 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
           payload?.playerId
         );
         if (result.ok) {
+          displaceSocket(result.replacedSocketId);
           socket.data.playerId = result.player.id;
           socket.data.role = 'player';
           ack?.({
@@ -72,9 +91,15 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
       }
     );
 
-    socket.on('admin:start', (_payload: unknown, ack?: (result: unknown) => void) => {
-      ack?.(engine.start());
-    });
+    socket.on(
+      'admin:start',
+      (
+        payload: { delayMinutes?: number } | undefined,
+        ack?: (result: unknown) => void
+      ) => {
+        ack?.(engine.start(payload ?? {}));
+      }
+    );
 
     socket.on('admin:pause', (_payload: unknown, ack?: (result: unknown) => void) => {
       ack?.(engine.pause());
@@ -92,7 +117,9 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
           continue;
         }
         delete target.data.playerId;
-        target.emit('game:reset', { reason: 'Game was reset — please sign in again' });
+        target.emit('game:reset', {
+          reason: 'Game was reset — please sign in again',
+        });
         target.disconnect(true);
       }
       ack?.(result);
@@ -108,25 +135,44 @@ export function registerSocketHandlers(io: Server, engine: GameEngine): void {
     socket.on(
       'admin:questionSet',
       (
-        payload: { questionSetId?: string },
+        payload: {
+          questionSetId?: string;
+          questionSetIds?: string[];
+          mode?: QuestionSetMode;
+        },
         ack?: (result: unknown) => void
       ) => {
-        const id = payload?.questionSetId?.trim();
-        if (!id) {
-          ack?.({ ok: false, error: 'questionSetId is required' });
+        const mode: QuestionSetMode =
+          payload?.mode === 'continuous' ? 'continuous' : 'single';
+        const ids =
+          payload?.questionSetIds?.filter((id) => Boolean(id?.trim())) ??
+          (payload?.questionSetId?.trim()
+            ? [payload.questionSetId.trim()]
+            : []);
+
+        if (ids.length === 0) {
+          ack?.({ ok: false, error: 'Select at least one question set' });
+          return;
+        }
+
+        if (mode === 'single' && ids.length !== 1) {
+          ack?.({
+            ok: false,
+            error: 'Single mode requires exactly one question set',
+          });
           return;
         }
 
         // Refresh the dropdown list in case files were added on disk.
         engine.setQuestionSets(listQuestionSets());
 
-        const loaded = loadQuestionSet(id);
+        const loaded = loadQuestionSetsInOrder(ids);
         if (!loaded.ok) {
           ack?.(loaded);
           return;
         }
 
-        ack?.(engine.setQuestions(id, loaded.questions));
+        ack?.(engine.setQuestions(ids, loaded.questions, mode));
       }
     );
 

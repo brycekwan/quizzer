@@ -1,4 +1,6 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type InputHTMLAttributes } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { QRCodeSVG } from 'qrcode.react';
 import type { GameConfig } from '@quizzer/shared';
 import { useGameSocket, useSyncedCountdown } from '@/hooks/useGameSocket';
@@ -14,6 +16,15 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import {
+  adminConfigSchema,
+  questionSetsSchema,
+  scheduleStartSchema,
+  type AdminConfigFormValues,
+  type QuestionSetsFormValues,
+  type ScheduleStartFormValues,
+} from './adminFormSchema';
 
 export function AdminPage() {
   const {
@@ -25,16 +36,59 @@ export function AdminPage() {
     reset,
     config,
     kick,
-    setQuestionSet,
+    setQuestionSets,
   } = useGameSocket('admin');
   const [message, setMessage] = useState<string | null>(null);
-  const [form, setForm] = useState<GameConfig | null>(null);
+
+  const configForm = useForm<AdminConfigFormValues>({
+    resolver: zodResolver(adminConfigSchema),
+    mode: 'onChange',
+    defaultValues: {
+      timeLimitSeconds: 30,
+      defaultScore: 1000,
+      minScore: 100,
+      scaleMs: 100,
+      revealDurationMs: 2000,
+      leaderboardDurationMs: 3000,
+    },
+  });
+
+  const scheduleForm = useForm<ScheduleStartFormValues>({
+    resolver: zodResolver(scheduleStartSchema),
+    mode: 'onChange',
+    defaultValues: {
+      scheduleEnabled: false,
+      delayMinutes: 15,
+    },
+  });
+
+  const questionForm = useForm<QuestionSetsFormValues>({
+    resolver: zodResolver(questionSetsSchema),
+    mode: 'onChange',
+    defaultValues: {
+      mode: 'single',
+      questionSetIds: [],
+    },
+  });
 
   useEffect(() => {
-    if (state?.config && !form) {
-      setForm(state.config);
+    if (!state?.config) {
+      return;
     }
-  }, [state?.config, form]);
+    configForm.reset(state.config);
+    void configForm.trigger();
+  }, [state?.config, configForm]);
+
+  useEffect(() => {
+    if (!state) {
+      return;
+    }
+    questionForm.reset({
+      mode: state.questionSetMode,
+      questionSetIds: state.questionSetIds,
+    });
+    void questionForm.trigger();
+  }, [state?.questionSetMode, state?.questionSetIds, state, questionForm]);
 
   const joinUrl = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -44,12 +98,18 @@ export function AdminPage() {
   }, []);
 
   const remainingMs = useSyncedCountdown(
-    state?.phase === 'answering' ? state.questionEndsAt : state?.phaseEndsAt,
+    state?.phase === 'answering'
+      ? state.questionEndsAt
+      : state?.scheduledStartAt ?? state?.phaseEndsAt,
     state?.serverNow
   );
 
   const canPause = state?.status === 'active' && state.phase === 'leaderboard';
   const canResume = state?.status === 'paused';
+  const canEditSetup = state?.status === 'waiting';
+  const scheduleEnabled = scheduleForm.watch('scheduleEnabled');
+  const questionMode = questionForm.watch('mode');
+  const selectedSets = questionForm.watch('questionSetIds');
 
   const run = async (
     action: () => Promise<unknown>,
@@ -63,24 +123,42 @@ export function AdminPage() {
     }
   };
 
-  const saveConfig = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!form) return;
-    const result = (await config(form)) as { ok?: boolean; error?: string };
-    setMessage(result?.ok === false ? result.error ?? 'Invalid config' : 'Config saved');
-  };
+  const saveConfig = configForm.handleSubmit(async (values) => {
+    const result = (await config(values as GameConfig)) as {
+      ok?: boolean;
+      error?: string;
+    };
+    setMessage(
+      result?.ok === false ? result.error ?? 'Invalid config' : 'Config saved'
+    );
+  });
 
-  const changeQuestionSet = async (questionSetId: string) => {
-    const result = (await setQuestionSet(questionSetId)) as {
+  const saveQuestionSets = questionForm.handleSubmit(async (values) => {
+    const result = (await setQuestionSets(values)) as {
       ok?: boolean;
       error?: string;
     };
     setMessage(
       result?.ok === false
-        ? result.error ?? 'Could not change question set'
-        : 'Question set updated'
+        ? result.error ?? 'Could not update question sets'
+        : values.mode === 'continuous'
+          ? `Continuous mode · ${values.questionSetIds.length} packs`
+          : 'Question set updated'
     );
-  };
+  });
+
+  const handleStart = scheduleForm.handleSubmit(async (values) => {
+    if (values.scheduleEnabled) {
+      await run(
+        () => start({ delayMinutes: values.delayMinutes }),
+        `Game scheduled in ${values.delayMinutes} minute${
+          values.delayMinutes === 1 ? '' : 's'
+        }`
+      );
+      return;
+    }
+    await run(() => start({}), 'Game started');
+  });
 
   if (!state) {
     return (
@@ -104,31 +182,86 @@ export function AdminPage() {
             <StatusBadge status={state.status} phase={state.phase} />
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button
-              onClick={() => void run(start, 'Game started')}
-              disabled={state.status === 'active' || state.status === 'paused'}
-            >
-              Start
-            </Button>
-            <Button
-              variant="sun"
-              disabled={!canPause}
-              onClick={() => void run(pause, 'Game paused')}
-            >
-              Pause
-            </Button>
-            <Button
-              variant="mint"
-              disabled={!canResume}
-              onClick={() => void run(resume, 'Game resumed')}
-            >
-              Resume
-            </Button>
-            <Button variant="coral" onClick={() => void run(reset, 'Game reset')}>
-              Reset
-            </Button>
+          <div className="mt-5 space-y-3 rounded-2xl border-4 border-ink/10 bg-cream/80 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-display text-lg font-bold">Start timing</p>
+                <p className="text-sm font-semibold text-ink/60">
+                  {scheduleEnabled
+                    ? 'Schedule a delayed start'
+                    : 'Start the game immediately'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="schedule-toggle" className="text-sm font-bold">
+                  Schedule
+                </Label>
+                <Switch
+                  id="schedule-toggle"
+                  checked={scheduleEnabled}
+                  disabled={!canEditSetup}
+                  onCheckedChange={(checked) =>
+                    scheduleForm.setValue('scheduleEnabled', checked, {
+                      shouldValidate: true,
+                    })
+                  }
+                />
+              </div>
+            </div>
+            {scheduleEnabled ? (
+              <div className="space-y-1">
+                <Label htmlFor="delay-minutes">Delay (minutes)</Label>
+                <Input
+                  id="delay-minutes"
+                  type="number"
+                  min={1}
+                  max={180}
+                  disabled={!canEditSetup}
+                  {...scheduleForm.register('delayMinutes')}
+                />
+                {scheduleForm.formState.errors.delayMinutes ? (
+                  <p className="text-sm font-bold text-coral" role="alert">
+                    {scheduleForm.formState.errors.delayMinutes.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {state.scheduledStartAt ? (
+              <p className="font-bold text-grape" role="status">
+                Starts in {Math.ceil(remainingMs / 1000)}s
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => void handleStart()}
+                disabled={
+                  state.status === 'active' ||
+                  state.status === 'paused' ||
+                  Boolean(state.scheduledStartAt)
+                }
+              >
+                {scheduleEnabled ? 'Schedule start' : 'Start'}
+              </Button>
+              <Button
+                variant="sun"
+                disabled={!canPause}
+                onClick={() => void run(pause, 'Game paused')}
+              >
+                Pause
+              </Button>
+              <Button
+                variant="mint"
+                disabled={!canResume}
+                onClick={() => void run(resume, 'Game resumed')}
+              >
+                Resume
+              </Button>
+              <Button variant="coral" onClick={() => void run(reset, 'Game reset')}>
+                Reset
+              </Button>
+            </div>
           </div>
+
           {message ? (
             <p className="mt-3 font-bold text-grape" role="status">
               {message}
@@ -175,63 +308,146 @@ export function AdminPage() {
             </div>
           </div>
 
+          <form onSubmit={saveQuestionSets} className="mt-6 space-y-3">
+            <h2 className="font-display text-2xl font-bold">Question sets</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-4 border-ink/10 bg-cream/60 px-4 py-3">
+              <div>
+                <p className="font-bold">Continuous mode</p>
+                <p className="text-sm font-semibold text-ink/60">
+                  Play selected packs back-to-back; scores carry over.
+                </p>
+              </div>
+              <Switch
+                checked={questionMode === 'continuous'}
+                disabled={!canEditSetup}
+                onCheckedChange={(checked) => {
+                  const nextMode = checked ? 'continuous' : 'single';
+                  const current = questionForm.getValues('questionSetIds');
+                  questionForm.setValue('mode', nextMode, { shouldValidate: true });
+                  if (nextMode === 'single' && current.length > 1) {
+                    questionForm.setValue('questionSetIds', [current[0]], {
+                      shouldValidate: true,
+                    });
+                  }
+                }}
+              />
+            </div>
+
+            {questionMode === 'single' ? (
+              <div className="space-y-1">
+                <Label htmlFor="question-set">Question set</Label>
+                <select
+                  id="question-set"
+                  className="flex h-12 w-full rounded-2xl border-4 border-ink/15 bg-white px-4 text-base font-bold text-ink shadow-pop-sm outline-none focus-visible:ring-4 focus-visible:ring-sun/70 disabled:opacity-50"
+                  disabled={!canEditSetup}
+                  value={selectedSets[0] ?? ''}
+                  onChange={(e) =>
+                    questionForm.setValue('questionSetIds', [e.target.value], {
+                      shouldValidate: true,
+                    })
+                  }
+                >
+                  {state.questionSets.map((set) => (
+                    <option key={set.id} value={set.id}>
+                      {set.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Question sets (play order)</Label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {state.questionSets.map((set) => {
+                    const checked = selectedSets.includes(set.id);
+                    return (
+                      <label
+                        key={set.id}
+                        className="flex cursor-pointer items-center gap-3 rounded-2xl border-4 border-ink/10 bg-white/80 px-3 py-2 font-bold shadow-pop-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-grape"
+                          disabled={!canEditSetup}
+                          checked={checked}
+                          onChange={() => {
+                            const next = checked
+                              ? selectedSets.filter((id) => id !== set.id)
+                              : [...selectedSets, set.id];
+                            questionForm.setValue('questionSetIds', next, {
+                              shouldValidate: true,
+                            });
+                          }}
+                        />
+                        {set.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {questionForm.formState.errors.questionSetIds ? (
+              <p className="text-sm font-bold text-coral" role="alert">
+                {questionForm.formState.errors.questionSetIds.message}
+              </p>
+            ) : (
+              <p className="text-sm font-semibold text-ink/55">
+                {canEditSetup
+                  ? `${state.totalQuestions} questions loaded from the current selection.`
+                  : 'Reset the game to change question sets.'}
+              </p>
+            )}
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={!canEditSetup || !questionForm.formState.isValid}
+            >
+              Apply question sets
+            </Button>
+          </form>
+
           <form onSubmit={saveConfig} className="mt-6 grid gap-3 sm:grid-cols-2">
             <h2 className="font-display text-2xl font-bold sm:col-span-2">
               Game config
             </h2>
-            <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="question-set">Question set</Label>
-              <select
-                id="question-set"
-                className="flex h-12 w-full rounded-2xl border-4 border-ink/15 bg-white px-4 text-base font-bold text-ink shadow-pop-sm outline-none focus-visible:ring-4 focus-visible:ring-sun/70 disabled:opacity-50"
-                value={state.questionSetId}
-                disabled={state.status !== 'waiting'}
-                onChange={(e) => void changeQuestionSet(e.target.value)}
-              >
-                {state.questionSets.map((set) => (
-                  <option key={set.id} value={set.id}>
-                    {set.label}
-                  </option>
-                ))}
-              </select>
-              {state.status !== 'waiting' ? (
-                <p className="text-sm font-semibold text-ink/55">
-                  Reset the game to change the question set.
-                </p>
-              ) : (
-                <p className="text-sm font-semibold text-ink/55">
-                  Packs are loaded from JSON files on the server (
-                  {state.totalQuestions} questions in this set).
-                </p>
-              )}
-            </div>
-            {form ? (
-              <>
-                <Field
-                  label="Seconds per question (min 10)"
-                  value={form.timeLimitSeconds}
-                  onChange={(v) => setForm({ ...form, timeLimitSeconds: v })}
-                />
-                <Field
-                  label="Default score"
-                  value={form.defaultScore}
-                  onChange={(v) => setForm({ ...form, defaultScore: v })}
-                />
-                <Field
-                  label="Minimum score"
-                  value={form.minScore}
-                  onChange={(v) => setForm({ ...form, minScore: v })}
-                />
-                <Field
-                  label="Scale (ms)"
-                  value={form.scaleMs}
-                  onChange={(v) => setForm({ ...form, scaleMs: v })}
-                />
-                <Button type="submit" className="sm:col-span-2" variant="outline">
-                  Save config
-                </Button>
-              </>
-            ) : null}
+            <ConfigField
+              label="Seconds per question (min 10)"
+              error={configForm.formState.errors.timeLimitSeconds?.message}
+              {...configForm.register('timeLimitSeconds')}
+            />
+            <ConfigField
+              label="Default score"
+              error={configForm.formState.errors.defaultScore?.message}
+              {...configForm.register('defaultScore')}
+            />
+            <ConfigField
+              label="Minimum score"
+              error={configForm.formState.errors.minScore?.message}
+              {...configForm.register('minScore')}
+            />
+            <ConfigField
+              label="Scale (ms)"
+              error={configForm.formState.errors.scaleMs?.message}
+              {...configForm.register('scaleMs')}
+            />
+            <ConfigField
+              label="Reveal answer delay (ms)"
+              error={configForm.formState.errors.revealDurationMs?.message}
+              {...configForm.register('revealDurationMs')}
+            />
+            <ConfigField
+              label="Leaderboard delay (ms)"
+              error={configForm.formState.errors.leaderboardDurationMs?.message}
+              {...configForm.register('leaderboardDurationMs')}
+            />
+            <Button
+              type="submit"
+              className="sm:col-span-2"
+              variant="outline"
+              disabled={!configForm.formState.isValid}
+            >
+              Save config
+            </Button>
           </form>
         </section>
 
@@ -283,23 +499,23 @@ export function AdminPage() {
   );
 }
 
-function Field({
+function ConfigField({
   label,
-  value,
-  onChange,
+  error,
+  ...inputProps
 }: {
   label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
+  error?: string;
+} & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div className="space-y-1">
       <Label>{label}</Label>
-      <Input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
+      <Input type="number" aria-invalid={Boolean(error)} {...inputProps} />
+      {error ? (
+        <p className="text-sm font-bold text-coral" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

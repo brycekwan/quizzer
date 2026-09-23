@@ -1,7 +1,7 @@
 # Multi-stage production image for Quizzer (official Node images from Docker Hub)
 # Serves Express + Socket.IO API and the built React client on port 8080.
 
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -12,7 +12,7 @@ COPY . .
 ENV NX_DAEMON=false
 RUN npx nx run-many -t build --projects=web,server
 
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080

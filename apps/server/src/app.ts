@@ -6,6 +6,9 @@ import { Server } from 'socket.io';
 import { GameEngine } from './quizzer/game/GameEngine';
 import { SessionRegistry } from './session/SessionRegistry';
 import { registerSocketHandlers } from './quizzer/socket/handlers';
+import { CrosswordEngine } from './crossword/CrosswordEngine';
+import { registerCrosswordHandlers } from './crossword/handlers';
+import { loadDefaultCrosswordPuzzle } from './crossword/loadPuzzle';
 import {
   listQuestionSets,
   loadDefaultQuestionSet,
@@ -66,5 +69,12 @@ export function createServer(options?: { staticDir?: string }) {
   const sessions = new SessionRegistry();
   registerSocketHandlers(io, engine, sessions);
 
-  return { app, server, io, engine, sessions };
+  const crosswordLoaded = loadDefaultCrosswordPuzzle();
+  const crossword = new CrosswordEngine(
+    crosswordLoaded.puzzle,
+    crosswordLoaded.words
+  );
+  registerCrosswordHandlers(io, crossword, sessions);
+
+  return { app, server, io, engine, sessions, crossword };
 }

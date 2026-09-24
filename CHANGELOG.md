@@ -1,3 +1,16 @@
+# [1.3.0](https://github.com/brycekwan/quizzer/compare/v1.2.0...v1.3.0) (2026-09-24)
+
+
+### Bug Fixes
+
+* update package lock ([da198de](https://github.com/brycekwan/quizzer/commit/da198decc768c7c37960ab47fb7da4b3cdf5622b))
+
+
+### Features
+
+* add platform login, menus, and [@party](https://github.com/party) scope ([0f2c358](https://github.com/brycekwan/quizzer/commit/0f2c358bac3c30eb5ae5b48c36d81561cf4c8587))
+* add server-authoritative crossword play and admin ([c64e3cb](https://github.com/brycekwan/quizzer/commit/c64e3cb6c3511c4286e7d30633a408132cc99b8c))
+
 # [1.2.0](https://github.com/brycekwan/quizzer/compare/v1.1.0...v1.2.0) (2026-09-23)
 
 

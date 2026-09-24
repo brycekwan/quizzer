@@ -26,9 +26,11 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist/apps/server/main.js ./main.js
 COPY --from=build /app/dist/apps/server/questions ./questions
+COPY --from=build /app/dist/apps/server/crossword/puzzles ./crossword/puzzles
 COPY --from=build /app/dist/apps/web ./public
 
 ENV QUESTIONS_DIR=/app/questions
+ENV CROSSWORD_PUZZLES_DIR=/app/crossword/puzzles
 
 USER quizzer
 EXPOSE 8080

@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/brycekwan/quizzer/compare/v1.3.1...v1.4.0) (2026-09-24)
+
+
+### Features
+
+* **crossword:** improve mobile play UX with soft keyboard and play timer ([42f560e](https://github.com/brycekwan/quizzer/commit/42f560e0a1278493cb1ef30635a711974eb6be5d))
+
 ## [1.3.1](https://github.com/brycekwan/quizzer/compare/v1.3.0...v1.3.1) (2026-09-24)
 
 

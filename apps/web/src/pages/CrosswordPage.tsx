@@ -3,14 +3,57 @@ import { Link, Navigate } from 'react-router-dom';
 import type { CrosswordCluePublic, CrosswordDirection } from '@party/shared';
 import { useCrosswordSocket } from '@/hooks/useCrosswordSocket';
 import { CrosswordGrid } from '@/components/crossword/CrosswordGrid';
-import { ClueList } from '@/components/crossword/ClueList';
+import {
+  CluePanel,
+  type CluePanelItem,
+} from '@/components/crossword/CluePanel';
+import { LetterKeyboard } from '@/components/crossword/LetterKeyboard';
 import { WinnerConfetti } from '@/components/WinnerConfetti';
 import { Button } from '@/components/ui/button';
 import {
   buildClientWords,
+  computeElapsedMs,
+  firstEmptyCellInWord,
+  formatElapsedMs,
   isCellCorrect,
+  nextEmptyCellInWord,
   wordsAtCell,
 } from '@/lib/crosswordClient';
+
+function useIsMobileViewport(): boolean {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 767px)').matches
+      : false
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobile;
+}
+
+function useElapsedClock(
+  elapsedMs: number,
+  activeSince: number | null
+): string {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (activeSince == null) {
+      return;
+    }
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [activeSince]);
+
+  return formatElapsedMs(computeElapsedMs(elapsedMs, activeSince, now));
+}
 
 export function CrosswordPage() {
   const {
@@ -24,11 +67,19 @@ export function CrosswordPage() {
     clearLetter,
   } = useCrosswordSocket('player');
 
+  const isMobile = useIsMobileViewport();
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(
     null
   );
   const [direction, setDirection] = useState<CrosswordDirection>('across');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [cluesExpanded, setCluesExpanded] = useState(false);
+
+  const elapsedLabel = useElapsedClock(
+    playerState?.elapsedMs ?? 0,
+    playerState?.activeSince ?? null
+  );
+
+  const showKeyboard = isMobile && selected != null;
 
   const words = useMemo(
     () => (playerState ? buildClientWords(playerState.puzzle) : []),
@@ -45,7 +96,6 @@ export function CrosswordPage() {
     if (!preferred) {
       return [];
     }
-    // Intersection: highlight all covering words.
     return covering.length > 1 ? covering : [preferred];
   }, [selected, words, direction]);
 
@@ -77,30 +127,57 @@ export function CrosswordPage() {
     return keys;
   }, [playerState, words]);
 
-  const activeAcross = new Set(
-    activeWords.filter((w) => w.direction === 'across').map((w) => w.number)
-  );
-  const activeDown = new Set(
-    activeWords.filter((w) => w.direction === 'down').map((w) => w.number)
-  );
-
-  useEffect(() => {
-    if (!playerState || selected) {
-      return;
+  const preferredActiveWord = useMemo(() => {
+    if (!selected) {
+      return null;
     }
-    for (let row = 0; row < playerState.puzzle.rows; row++) {
-      for (let col = 0; col < playerState.puzzle.cols; col++) {
-        if (playerState.puzzle.open[row][col]) {
-          setSelected({ row, col });
-          return;
-        }
-      }
-    }
-  }, [playerState, selected]);
+    const covering = wordsAtCell(words, selected.row, selected.col);
+    return (
+      covering.find((word) => word.direction === direction) ??
+      covering[0] ??
+      null
+    );
+  }, [selected, words, direction]);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, [selected]);
+  const clueItems = useMemo((): CluePanelItem[] => {
+    if (!playerState) {
+      return [];
+    }
+    if (cluesExpanded) {
+      return [
+        ...playerState.puzzle.across.map((clue) => ({
+          direction: 'across' as const,
+          clue,
+        })),
+        ...playerState.puzzle.down.map((clue) => ({
+          direction: 'down' as const,
+          clue,
+        })),
+      ];
+    }
+    if (!selected) {
+      return [];
+    }
+    const covering = wordsAtCell(words, selected.row, selected.col);
+    return covering
+      .map((word) => {
+        const list =
+          word.direction === 'across'
+            ? playerState.puzzle.across
+            : playerState.puzzle.down;
+        const clue = list.find((c) => c.number === word.number);
+        return clue ? { direction: word.direction, clue } : null;
+      })
+      .filter((item): item is CluePanelItem => item != null);
+  }, [playerState, cluesExpanded, selected, words]);
+
+  const activeClueKey = preferredActiveWord
+    ? `${preferredActiveWord.direction}-${preferredActiveWord.number}`
+    : null;
+
+  const collapseClues = () => {
+    setCluesExpanded(false);
+  };
 
   const moveInDirection = (
     row: number,
@@ -134,7 +211,27 @@ export function CrosswordPage() {
     }
   };
 
+  const advanceAfterLetter = (row: number, col: number) => {
+    if (!playerState) {
+      return;
+    }
+    const covering = wordsAtCell(words, row, col);
+    const word =
+      covering.find((w) => w.direction === direction) ?? covering[0];
+    if (!word) {
+      return;
+    }
+    const letters = playerState.letters.map((letterRow, r) =>
+      letterRow.map((letter, c) => (r === row && c === col ? 'X' : letter))
+    );
+    const next = nextEmptyCellInWord(word, letters, { row, col });
+    if (next) {
+      setSelected(next);
+    }
+  };
+
   const selectCell = (row: number, col: number) => {
+    collapseClues();
     if (
       selected?.row === row &&
       selected?.col === col &&
@@ -150,13 +247,22 @@ export function CrosswordPage() {
       }
       setSelected({ row, col });
     }
-    inputRef.current?.focus();
   };
 
   const selectClue = (clue: CrosswordCluePublic, dir: CrosswordDirection) => {
+    if (!playerState) {
+      return;
+    }
+    collapseClues();
     setDirection(dir);
-    setSelected({ row: clue.row, col: clue.col });
-    inputRef.current?.focus();
+    const word = words.find(
+      (w) => w.direction === dir && w.number === clue.number
+    );
+    if (word) {
+      setSelected(firstEmptyCellInWord(word, playerState.letters));
+    } else {
+      setSelected({ row: clue.row, col: clue.col });
+    }
   };
 
   const handleKey = async (key: string) => {
@@ -196,10 +302,43 @@ export function CrosswordPage() {
       return;
     }
     if (/^[a-zA-Z]$/.test(key)) {
+      collapseClues();
       await setLetter(row, col, key);
-      moveInDirection(row, col, direction, 1);
+      advanceAfterLetter(row, col);
     }
   };
+
+  const handleKeyRef = useRef(handleKey);
+  handleKeyRef.current = handleKey;
+
+  useEffect(() => {
+    if (isMobile || !selected) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (
+        event.key === 'Backspace' ||
+        event.key === 'Delete' ||
+        event.key.startsWith('Arrow') ||
+        event.key === 'Tab' ||
+        /^[a-zA-Z]$/.test(event.key)
+      ) {
+        event.preventDefault();
+        void handleKeyRef.current(event.key);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMobile, selected]);
 
   if (!playerId || !playerName) {
     return <Navigate to="/login" replace />;
@@ -230,98 +369,96 @@ export function CrosswordPage() {
     );
   }
 
-  return (
-    <div className="min-h-[100dvh] bg-playfield px-4 py-6 text-ink">
-      <WinnerConfetti active={playerState.completed} />
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-extrabold uppercase tracking-widest text-grape">
-              Crossword
-            </p>
-            <h1 className="font-display text-3xl font-bold sm:text-4xl">
-              {playerState.puzzle.title}
-            </h1>
-            <p className="mt-1 text-sm font-semibold text-ink/60">
-              Playing as {playerName} · {playerState.correctWordIds.length}/
-              {playerState.totalWords} words
-            </p>
-          </div>
-          <Button asChild variant="outline">
-            <Link to="/">Back to menu</Link>
-          </Button>
-        </div>
-
-        {playerState.completed ? (
-          <div className="rounded-[1.5rem] border-4 border-mint/40 bg-mint/20 px-4 py-3 text-center shadow-pop-sm">
-            <p className="font-display text-2xl font-bold text-ink">
-              Congratulations!
-            </p>
-            <p className="text-sm font-semibold text-ink/70">
-              You completed the crossword.
-            </p>
-          </div>
-        ) : null}
-
-        {error ? (
-          <p role="alert" className="text-center font-bold text-coral">
-            {error}
+  const content = (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-extrabold uppercase tracking-widest text-grape">
+            Crossword
           </p>
-        ) : null}
+          <h1 className="font-display text-2xl font-bold sm:text-4xl">
+            {playerState.puzzle.title}
+          </h1>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/">Back to menu</Link>
+        </Button>
+      </div>
 
-        <CrosswordGrid
-          open={playerState.puzzle.open}
-          cellNumbers={playerState.puzzle.cellNumbers}
-          letters={playerState.letters}
-          selected={selected}
-          highlighted={highlighted}
-          correctCells={correctCells}
-          onSelect={selectCell}
-        />
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-semibold text-ink/60">
+          Playing as {playerName} · {playerState.correctWordIds.length}/
+          {playerState.totalWords} words
+        </p>
+        <p
+          className="shrink-0 text-sm font-semibold tabular-nums text-ink/60"
+          aria-live="polite"
+          aria-label={`Elapsed time ${elapsedLabel}`}
+        >
+          {elapsedLabel}
+        </p>
+      </div>
 
-        <input
-          ref={inputRef}
-          className="sr-only"
-          autoCapitalize="characters"
-          autoCorrect="off"
-          spellCheck={false}
-          value=""
-          aria-label="Crossword keyboard input"
-          onChange={(event) => {
-            const value = event.target.value;
-            event.target.value = '';
-            if (value) {
-              void handleKey(value.slice(-1));
-            }
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === 'Backspace' ||
-              event.key === 'Delete' ||
-              event.key.startsWith('Arrow') ||
-              event.key === 'Tab'
-            ) {
-              event.preventDefault();
-              void handleKey(event.key);
-            }
-          }}
-        />
+      {playerState.completed ? (
+        <div className="rounded-xl border-2 border-mint/40 bg-mint/20 px-3 py-2 text-center shadow-pop-sm">
+          <p className="font-display text-lg font-bold text-ink">
+            Congratulations!
+          </p>
+          <p className="text-xs font-semibold text-ink/70">
+            You completed the crossword.
+          </p>
+        </div>
+      ) : null}
 
-        <div className="grid gap-6 rounded-[1.5rem] border-4 border-white/50 bg-white/70 p-4 shadow-pop backdrop-blur sm:grid-cols-2">
-          <ClueList
-            title="Across"
-            clues={playerState.puzzle.across}
-            activeNumbers={activeAcross}
-            onSelect={(clue) => selectClue(clue, 'across')}
-          />
-          <ClueList
-            title="Down"
-            clues={playerState.puzzle.down}
-            activeNumbers={activeDown}
-            onSelect={(clue) => selectClue(clue, 'down')}
-          />
+      {error ? (
+        <p role="alert" className="text-center font-bold text-coral">
+          {error}
+        </p>
+      ) : null}
+
+      <CrosswordGrid
+        open={playerState.puzzle.open}
+        cellNumbers={playerState.puzzle.cellNumbers}
+        letters={playerState.letters}
+        selected={selected}
+        highlighted={highlighted}
+        correctCells={correctCells}
+        onSelect={selectCell}
+      />
+
+      <CluePanel
+        items={clueItems}
+        expanded={cluesExpanded}
+        onToggleExpanded={() => setCluesExpanded((value) => !value)}
+        onSelect={selectClue}
+        activeKey={activeClueKey}
+      />
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="flex h-[100dvh] flex-col overflow-hidden bg-playfield text-ink">
+        <WinnerConfetti active={playerState.completed} />
+        <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+            {content}
+          </div>
+          {showKeyboard ? (
+            <LetterKeyboard
+              onLetter={(letter) => void handleKey(letter)}
+              onBackspace={() => void handleKey('Backspace')}
+            />
+          ) : null}
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-playfield px-4 py-3 text-ink">
+      <WinnerConfetti active={playerState.completed} />
+      <div className="mx-auto w-full max-w-3xl">{content}</div>
     </div>
   );
 }

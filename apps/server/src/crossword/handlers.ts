@@ -57,6 +57,7 @@ export function registerCrosswordHandlers(
       }
       engine.ensurePlayer(playerId, session.name);
       socket.data.crosswordPlayer = true;
+      engine.resumeTimer(playerId);
       ack?.({ ok: true });
       const snapshot = engine.getPlayerSnapshot(playerId);
       if (snapshot) {
@@ -119,6 +120,10 @@ export function registerCrosswordHandlers(
     );
 
     socket.on('disconnect', () => {
+      const playerId = socket.data.playerId as string | undefined;
+      if (socket.data.crosswordPlayer && playerId) {
+        engine.pauseTimer(playerId);
+      }
       delete socket.data.crosswordPlayer;
       delete socket.data.crosswordAdmin;
     });

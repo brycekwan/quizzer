@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/brycekwan/quizzer/compare/v1.3.0...v1.3.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* include crossword puzzles in the production image ([64029d2](https://github.com/brycekwan/quizzer/commit/64029d2129a248cc7b506ea65f86679c417f90f8))
+
 # [1.3.0](https://github.com/brycekwan/quizzer/compare/v1.2.0...v1.3.0) (2026-09-24)
 
 

@@ -3,13 +3,17 @@ import cors from 'cors';
 import path from 'path';
 import http from 'http';
 import { Server } from 'socket.io';
-import { GameEngine } from './game/GameEngine';
-import { registerSocketHandlers } from './socket/handlers';
+import { GameEngine } from './quizzer/game/GameEngine';
+import { SessionRegistry } from './session/SessionRegistry';
+import { registerSocketHandlers } from './quizzer/socket/handlers';
+import { CrosswordEngine } from './crossword/CrosswordEngine';
+import { registerCrosswordHandlers } from './crossword/handlers';
+import { loadDefaultCrosswordPuzzle } from './crossword/loadPuzzle';
 import {
   listQuestionSets,
   loadDefaultQuestionSet,
   resolveQuestionsDir,
-} from './questions/questionSets';
+} from './quizzer/questions/questionSets';
 
 export function createApp(staticDir?: string) {
   const app = express();
@@ -62,7 +66,15 @@ export function createServer(options?: { staticDir?: string }) {
     questionSetMode: 'single',
     questionSets,
   });
-  registerSocketHandlers(io, engine);
+  const sessions = new SessionRegistry();
+  registerSocketHandlers(io, engine, sessions);
 
-  return { app, server, io, engine };
+  const crosswordLoaded = loadDefaultCrosswordPuzzle();
+  const crossword = new CrosswordEngine(
+    crosswordLoaded.puzzle,
+    crosswordLoaded.words
+  );
+  registerCrosswordHandlers(io, crossword, sessions);
+
+  return { app, server, io, engine, sessions, crossword };
 }

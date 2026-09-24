@@ -16,7 +16,7 @@ import {
   type QuestionPublic,
   type QuestionSetInfo,
   type QuestionSetMode,
-} from '@quizzer/shared';
+} from '@party/shared';
 
 export interface Player {
   id: string;
@@ -199,13 +199,18 @@ export class GameEngine {
         this.emit();
         return { ok: true, player: existing, replacedSocketId };
       }
-      // After reset/kick the old id is gone — force a fresh sign-in.
-      return { ok: false, error: 'Session expired — please join again' };
+      // Platform session still valid after quiz reset — re-enter with same id.
     }
 
     const byName = this.findPlayerByName(normalized);
     if (byName) {
-      if (byName.connected) {
+      if (playerId && byName.id !== playerId) {
+        return {
+          ok: false,
+          error: 'That name is already in use by another player',
+        };
+      }
+      if (byName.connected && byName.socketId !== socketId) {
         return {
           ok: false,
           error: 'That name is already in use by another player',
@@ -231,7 +236,10 @@ export class GameEngine {
       return { ok: false, error: 'That name is already taken' };
     }
 
-    const id = `p_${Math.random().toString(36).slice(2, 10)}`;
+    const id =
+      playerId && !this.players.has(playerId)
+        ? playerId
+        : `p_${Math.random().toString(36).slice(2, 10)}`;
     const player: Player = {
       id,
       name: normalized,

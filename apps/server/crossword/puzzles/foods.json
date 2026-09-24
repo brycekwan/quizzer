@@ -1,0 +1,29 @@
+{
+  "id": "foods",
+  "title": "Foods",
+  "grid": [
+    [null, "B", "A", "S", "I", "L", null, null, null],
+    [null, "A", null, "A", null, null, null, null, null],
+    [null, "G", "E", "L", "A", "T", "O", null, "C"],
+    [null, "E", null, "M", null, null, null, null, "A"],
+    ["A", "L", "M", "O", "N", "D", null, null, "R"],
+    ["P", null, null, "N", null, "A", null, null, "R"],
+    ["P", null, null, null, null, "T", "A", "C", "O"],
+    ["L", "Y", "C", "H", "E", "E", null, null, "T"],
+    ["E", null, null, null, null, null, null, null, null]
+  ],
+  "across": [
+    { "number": 1, "row": 0, "col": 1, "clue": "Aromatic herb in pesto" },
+    { "number": 3, "row": 2, "col": 1, "clue": "Italian-style ice cream" },
+    { "number": 5, "row": 4, "col": 0, "clue": "Nut used in marzipan" },
+    { "number": 7, "row": 6, "col": 5, "clue": "Folded Mexican street food" },
+    { "number": 8, "row": 7, "col": 0, "clue": "Sweet tropical fruit with a bumpy rind" }
+  ],
+  "down": [
+    { "number": 1, "row": 0, "col": 1, "clue": "Round bread with a hole" },
+    { "number": 2, "row": 0, "col": 3, "clue": "Pink fish often smoked or grilled" },
+    { "number": 4, "row": 2, "col": 8, "clue": "Orange root vegetable" },
+    { "number": 5, "row": 4, "col": 0, "clue": "Crisp fruit that keeps the doctor away" },
+    { "number": 6, "row": 4, "col": 5, "clue": "Dried fruit on a palm tree" }
+  ]
+}

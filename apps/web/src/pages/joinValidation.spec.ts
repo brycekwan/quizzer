@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidPlayerName } from '@quizzer/shared';
+import { isValidPlayerName } from '@party/shared';
 
 describe('join name validation', () => {
   it('requires a non-empty name up to 24 chars', () => {

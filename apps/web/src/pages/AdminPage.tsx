@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type InputHTMLAttributes } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { QRCodeSVG } from 'qrcode.react';
-import type { GameConfig } from '@quizzer/shared';
+import type { GameConfig } from '@party/shared';
 import { useGameSocket, useSyncedCountdown } from '@/hooks/useGameSocket';
 import { AnswerGrid } from '@/components/AnswerGrid';
 import { Leaderboard } from '@/components/Leaderboard';
@@ -94,7 +95,7 @@ export function AdminPage() {
     if (typeof window === 'undefined') {
       return '';
     }
-    return `${window.location.origin}/play`;
+    return `${window.location.origin}/login`;
   }, []);
 
   const remainingMs = useSyncedCountdown(
@@ -179,7 +180,12 @@ export function AdminPage() {
               </p>
               <h1 className="font-display text-4xl font-bold">Admin console</h1>
             </div>
-            <StatusBadge status={state.status} phase={state.phase} />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link to="/host">Back to host menu</Link>
+              </Button>
+              <StatusBadge status={state.status} phase={state.phase} />
+            </div>
           </div>
 
           <div className="mt-5 space-y-3 rounded-2xl border-4 border-ink/10 bg-cream/80 p-4">

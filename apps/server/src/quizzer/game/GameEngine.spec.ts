@@ -4,7 +4,7 @@ import {
   MULTIPLIER_SPLASH_DURATION_MS,
   REVEAL_DURATION_MS,
   type Question,
-} from '@quizzer/shared';
+} from '@party/shared';
 import { GameEngine } from './GameEngine';
 
 const questions: Question[] = [
@@ -246,14 +246,16 @@ describe('GameEngine', () => {
     ).toBe(true);
   });
 
-  it('rejects stale player ids after reset', () => {
+  it('allows the same player id to re-enter after reset', () => {
     const engine = createEngine();
     const join = engine.join('Buddy', 's1');
     expect(join.ok).toBe(true);
     if (!join.ok) return;
     engine.reset();
-    expect(engine.join('Buddy', 's2', join.player.id).ok).toBe(false);
-    expect(engine.join('Buddy', 's2').ok).toBe(true);
+    const reenter = engine.join('Buddy', 's2', join.player.id);
+    expect(reenter.ok).toBe(true);
+    if (!reenter.ok) return;
+    expect(reenter.player.id).toBe(join.player.id);
   });
 
   it('switches question sets while waiting', () => {

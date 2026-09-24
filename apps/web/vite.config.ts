@@ -26,7 +26,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
-      '@quizzer/shared': resolve(__dirname, '../../libs/shared/src/index.ts'),
+      '@party/shared': resolve(__dirname, '../../libs/shared/src/index.ts'),
     },
   },
   build: {

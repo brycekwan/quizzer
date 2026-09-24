@@ -5,7 +5,7 @@ import {
   type Question,
   type QuestionSetInfo,
   type QuestionsFile,
-} from '@quizzer/shared';
+} from '@party/shared';
 
 export function resolveQuestionsDir(): string {
   if (process.env.QUESTIONS_DIR) {

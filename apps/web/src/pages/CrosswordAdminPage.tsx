@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCrosswordSocket } from '@/hooks/useCrosswordSocket';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { computeElapsedMs, formatElapsedMs } from '@/lib/crosswordClient';
 
 function ElapsedCell({
@@ -33,7 +34,8 @@ function ElapsedCell({
 }
 
 export function CrosswordAdminPage() {
-  const { connected, adminState, error, reset } = useCrosswordSocket('admin');
+  const { connected, adminState, error, setError, reset, selectPuzzle } =
+    useCrosswordSocket('admin');
 
   if (!adminState) {
     return (
@@ -43,6 +45,22 @@ export function CrosswordAdminPage() {
       </div>
     );
   }
+
+  const pendingDiffers = adminState.pendingPuzzleId !== adminState.puzzleId;
+
+  const onSelectPuzzle = async (puzzleId: string) => {
+    const result = await selectPuzzle(puzzleId);
+    if (!result.ok) {
+      setError(result.error ?? 'Could not select crossword');
+    }
+  };
+
+  const onReset = async () => {
+    const result = await reset();
+    if (!result.ok) {
+      setError(result.error ?? 'Could not reset crossword');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-playfield px-4 py-6 text-ink">
@@ -63,11 +81,7 @@ export function CrosswordAdminPage() {
             <Button asChild variant="outline" size="sm">
               <Link to="/host">Back to host menu</Link>
             </Button>
-            <Button
-              variant="coral"
-              size="sm"
-              onClick={() => void reset()}
-            >
+            <Button variant="coral" size="sm" onClick={() => void onReset()}>
               Reset crossword
             </Button>
           </div>
@@ -79,11 +93,35 @@ export function CrosswordAdminPage() {
           </p>
         ) : null}
 
+        <section className="rounded-[2rem] border-4 border-white/60 bg-white/75 p-5 shadow-pop backdrop-blur">
+          <h2 className="font-display text-2xl font-bold">Active crossword</h2>
+          <div className="mt-3 space-y-1">
+            <Label htmlFor="crossword-puzzle">Crossword puzzle</Label>
+            <select
+              id="crossword-puzzle"
+              className="flex h-12 w-full rounded-2xl border-4 border-ink/15 bg-white px-4 text-base font-bold text-ink shadow-pop-sm outline-none focus-visible:ring-4 focus-visible:ring-sun/70"
+              value={adminState.pendingPuzzleId}
+              onChange={(e) => void onSelectPuzzle(e.target.value)}
+            >
+              {adminState.puzzles.map((puzzle) => (
+                <option key={puzzle.id} value={puzzle.id}>
+                  {puzzle.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-2 text-sm font-semibold text-ink/55">
+            {pendingDiffers
+              ? 'Selection saved — reset the crossword to load it and clear scores.'
+              : 'Reset clears scores. Change the puzzle above, then reset to switch everyone to it.'}
+          </p>
+        </section>
+
         <section className="overflow-hidden rounded-[2rem] border-4 border-white/60 bg-white/75 shadow-pop backdrop-blur">
           <div className="border-b-4 border-ink/10 px-5 py-3">
-            <h2 className="font-display text-2xl font-bold">Player progress</h2>
+            <h2 className="font-display text-2xl font-bold">Scoreboard</h2>
             <p className="text-sm font-semibold text-ink/60">
-              Most words completed, then shortest time
+              100 pts per word · placement bonus 1000→100 for ranks 1–10
             </p>
           </div>
           {adminState.players.length === 0 ? (
@@ -105,19 +143,20 @@ export function CrosswordAdminPage() {
                         {player.name}
                       </p>
                       <p className="text-sm font-semibold text-ink/55">
-                        {done ? 'Completed' : 'In progress'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-display text-2xl font-bold text-grape">
-                        {player.correctWordCount}/{player.totalWords}
-                      </p>
-                      <p className="text-xs font-extrabold uppercase tracking-wide text-ink/45">
-                        words ·{' '}
+                        {done ? 'Completed' : 'In progress'} ·{' '}
+                        {player.correctWordCount}/{player.totalWords} words ·{' '}
                         <ElapsedCell
                           elapsedMs={player.elapsedMs}
                           activeSince={player.activeSince}
                         />
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-display text-2xl font-bold text-grape">
+                        {player.score}
+                      </p>
+                      <p className="text-xs font-extrabold uppercase tracking-wide text-ink/45">
+                        points
                       </p>
                     </div>
                   </li>

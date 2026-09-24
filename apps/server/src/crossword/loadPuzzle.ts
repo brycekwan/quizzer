@@ -4,6 +4,7 @@ import {
   deriveCrosswordWords,
   validateCrosswordFile,
   type CrosswordPuzzleFile,
+  type CrosswordPuzzleInfo,
   type CrosswordWord,
 } from '@party/shared';
 
@@ -26,6 +27,24 @@ export function resolveCrosswordPuzzlesDir(): string {
   }
 
   return candidates[0];
+}
+
+/** List puzzle JSON files; `label` is the filename (e.g. `foods.json`). */
+export function listCrosswordPuzzles(
+  dir = resolveCrosswordPuzzlesDir()
+): CrosswordPuzzleInfo[] {
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(dir)
+    .filter((file) => file.endsWith('.json'))
+    .sort((a, b) => a.localeCompare(b))
+    .map((file) => ({
+      id: file.replace(/\.json$/i, ''),
+      label: file,
+    }));
 }
 
 export function loadCrosswordPuzzle(
@@ -70,27 +89,21 @@ export function loadCrosswordPuzzle(
 
 export function loadDefaultCrosswordPuzzle(
   dir = resolveCrosswordPuzzlesDir()
-): { puzzle: CrosswordPuzzleFile; words: CrosswordWord[] } {
-  const preferred = loadCrosswordPuzzle('foods', dir);
-  if (preferred.ok) {
-    return { puzzle: preferred.puzzle, words: preferred.words };
-  }
-
-  if (!fs.existsSync(dir)) {
+): {
+  puzzle: CrosswordPuzzleFile;
+  words: CrosswordWord[];
+  puzzles: CrosswordPuzzleInfo[];
+} {
+  const puzzles = listCrosswordPuzzles(dir);
+  if (puzzles.length === 0) {
     throw new Error(`No crossword puzzles found in ${dir}`);
   }
 
-  const first = fs
-    .readdirSync(dir)
-    .filter((file) => file.endsWith('.json'))
-    .sort()[0];
-  if (!first) {
-    throw new Error(`No crossword puzzles found in ${dir}`);
-  }
-
-  const loaded = loadCrosswordPuzzle(first.replace(/\.json$/i, ''), dir);
+  const preferredId =
+    puzzles.find((p) => p.id === 'foods')?.id ?? puzzles[0].id;
+  const loaded = loadCrosswordPuzzle(preferredId, dir);
   if (!loaded.ok) {
     throw new Error(loaded.error);
   }
-  return { puzzle: loaded.puzzle, words: loaded.words };
+  return { puzzle: loaded.puzzle, words: loaded.words, puzzles };
 }

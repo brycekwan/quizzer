@@ -1,10 +1,12 @@
 import {
+  crosswordScore,
   emptyLetterGrid,
   toPublicCrosswordPuzzle,
   type CrosswordAdminEntry,
   type CrosswordAdminSnapshot,
   type CrosswordPlayerSnapshot,
   type CrosswordPuzzleFile,
+  type CrosswordPuzzleInfo,
   type CrosswordWord,
 } from '@party/shared';
 
@@ -38,16 +40,26 @@ function currentElapsedMs(
 type Listener = () => void;
 
 export class CrosswordEngine {
-  private readonly puzzle: CrosswordPuzzleFile;
-  private readonly words: CrosswordWord[];
-  private readonly publicPuzzle;
+  private puzzle: CrosswordPuzzleFile;
+  private words: CrosswordWord[];
+  private publicPuzzle;
+  private pendingPuzzleId: string;
+  private puzzles: CrosswordPuzzleInfo[];
   private readonly players = new Map<string, PlayerProgress>();
   private readonly listeners = new Set<Listener>();
 
-  constructor(puzzle: CrosswordPuzzleFile, words: CrosswordWord[]) {
+  constructor(
+    puzzle: CrosswordPuzzleFile,
+    words: CrosswordWord[],
+    options?: { puzzles?: CrosswordPuzzleInfo[]; pendingPuzzleId?: string }
+  ) {
     this.puzzle = puzzle;
     this.words = words;
     this.publicPuzzle = toPublicCrosswordPuzzle(puzzle, words);
+    this.puzzles = options?.puzzles ?? [
+      { id: puzzle.id, label: `${puzzle.id}.json` },
+    ];
+    this.pendingPuzzleId = options?.pendingPuzzleId ?? puzzle.id;
   }
 
   onChange(listener: Listener): () => void {
@@ -65,10 +77,43 @@ export class CrosswordEngine {
     return this.words.length;
   }
 
+  get activePuzzleId(): string {
+    return this.puzzle.id;
+  }
+
+  getPendingPuzzleId(): string {
+    return this.pendingPuzzleId;
+  }
+
+  setPuzzles(puzzles: CrosswordPuzzleInfo[]): void {
+    this.puzzles = puzzles;
+    this.emit();
+  }
+
+  selectPuzzle(
+    puzzleId: string
+  ): { ok: true } | { ok: false; error: string } {
+    if (!this.puzzles.some((puzzle) => puzzle.id === puzzleId)) {
+      return { ok: false, error: 'Crossword not found' };
+    }
+    this.pendingPuzzleId = puzzleId;
+    this.emit();
+    return { ok: true };
+  }
+
+  /** Swap the active puzzle (typically during reset). Clears grids to match. */
+  setPuzzle(puzzle: CrosswordPuzzleFile, words: CrosswordWord[]): void {
+    this.puzzle = puzzle;
+    this.words = words;
+    this.publicPuzzle = toPublicCrosswordPuzzle(puzzle, words);
+    this.pendingPuzzleId = puzzle.id;
+  }
+
   ensurePlayer(playerId: string, name: string): void {
     const existing = this.players.get(playerId);
     if (existing) {
       existing.name = name;
+      this.emit();
       return;
     }
     this.players.set(playerId, {
@@ -213,11 +258,14 @@ export class CrosswordEngine {
     };
   }
 
-  private sortElapsed(player: {
-    elapsedMs: number;
-    activeSince: number | null;
-    completedAt: number | null;
-  }, now: number): number {
+  private sortElapsed(
+    player: {
+      elapsedMs: number;
+      activeSince: number | null;
+      completedAt: number | null;
+    },
+    now: number
+  ): number {
     if (
       player.completedAt == null &&
       player.activeSince == null &&
@@ -236,6 +284,7 @@ export class CrosswordEngine {
         name: player.name,
         correctWordCount: player.correctWordIds.size,
         totalWords: this.words.length,
+        score: 0,
         elapsedMs: player.elapsedMs,
         activeSince: player.activeSince,
         completedAt: player.completedAt,
@@ -254,9 +303,16 @@ export class CrosswordEngine {
       return a.name.localeCompare(b.name);
     });
 
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      entry.score = crosswordScore(entry.correctWordCount, i + 1);
+    }
+
     return {
       puzzleId: this.puzzle.id,
       title: this.puzzle.title,
+      pendingPuzzleId: this.pendingPuzzleId,
+      puzzles: [...this.puzzles],
       totalWords: this.words.length,
       players: entries,
     };

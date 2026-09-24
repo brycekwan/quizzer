@@ -59,6 +59,13 @@ export interface CrosswordPlayerSnapshot {
   letters: (string | null)[][];
   correctWordIds: string[];
   completed: boolean;
+  /**
+   * Accumulated play time in ms (paused while away from the crossword).
+   * When `activeSince` is set, add `now - activeSince` for the live total.
+   */
+  elapsedMs: number;
+  /** Epoch ms when the current on-page play session started; null when paused/done */
+  activeSince: number | null;
   completedAt: number | null;
   totalWords: number;
 }
@@ -68,6 +75,8 @@ export interface CrosswordAdminEntry {
   name: string;
   correctWordCount: number;
   totalWords: number;
+  elapsedMs: number;
+  activeSince: number | null;
   completedAt: number | null;
 }
 

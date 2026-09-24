@@ -13,7 +13,26 @@ interface PlayerProgress {
   name: string;
   letters: (string | null)[][];
   correctWordIds: Set<string>;
+  /** Accumulated play time while paused / completed */
+  elapsedMs: number;
+  /** When the current viewing session started counting; null if paused */
+  activeSince: number | null;
+  /** Whether the player has entered at least one letter (timer has started) */
+  timerStarted: boolean;
   completedAt: number | null;
+}
+
+function currentElapsedMs(
+  player: Pick<PlayerProgress, 'elapsedMs' | 'activeSince' | 'completedAt'>,
+  now: number = Date.now()
+): number {
+  if (player.completedAt != null) {
+    return player.elapsedMs;
+  }
+  if (player.activeSince == null) {
+    return player.elapsedMs;
+  }
+  return player.elapsedMs + Math.max(0, now - player.activeSince);
 }
 
 type Listener = () => void;
@@ -57,8 +76,37 @@ export class CrosswordEngine {
       name,
       letters: emptyLetterGrid(this.puzzle),
       correctWordIds: new Set(),
+      elapsedMs: 0,
+      activeSince: null,
+      timerStarted: false,
       completedAt: null,
     });
+    this.emit();
+  }
+
+  /** Pause play-time accumulation (player left the crossword page). */
+  pauseTimer(playerId: string): void {
+    const player = this.players.get(playerId);
+    if (!player || player.activeSince == null || player.completedAt != null) {
+      return;
+    }
+    player.elapsedMs = currentElapsedMs(player);
+    player.activeSince = null;
+    this.emit();
+  }
+
+  /** Resume play-time accumulation when returning to the crossword. */
+  resumeTimer(playerId: string): void {
+    const player = this.players.get(playerId);
+    if (
+      !player ||
+      !player.timerStarted ||
+      player.completedAt != null ||
+      player.activeSince != null
+    ) {
+      return;
+    }
+    player.activeSince = Date.now();
     this.emit();
   }
 
@@ -78,6 +126,13 @@ export class CrosswordEngine {
     const normalized = letter.trim().toUpperCase();
     if (!/^[A-Z]$/.test(normalized)) {
       return { ok: false, error: 'Enter a single letter' };
+    }
+    if (!player.timerStarted) {
+      player.timerStarted = true;
+      player.activeSince = Date.now();
+    } else if (player.completedAt == null && player.activeSince == null) {
+      // Typing again while somehow paused — keep counting.
+      player.activeSince = Date.now();
     }
     player.letters[row][col] = normalized;
     this.recomputeWords(player);
@@ -129,10 +184,15 @@ export class CrosswordEngine {
     player.correctWordIds = next;
     if (next.size === this.words.length) {
       if (player.completedAt == null) {
+        // Freeze play time at completion.
+        player.elapsedMs = currentElapsedMs(player);
+        player.activeSince = null;
         player.completedAt = Date.now();
       }
-    } else {
+    } else if (player.completedAt != null) {
+      // No longer complete — resume counting while they keep editing.
       player.completedAt = null;
+      player.activeSince = Date.now();
     }
   }
 
@@ -146,34 +206,50 @@ export class CrosswordEngine {
       letters: player.letters.map((row) => [...row]),
       correctWordIds: [...player.correctWordIds],
       completed: player.completedAt != null,
+      elapsedMs: player.elapsedMs,
+      activeSince: player.activeSince,
       completedAt: player.completedAt,
       totalWords: this.words.length,
     };
   }
 
+  private sortElapsed(player: {
+    elapsedMs: number;
+    activeSince: number | null;
+    completedAt: number | null;
+  }, now: number): number {
+    if (
+      player.completedAt == null &&
+      player.activeSince == null &&
+      player.elapsedMs === 0
+    ) {
+      return Number.POSITIVE_INFINITY;
+    }
+    return currentElapsedMs(player, now);
+  }
+
   getAdminSnapshot(): CrosswordAdminSnapshot {
+    const now = Date.now();
     const entries: CrosswordAdminEntry[] = [...this.players.values()].map(
       (player) => ({
         playerId: player.playerId,
         name: player.name,
         correctWordCount: player.correctWordIds.size,
         totalWords: this.words.length,
+        elapsedMs: player.elapsedMs,
+        activeSince: player.activeSince,
         completedAt: player.completedAt,
       })
     );
 
     entries.sort((a, b) => {
-      if (a.completedAt != null && b.completedAt != null) {
-        return b.completedAt - a.completedAt;
-      }
-      if (a.completedAt != null) {
-        return -1;
-      }
-      if (b.completedAt != null) {
-        return 1;
-      }
       if (b.correctWordCount !== a.correctWordCount) {
         return b.correctWordCount - a.correctWordCount;
+      }
+      const ae = this.sortElapsed(a, now);
+      const be = this.sortElapsed(b, now);
+      if (ae !== be) {
+        return ae - be;
       }
       return a.name.localeCompare(b.name);
     });
@@ -190,6 +266,9 @@ export class CrosswordEngine {
     for (const player of this.players.values()) {
       player.letters = emptyLetterGrid(this.puzzle);
       player.correctWordIds = new Set();
+      player.elapsedMs = 0;
+      player.activeSince = null;
+      player.timerStarted = false;
       player.completedAt = null;
     }
     this.emit();

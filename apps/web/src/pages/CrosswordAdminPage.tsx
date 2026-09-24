@@ -1,12 +1,35 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCrosswordSocket } from '@/hooks/useCrosswordSocket';
 import { Button } from '@/components/ui/button';
+import { computeElapsedMs, formatElapsedMs } from '@/lib/crosswordClient';
 
-function formatCompletedAt(value: number | null): string {
-  if (value == null) {
-    return '—';
+function ElapsedCell({
+  elapsedMs,
+  activeSince,
+}: {
+  elapsedMs: number;
+  activeSince: number | null;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (activeSince == null) {
+      return;
+    }
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [activeSince]);
+
+  if (elapsedMs === 0 && activeSince == null) {
+    return <span className="text-ink/40">—</span>;
   }
-  return new Date(value).toLocaleTimeString();
+
+  return (
+    <span className="tabular-nums">
+      {formatElapsedMs(computeElapsedMs(elapsedMs, activeSince, now))}
+    </span>
+  );
 }
 
 export function CrosswordAdminPage() {
@@ -60,7 +83,7 @@ export function CrosswordAdminPage() {
           <div className="border-b-4 border-ink/10 px-5 py-3">
             <h2 className="font-display text-2xl font-bold">Player progress</h2>
             <p className="text-sm font-semibold text-ink/60">
-              Completed (newest first), then most correct words
+              Most words completed, then shortest time
             </p>
           </div>
           {adminState.players.length === 0 ? (
@@ -82,9 +105,7 @@ export function CrosswordAdminPage() {
                         {player.name}
                       </p>
                       <p className="text-sm font-semibold text-ink/55">
-                        {done
-                          ? `Completed at ${formatCompletedAt(player.completedAt)}`
-                          : 'In progress'}
+                        {done ? 'Completed' : 'In progress'}
                       </p>
                     </div>
                     <div className="text-right">
@@ -92,7 +113,11 @@ export function CrosswordAdminPage() {
                         {player.correctWordCount}/{player.totalWords}
                       </p>
                       <p className="text-xs font-extrabold uppercase tracking-wide text-ink/45">
-                        correct words
+                        words ·{' '}
+                        <ElapsedCell
+                          elapsedMs={player.elapsedMs}
+                          activeSince={player.activeSince}
+                        />
                       </p>
                     </div>
                   </li>

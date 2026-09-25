@@ -74,7 +74,7 @@ export function selectionLine(
   return cells.length > 0 ? cells : [{ row: anchor.row, col: anchor.col }];
 }
 
-/** Add one letter when it continues the current straight line. */
+/** Add one letter, or toggle off a letter at either end of the path. */
 export function appendTap(
   path: readonly WordSearchCellRef[],
   cell: WordSearchCellRef,
@@ -89,12 +89,22 @@ export function appendTap(
   }
 
   const start = path[0];
+  const last = path[path.length - 1];
+  const isStart = start.row === cell.row && start.col === cell.col;
+  const isLast = last.row === cell.row && last.col === cell.col;
+  if (isStart || isLast) {
+    if (path.length === 1) {
+      return [];
+    }
+    if (isLast) {
+      return path.slice(0, -1);
+    }
+    return path.slice(1);
+  }
+
   if (path.length === 1) {
     const dr = cell.row - start.row;
     const dc = cell.col - start.col;
-    if (dr === 0 && dc === 0) {
-      return [...path];
-    }
     if (Math.abs(dr) <= 1 && Math.abs(dc) <= 1) {
       return [start, { row: cell.row, col: cell.col }];
     }
@@ -103,7 +113,6 @@ export function appendTap(
 
   const stepR = path[1].row - start.row;
   const stepC = path[1].col - start.col;
-  const last = path[path.length - 1];
   const next = { row: last.row + stepR, col: last.col + stepC };
   if (
     next.row === cell.row &&

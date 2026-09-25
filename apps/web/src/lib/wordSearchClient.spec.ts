@@ -57,6 +57,26 @@ describe('appendTap', () => {
     expect(appendTap(third, { row: 6, col: 8 }, rows, cols)).toEqual(third);
     expect(appendTap(first, { row: 4, col: 8 }, rows, cols)).toEqual(first);
   });
+
+  it('toggles off either end and leaves a middle letter selected', () => {
+    const path = [
+      { row: 4, col: 4 },
+      { row: 5, col: 5 },
+      { row: 6, col: 6 },
+    ];
+    expect(appendTap(path, { row: 6, col: 6 }, rows, cols)).toEqual([
+      { row: 4, col: 4 },
+      { row: 5, col: 5 },
+    ]);
+    expect(appendTap(path, { row: 4, col: 4 }, rows, cols)).toEqual([
+      { row: 5, col: 5 },
+      { row: 6, col: 6 },
+    ]);
+    expect(appendTap(path, { row: 5, col: 5 }, rows, cols)).toEqual(path);
+    expect(appendTap([{ row: 4, col: 4 }], { row: 4, col: 4 }, rows, cols)).toEqual(
+      []
+    );
+  });
 });
 
 describe('roundedRectForCells', () => {

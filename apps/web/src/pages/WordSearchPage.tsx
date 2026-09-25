@@ -106,6 +106,11 @@ export function WordSearchPage() {
           </div>
         </header>
 
+        <p className="px-3 pb-2 text-xs font-semibold leading-snug text-ink/65">
+          Words run in any of eight directions, including backwards and
+          diagonally. Drag across the letters, or tap them one at a time.
+        </p>
+
         {playerState.completed ? (
           <p className="mx-3 mb-2 rounded-xl border-2 border-mint/40 bg-mint/20 px-3 py-2 text-center font-display font-bold">
             You found every word.

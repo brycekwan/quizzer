@@ -9,6 +9,9 @@ import { registerSocketHandlers } from './quizzer/socket/handlers';
 import { CrosswordEngine } from './crossword/CrosswordEngine';
 import { registerCrosswordHandlers } from './crossword/handlers';
 import { loadDefaultCrosswordPuzzle } from './crossword/loadPuzzle';
+import { WordSearchEngine } from './wordsearch/WordSearchEngine';
+import { registerWordSearchHandlers } from './wordsearch/handlers';
+import { loadDefaultWordSearchPuzzle } from './wordsearch/loadPuzzle';
 import {
   listQuestionSets,
   loadDefaultQuestionSet,
@@ -77,5 +80,13 @@ export function createServer(options?: { staticDir?: string }) {
   );
   registerCrosswordHandlers(io, crossword, sessions);
 
-  return { app, server, io, engine, sessions, crossword };
+  const wordSearchLoaded = loadDefaultWordSearchPuzzle();
+  const wordSearch = new WordSearchEngine(
+    wordSearchLoaded.puzzle,
+    wordSearchLoaded.words,
+    { puzzles: wordSearchLoaded.puzzles }
+  );
+  registerWordSearchHandlers(io, wordSearch, sessions);
+
+  return { app, server, io, engine, sessions, crossword, wordSearch };
 }

@@ -21,6 +21,8 @@ pub struct SocketMeta {
     pub crossword_admin: bool,
     pub wordsearch_player: bool,
     pub wordsearch_admin: bool,
+    /// Play clock is paused because this socket has the instructions open.
+    pub wordsearch_help: bool,
     pub system_admin: bool,
 }
 

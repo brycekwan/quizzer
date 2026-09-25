@@ -25,7 +25,7 @@ Multi-game party platform: Kahoot-style quizzer, crossword, and word search. Ser
 | `libs/party/` | Session registry, quizzer, crossword, word search, system admin |
 | `apps/server/questions/*.json` | Quizzer question packs |
 | `apps/server/crossword/puzzles/*.json` | Crossword packs (grid-first) |
-| `apps/server/wordsearch/puzzles/*.json` | Word search packs (20×20 grid + placements) |
+| `apps/server/wordsearch/puzzles/*.json` | Word search packs (12×12 grid + placements) |
 | `libs/shared/src/` | Types, scoring, names, crossword and word search validation |
 
 ## Commands
@@ -68,7 +68,7 @@ JSON under `apps/server/crossword/puzzles/`: `{ id, title, grid, across, down }`
 
 ## Word search packs
 
-JSON under `apps/server/wordsearch/puzzles/`: `{ id, title, grid, words }`. `grid` is a 20×20 array of letters. Each of the ten `words` is `{ word, row, col, direction }` with `direction` one of `E W N S NE NW SE SW`. The word is walked from that cell; filler letters fill the rest. Validate via `validateWordSearchFile`. The server accepts only those declared placements.
+JSON under `apps/server/wordsearch/puzzles/`: `{ id, title, grid, words }`. `grid` is a 12×12 array of letters. Each of the ten `words` is `{ word, row, col, direction }` with `direction` one of `E W N S NE NW SE SW`. The word is walked from that cell; filler letters fill the rest. Validate via `validateWordSearchFile`. The server accepts only those declared placements.
 
 ## Socket events (high level)
 
@@ -82,6 +82,7 @@ JSON under `apps/server/wordsearch/puzzles/`: `{ id, title, grid, words }`. `gri
 | `crossword:admin:subscribe` / `reset` | Crossword host |
 | `wordsearch:subscribe` | Enter word search (requires session) |
 | `wordsearch:submitSelection` | Submit a selected cell path |
+| `wordsearch:pauseTimer` / `resumeTimer` | Pause the play clock while instructions are open |
 | `wordsearch:admin:subscribe` / `selectPuzzle` / `reset` / `resetPlayer` | Word search host |
 | `system:admin:subscribe` / `kick` | System host: connected players and remove from the party |
 

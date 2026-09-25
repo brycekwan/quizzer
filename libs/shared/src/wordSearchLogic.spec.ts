@@ -13,15 +13,15 @@ import {
 
 const WORDS: WordSearchPlacement[] = [
   { word: 'OTTAWA', row: 0, col: 0, direction: 'E' },
-  { word: 'HOCKEY', row: 2, col: 3, direction: 'S' },
-  { word: 'MOOSE', row: 1, col: 10, direction: 'SE' },
-  { word: 'BEAVER', row: 5, col: 18, direction: 'W' },
-  { word: 'TORONTO', row: 8, col: 2, direction: 'E' },
-  { word: 'CALGARY', row: 4, col: 19, direction: 'S' },
-  { word: 'NIAGARA', row: 12, col: 15, direction: 'SW' },
-  { word: 'POUTINE', row: 15, col: 1, direction: 'E' },
-  { word: 'QUEBEC', row: 19, col: 7, direction: 'N' },
-  { word: 'MAPLE', row: 19, col: 19, direction: 'W' },
+  { word: 'HOCKEY', row: 0, col: 6, direction: 'S' },
+  { word: 'MOOSE', row: 1, col: 7, direction: 'E' },
+  { word: 'BEAVER', row: 3, col: 0, direction: 'E' },
+  { word: 'TORONTO', row: 6, col: 0, direction: 'E' },
+  { word: 'QUEBEC', row: 7, col: 0, direction: 'E' },
+  { word: 'NIAGARA', row: 8, col: 0, direction: 'E' },
+  { word: 'POUTINE', row: 9, col: 0, direction: 'E' },
+  { word: 'CALGARY', row: 10, col: 0, direction: 'E' },
+  { word: 'MAPLE', row: 11, col: 11, direction: 'N' },
 ];
 
 function samplePuzzle(): WordSearchFile {
@@ -52,17 +52,17 @@ function samplePuzzle(): WordSearchFile {
 }
 
 describe('validateWordSearchFile', () => {
-  it('accepts a 20×20 grid whose placements match the letters', () => {
+  it('accepts a 12×12 grid whose placements match the letters', () => {
     const puzzle = samplePuzzle();
     expect(validateWordSearchFile(puzzle)).toBeNull();
     const words = deriveWordSearchWords(puzzle);
     expect(Array.isArray(words) && words).toHaveLength(WORD_SEARCH_WORD_COUNT);
   });
 
-  it('rejects a grid that is not 20×20', () => {
+  it('rejects a grid that is not 12×12', () => {
     const puzzle = samplePuzzle();
     puzzle.grid = puzzle.grid.slice(0, 10);
-    expect(validateWordSearchFile(puzzle)).toMatch(/20×20/);
+    expect(validateWordSearchFile(puzzle)).toMatch(/12×12/);
   });
 
   it('rejects a placement that does not match the grid', () => {

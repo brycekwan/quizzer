@@ -217,6 +217,18 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         },
     );
     socket.on(
+        "wordsearch:pauseTimer",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_wordsearch_timer(app, socket, ack, true);
+        },
+    );
+    socket.on(
+        "wordsearch:resumeTimer",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_wordsearch_timer(app, socket, ack, false);
+        },
+    );
+    socket.on(
         "wordsearch:admin:subscribe",
         async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
             flag_mut(&app, &socket, |meta| meta.wordsearch_admin = true);
@@ -525,6 +537,32 @@ fn on_wordsearch_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     changed(&app);
 }
 
+fn on_wordsearch_timer(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
+    let sid = sid_of(&socket);
+    let meta = app
+        .meta
+        .lock()
+        .expect("meta")
+        .get(&sid)
+        .cloned()
+        .unwrap_or_default();
+    let Some(player_id) = meta.player_id.filter(|_| meta.wordsearch_player) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    {
+        let mut party = app.party.lock().expect("party");
+        if pause {
+            party.word_search.pause_timer(&player_id);
+        } else {
+            party.word_search.resume_timer(&player_id);
+        }
+    }
+    flag_mut(&app, &socket, |meta| meta.wordsearch_help = pause);
+    let _ = ack.send(&json!({ "ok": true }));
+    changed(&app);
+}
+
 fn on_wordsearch_selection(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
     let sid = sid_of(&socket);
     let meta = app.meta.lock().expect("meta").get(&sid).cloned().unwrap_or_default();
@@ -641,6 +679,7 @@ fn reset_crossword(app: &App) -> Value {
 
 fn reset_word_search(app: &App, only_player: Option<&str>) -> Value {
     let resume_ids = subscribed_wordsearch(app, only_player);
+    let help_paused = help_paused_players(app);
     let mut party = app.party.lock().expect("party");
     if only_player.is_none() {
         let pending = party.word_search.pending_puzzle_id().to_string();
@@ -658,9 +697,22 @@ fn reset_word_search(app: &App, only_player: Option<&str>) -> Value {
         }
     }
     for player_id in resume_ids {
+        if help_paused.iter().any(|paused| paused == &player_id) {
+            continue;
+        }
         party.word_search.resume_timer(&player_id);
     }
     json!({ "ok": true })
+}
+
+fn help_paused_players(app: &App) -> Vec<String> {
+    app.meta
+        .lock()
+        .expect("meta")
+        .values()
+        .filter(|meta| meta.wordsearch_help)
+        .filter_map(|meta| meta.player_id.clone())
+        .collect()
 }
 
 fn subscribed_wordsearch(app: &App, only_player: Option<&str>) -> Vec<String> {

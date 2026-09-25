@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub const WORD_SEARCH_SIZE: usize = 20;
+pub const WORD_SEARCH_SIZE: usize = 12;
 pub const WORD_SEARCH_WORD_COUNT: usize = 10;
 pub const WORD_SEARCH_POINTS_PER_WORD: i64 = 100;
 pub const WORD_SEARCH_RANK_BONUS_FIRST: i64 = 1000;
@@ -296,15 +296,15 @@ mod tests {
     fn placements() -> Vec<WordSearchPlacement> {
         vec![
             placement("OTTAWA", 0, 0, WordSearchDirection::E),
-            placement("HOCKEY", 2, 3, WordSearchDirection::S),
-            placement("MOOSE", 1, 10, WordSearchDirection::SE),
-            placement("BEAVER", 5, 18, WordSearchDirection::W),
-            placement("TORONTO", 8, 2, WordSearchDirection::E),
-            placement("CALGARY", 4, 19, WordSearchDirection::S),
-            placement("NIAGARA", 12, 15, WordSearchDirection::SW),
-            placement("POUTINE", 15, 1, WordSearchDirection::E),
-            placement("QUEBEC", 19, 7, WordSearchDirection::N),
-            placement("MAPLE", 19, 19, WordSearchDirection::W),
+            placement("HOCKEY", 0, 6, WordSearchDirection::S),
+            placement("MOOSE", 1, 7, WordSearchDirection::E),
+            placement("BEAVER", 3, 0, WordSearchDirection::E),
+            placement("TORONTO", 6, 0, WordSearchDirection::E),
+            placement("QUEBEC", 7, 0, WordSearchDirection::E),
+            placement("NIAGARA", 8, 0, WordSearchDirection::E),
+            placement("POUTINE", 9, 0, WordSearchDirection::E),
+            placement("CALGARY", 10, 0, WordSearchDirection::E),
+            placement("MAPLE", 11, 11, WordSearchDirection::N),
         ]
     }
 
@@ -351,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_matching_20_grid() {
+    fn accepts_matching_12_grid() {
         let puzzle = sample_puzzle();
         assert!(validate_word_search_file(&puzzle).is_none());
         let words = derive_word_search_words(&puzzle).unwrap();
@@ -363,7 +363,7 @@ mod tests {
         let mut puzzle = sample_puzzle();
         puzzle.grid.truncate(10);
         let error = validate_word_search_file(&puzzle).unwrap();
-        assert!(error.contains("20×20"));
+        assert!(error.contains("12×12"));
     }
 
     #[test]

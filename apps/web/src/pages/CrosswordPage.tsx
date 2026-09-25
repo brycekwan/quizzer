@@ -168,20 +168,25 @@ export function CrosswordPage() {
     return keys;
   }, [preferredActiveWord]);
 
+  const showAllClues = !isMobile || cluesExpanded;
+
   const clueItems = useMemo((): CluePanelItem[] => {
     if (!playerState) {
       return [];
     }
-    if (cluesExpanded) {
+    const solvedIds = new Set(playerState.correctWordIds);
+    const toItem = (
+      direction: CrosswordDirection,
+      clue: CrosswordCluePublic
+    ): CluePanelItem => ({
+      direction,
+      clue,
+      solved: solvedIds.has(`${direction}-${clue.number}`),
+    });
+    if (showAllClues) {
       return [
-        ...playerState.puzzle.across.map((clue) => ({
-          direction: 'across' as const,
-          clue,
-        })),
-        ...playerState.puzzle.down.map((clue) => ({
-          direction: 'down' as const,
-          clue,
-        })),
+        ...playerState.puzzle.across.map((clue) => toItem('across', clue)),
+        ...playerState.puzzle.down.map((clue) => toItem('down', clue)),
       ];
     }
     if (!selected) {
@@ -195,10 +200,10 @@ export function CrosswordPage() {
             ? playerState.puzzle.across
             : playerState.puzzle.down;
         const clue = list.find((c) => c.number === word.number);
-        return clue ? { direction: word.direction, clue } : null;
+        return clue ? toItem(word.direction, clue) : null;
       })
       .filter((item): item is CluePanelItem => item != null);
-  }, [playerState, cluesExpanded, selected, words]);
+  }, [playerState, showAllClues, selected, words]);
 
   const activeClueKey = preferredActiveWord
     ? `${preferredActiveWord.direction}-${preferredActiveWord.number}`
@@ -471,6 +476,29 @@ export function CrosswordPage() {
     );
   }
 
+  const grid = (
+    <CrosswordGrid
+      open={playerState.puzzle.open}
+      cellNumbers={playerState.puzzle.cellNumbers}
+      letters={playerState.letters}
+      selected={selected}
+      highlighted={highlighted}
+      correctCells={correctCells}
+      onSelect={selectCell}
+    />
+  );
+
+  const clues = (
+    <CluePanel
+      items={clueItems}
+      expanded={showAllClues}
+      collapsible={isMobile}
+      onToggleExpanded={() => setCluesExpanded((value) => !value)}
+      onSelect={selectClue}
+      activeKey={activeClueKey}
+    />
+  );
+
   const content = (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -522,23 +550,17 @@ export function CrosswordPage() {
         Double-click a square to toggle direction
       </p>
 
-      <CrosswordGrid
-        open={playerState.puzzle.open}
-        cellNumbers={playerState.puzzle.cellNumbers}
-        letters={playerState.letters}
-        selected={selected}
-        highlighted={highlighted}
-        correctCells={correctCells}
-        onSelect={selectCell}
-      />
-
-      <CluePanel
-        items={clueItems}
-        expanded={cluesExpanded}
-        onToggleExpanded={() => setCluesExpanded((value) => !value)}
-        onSelect={selectClue}
-        activeKey={activeClueKey}
-      />
+      {isMobile ? (
+        <>
+          {grid}
+          {clues}
+        </>
+      ) : (
+        <div className="flex items-start gap-6">
+          <div className="w-full max-w-md shrink-0">{grid}</div>
+          <div className="min-w-0 flex-1">{clues}</div>
+        </div>
+      )}
     </div>
   );
 
@@ -564,7 +586,7 @@ export function CrosswordPage() {
   return (
     <div className="min-h-[100dvh] bg-playfield px-4 py-3 text-ink">
       <WinnerConfetti active={playerState.completed} />
-      <div className="mx-auto w-full max-w-3xl">{content}</div>
+      <div className="mx-auto w-full max-w-5xl">{content}</div>
     </div>
   );
 }

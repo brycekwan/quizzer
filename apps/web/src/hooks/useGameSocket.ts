@@ -6,6 +6,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 
 export function useGameSocket(role: 'player' | 'admin' = 'player') {
   const socketRef = useRef<Socket | null>(null);
@@ -29,6 +30,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
+    let active = true;
 
     const clearSession = () => {
       clearStoredSession();
@@ -102,7 +104,17 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     socket.on('game:state', (snapshot: GameStateSnapshot) => {
       setState(snapshot);
     });
-    socket.on('player:kicked', () => {
+    socket.on('player:kicked', (payload?: { reason?: string }) => {
+      if (!active) {
+        return;
+      }
+      if (isSystemRemoval(payload)) {
+        noteSystemRemoval();
+        setPlayerId(null);
+        setPlayerName(null);
+        setJoinedQuizzer(false);
+        return;
+      }
       setKicked(true);
       clearSession();
     });
@@ -113,6 +125,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     });
 
     return () => {
+      active = false;
       socket.disconnect();
       socketRef.current = null;
     };

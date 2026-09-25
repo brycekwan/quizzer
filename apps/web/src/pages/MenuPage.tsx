@@ -1,10 +1,10 @@
 import { Link, Navigate } from 'react-router-dom';
-import { readStoredSession } from '@/lib/sessionStorage';
+import { useSession } from '@/hooks/useSession';
 import { Button } from '@/components/ui/button';
 import { PageShell } from '@/components/PageShell';
 
 export function MenuPage() {
-  const { playerId, playerName } = readStoredSession();
+  const { playerId, playerName } = useSession();
 
   if (!playerId || !playerName) {
     return <Navigate to="/login" replace />;

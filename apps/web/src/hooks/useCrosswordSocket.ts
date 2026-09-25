@@ -9,6 +9,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 
 export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
   const socketRef = useRef<Socket | null>(null);
@@ -35,6 +36,7 @@ export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
+    let active = true;
 
     const clearSession = () => {
       clearStoredSession();
@@ -95,12 +97,22 @@ export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
     socket.on('crossword:admin:state', (snapshot: CrosswordAdminSnapshot) => {
       setAdminState(snapshot);
     });
-    socket.on('player:kicked', () => {
+    socket.on('player:kicked', (payload?: { reason?: string }) => {
+      if (!active) {
+        return;
+      }
+      if (isSystemRemoval(payload)) {
+        noteSystemRemoval();
+        setPlayerId(null);
+        setPlayerName(null);
+        return;
+      }
       setKicked(true);
       clearSession();
     });
 
     return () => {
+      active = false;
       socket.disconnect();
       socketRef.current = null;
     };

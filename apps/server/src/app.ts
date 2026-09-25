@@ -12,6 +12,8 @@ import { loadDefaultCrosswordPuzzle } from './crossword/loadPuzzle';
 import { WordSearchEngine } from './wordsearch/WordSearchEngine';
 import { registerWordSearchHandlers } from './wordsearch/handlers';
 import { loadDefaultWordSearchPuzzle } from './wordsearch/loadPuzzle';
+import { SystemAdmin } from './system/SystemAdmin';
+import { registerSystemHandlers } from './system/handlers';
 import {
   listQuestionSets,
   loadDefaultQuestionSet,
@@ -88,5 +90,8 @@ export function createServer(options?: { staticDir?: string }) {
   );
   registerWordSearchHandlers(io, wordSearch, sessions);
 
-  return { app, server, io, engine, sessions, crossword, wordSearch };
+  const system = new SystemAdmin(sessions, engine, crossword, wordSearch);
+  registerSystemHandlers(io, system);
+
+  return { app, server, io, engine, sessions, crossword, wordSearch, system };
 }

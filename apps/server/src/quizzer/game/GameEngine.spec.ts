@@ -360,6 +360,20 @@ describe('GameEngine', () => {
     expect(engine.getPlayer(join.player.id)).toBeUndefined();
   });
 
+  it('reveals as soon as kicking the last unanswered player', () => {
+    const engine = createEngine();
+    const a = engine.join('Ada', 's1');
+    const b = engine.join('Bea', 's2');
+    if (!a.ok || !b.ok) return;
+    engine.start();
+    engine.submitAnswer(a.player.id, 'b');
+    expect(engine.getPhase()).toBe('answering');
+    expect(engine.kick(b.player.id).ok).toBe(true);
+    expect(engine.getPhase()).toBe('reveal');
+    expect(engine.getPlayer(a.player.id)?.score).toBeGreaterThan(0);
+    expect(engine.getPlayer(b.player.id)).toBeUndefined();
+  });
+
   it('advances early when all connected players answer', () => {
     const engine = createEngine();
     const a = engine.join('A', 's1');

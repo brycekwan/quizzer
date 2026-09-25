@@ -13,12 +13,16 @@ import { Button } from '@/components/ui/button';
 import {
   buildClientWords,
   computeElapsedMs,
+  directionForCell,
   firstEmptyCellInWord,
   formatElapsedMs,
   isCellCorrect,
   nextEmptyCellInWord,
+  nextUnsolvedClue,
   wordsAtCell,
 } from '@/lib/crosswordClient';
+
+const DOUBLE_CLICK_MS = 400;
 
 function useIsMobileViewport(): boolean {
   const [isMobile, setIsMobile] = useState(() =>
@@ -36,6 +40,10 @@ function useIsMobileViewport(): boolean {
   }, []);
 
   return isMobile;
+}
+
+function isGridEmpty(letters: (string | null)[][]): boolean {
+  return letters.every((row) => row.every((letter) => !letter));
 }
 
 function useElapsedClock(
@@ -73,6 +81,39 @@ export function CrosswordPage() {
   );
   const [direction, setDirection] = useState<CrosswordDirection>('across');
   const [cluesExpanded, setCluesExpanded] = useState(false);
+  const selectedRef = useRef(selected);
+  const directionRef = useRef(direction);
+  const lastClickRef = useRef<{
+    row: number;
+    col: number;
+    at: number;
+  } | null>(null);
+  const gridRef = useRef<{
+    letters: (string | null)[][];
+    correctWordIds: string[];
+  } | null>(null);
+  const keyQueueRef = useRef(Promise.resolve());
+  const seenLettersRef = useRef<(string | null)[][] | null>(null);
+  const puzzleIdRef = useRef<string | null>(null);
+  selectedRef.current = selected;
+  directionRef.current = direction;
+
+  if (playerState && seenLettersRef.current !== playerState.letters) {
+    const previousLetters = seenLettersRef.current;
+    seenLettersRef.current = playerState.letters;
+    const puzzleChanged = puzzleIdRef.current !== playerState.puzzle.id;
+    puzzleIdRef.current = playerState.puzzle.id;
+    const cleared =
+      previousLetters != null &&
+      !isGridEmpty(previousLetters) &&
+      isGridEmpty(playerState.letters);
+    if (!gridRef.current || puzzleChanged || cleared) {
+      gridRef.current = {
+        letters: playerState.letters,
+        correctWordIds: playerState.correctWordIds,
+      };
+    }
+  }
 
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
@@ -85,29 +126,6 @@ export function CrosswordPage() {
     () => (playerState ? buildClientWords(playerState.puzzle) : []),
     [playerState]
   );
-
-  const activeWords = useMemo(() => {
-    if (!selected) {
-      return [];
-    }
-    const covering = wordsAtCell(words, selected.row, selected.col);
-    const preferred =
-      covering.find((word) => word.direction === direction) ?? covering[0];
-    if (!preferred) {
-      return [];
-    }
-    return covering.length > 1 ? covering : [preferred];
-  }, [selected, words, direction]);
-
-  const highlighted = useMemo(() => {
-    const keys = new Set<string>();
-    for (const word of activeWords) {
-      for (const cell of word.cells) {
-        keys.add(`${cell.row}:${cell.col}`);
-      }
-    }
-    return keys;
-  }, [activeWords]);
 
   const correctCells = useMemo(() => {
     const keys = new Set<string>();
@@ -138,6 +156,17 @@ export function CrosswordPage() {
       null
     );
   }, [selected, words, direction]);
+
+  const highlighted = useMemo(() => {
+    const keys = new Set<string>();
+    if (!preferredActiveWord) {
+      return keys;
+    }
+    for (const cell of preferredActiveWord.cells) {
+      keys.add(`${cell.row}:${cell.col}`);
+    }
+    return keys;
+  }, [preferredActiveWord]);
 
   const clueItems = useMemo((): CluePanelItem[] => {
     if (!playerState) {
@@ -179,6 +208,18 @@ export function CrosswordPage() {
     setCluesExpanded(false);
   };
 
+  const focusCell = (
+    cell: { row: number; col: number },
+    dir?: CrosswordDirection
+  ) => {
+    if (dir) {
+      directionRef.current = dir;
+      setDirection(dir);
+    }
+    selectedRef.current = cell;
+    setSelected(cell);
+  };
+
   const moveInDirection = (
     row: number,
     col: number,
@@ -205,48 +246,48 @@ export function CrosswordPage() {
         return;
       }
       if (playerState.puzzle.open[r][c]) {
-        setSelected({ row: r, col: c });
+        focusCell({ row: r, col: c });
         return;
       }
     }
   };
 
-  const advanceAfterLetter = (row: number, col: number) => {
-    if (!playerState) {
-      return;
-    }
-    const covering = wordsAtCell(words, row, col);
-    const word =
-      covering.find((w) => w.direction === direction) ?? covering[0];
-    if (!word) {
-      return;
-    }
-    const letters = playerState.letters.map((letterRow, r) =>
-      letterRow.map((letter, c) => (r === row && c === col ? 'X' : letter))
-    );
-    const next = nextEmptyCellInWord(word, letters, { row, col });
-    if (next) {
-      setSelected(next);
-    }
-  };
-
   const selectCell = (row: number, col: number) => {
     collapseClues();
-    if (
-      selected?.row === row &&
-      selected?.col === col &&
-      wordsAtCell(words, row, col).length > 1
-    ) {
-      setDirection((current) => (current === 'across' ? 'down' : 'across'));
-    } else {
-      const covering = wordsAtCell(words, row, col);
-      const preferred =
-        covering.find((word) => word.direction === direction) ?? covering[0];
-      if (preferred) {
-        setDirection(preferred.direction);
-      }
-      setSelected({ row, col });
+    const now = performance.now();
+    const previousClick = lastClickRef.current;
+    const sameSquare =
+      selectedRef.current?.row === row && selectedRef.current?.col === col;
+    const doubleClick =
+      sameSquare &&
+      previousClick?.row === row &&
+      previousClick?.col === col &&
+      now - previousClick.at <= DOUBLE_CLICK_MS;
+    lastClickRef.current = { row, col, at: now };
+
+    const covering = wordsAtCell(words, row, col);
+    if (doubleClick && covering.length > 1) {
+      const next = directionRef.current === 'across' ? 'down' : 'across';
+      directionRef.current = next;
+      setDirection(next);
+      return;
     }
+    if (sameSquare) {
+      return;
+    }
+
+    const correctWordIds =
+      gridRef.current?.correctWordIds ?? playerState?.correctWordIds ?? [];
+    focusCell(
+      { row, col },
+      directionForCell(
+        covering,
+        row,
+        col,
+        directionRef.current,
+        correctWordIds
+      )
+    );
   };
 
   const selectClue = (clue: CrosswordCluePublic, dir: CrosswordDirection) => {
@@ -254,57 +295,118 @@ export function CrosswordPage() {
       return;
     }
     collapseClues();
-    setDirection(dir);
     const word = words.find(
-      (w) => w.direction === dir && w.number === clue.number
+      (entry) => entry.direction === dir && entry.number === clue.number
     );
-    if (word) {
-      setSelected(firstEmptyCellInWord(word, playerState.letters));
-    } else {
-      setSelected({ row: clue.row, col: clue.col });
-    }
+    const letters = gridRef.current?.letters ?? playerState.letters;
+    focusCell(
+      word
+        ? firstEmptyCellInWord(word, letters)
+        : { row: clue.row, col: clue.col },
+      dir
+    );
   };
 
-  const handleKey = async (key: string) => {
-    if (!selected || !playerState) {
+  const handleKey = (key: string) => {
+    const run = keyQueueRef.current.then(() => applyKey(key));
+    keyQueueRef.current = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  };
+
+  const applyKey = async (key: string) => {
+    const current = selectedRef.current;
+    if (!current || !playerState) {
       return;
     }
-    const { row, col } = selected;
+    const { row, col } = current;
+    const dir = directionRef.current;
     if (key === 'Backspace' || key === 'Delete') {
-      await clearLetter(row, col);
+      const cleared = await clearLetter(row, col);
+      if (cleared.ok && cleared.correctWordIds && gridRef.current) {
+        gridRef.current = {
+          letters: gridRef.current.letters.map((letterRow, r) =>
+            letterRow.map((letter, c) => (r === row && c === col ? '' : letter))
+          ),
+          correctWordIds: cleared.correctWordIds,
+        };
+      }
       if (key === 'Backspace') {
-        moveInDirection(row, col, direction, -1);
+        moveInDirection(row, col, dir, -1);
       }
       return;
     }
     if (key === 'ArrowLeft') {
+      directionRef.current = 'across';
       setDirection('across');
       moveInDirection(row, col, 'across', -1);
       return;
     }
     if (key === 'ArrowRight') {
+      directionRef.current = 'across';
       setDirection('across');
       moveInDirection(row, col, 'across', 1);
       return;
     }
     if (key === 'ArrowUp') {
+      directionRef.current = 'down';
       setDirection('down');
       moveInDirection(row, col, 'down', -1);
       return;
     }
     if (key === 'ArrowDown') {
+      directionRef.current = 'down';
       setDirection('down');
       moveInDirection(row, col, 'down', 1);
       return;
     }
     if (key === 'Tab') {
-      setDirection((current) => (current === 'across' ? 'down' : 'across'));
+      const next = dir === 'across' ? 'down' : 'across';
+      directionRef.current = next;
+      setDirection(next);
       return;
     }
-    if (/^[a-zA-Z]$/.test(key)) {
-      collapseClues();
-      await setLetter(row, col, key);
-      advanceAfterLetter(row, col);
+    if (!/^[a-zA-Z]$/.test(key)) {
+      return;
+    }
+    collapseClues();
+    const baseline =
+      gridRef.current ??
+      ({
+        letters: playerState.letters,
+        correctWordIds: playerState.correctWordIds,
+      } as const);
+    const previousCorrect = new Set(baseline.correctWordIds);
+    const result = await setLetter(row, col, key);
+    if (!result.ok || !result.correctWordIds) {
+      return;
+    }
+    const letters = baseline.letters.map((letterRow, r) =>
+      letterRow.map((letter, c) =>
+        r === row && c === col ? key.toUpperCase() : letter
+      )
+    );
+    gridRef.current = { letters, correctWordIds: result.correctWordIds };
+
+    const covering = wordsAtCell(words, row, col);
+    const word = covering.find((entry) => entry.direction === dir) ?? covering[0];
+    if (!word) {
+      return;
+    }
+    const justSolved =
+      result.correctWordIds.includes(word.id) && !previousCorrect.has(word.id);
+    if (justSolved) {
+      const nextClue = nextUnsolvedClue(words, word.id, result.correctWordIds);
+      if (nextClue) {
+        focusCell(firstEmptyCellInWord(nextClue, letters), nextClue.direction);
+      }
+      return;
+    }
+    const nextCell = nextEmptyCellInWord(word, letters, { row, col });
+    if (nextCell) {
+      focusCell(nextCell);
     }
   };
 
@@ -415,6 +517,10 @@ export function CrosswordPage() {
           {error}
         </p>
       ) : null}
+
+      <p className="flex h-5 items-center justify-center text-center text-xs font-semibold leading-none text-ink/55">
+        Double-click a square to toggle direction
+      </p>
 
       <CrosswordGrid
         open={playerState.puzzle.open}

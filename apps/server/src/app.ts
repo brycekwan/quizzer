@@ -72,7 +72,8 @@ export function createServer(options?: { staticDir?: string }) {
   const crosswordLoaded = loadDefaultCrosswordPuzzle();
   const crossword = new CrosswordEngine(
     crosswordLoaded.puzzle,
-    crosswordLoaded.words
+    crosswordLoaded.words,
+    { puzzles: crosswordLoaded.puzzles }
   );
   registerCrosswordHandlers(io, crossword, sessions);
 

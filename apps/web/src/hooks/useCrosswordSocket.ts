@@ -128,6 +128,14 @@ export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
         new Promise<{ ok: boolean; error?: string }>((resolve) => {
           socketRef.current?.emit('crossword:admin:reset', {}, resolve);
         }),
+      selectPuzzle: (puzzleId: string) =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit(
+            'crossword:admin:selectPuzzle',
+            { puzzleId },
+            resolve
+          );
+        }),
     }),
     []
   );

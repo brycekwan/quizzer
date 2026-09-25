@@ -70,11 +70,19 @@ export interface CrosswordPlayerSnapshot {
   totalWords: number;
 }
 
+export interface CrosswordPuzzleInfo {
+  id: string;
+  /** Filename used as the admin dropdown label (e.g. `foods.json`). */
+  label: string;
+}
+
 export interface CrosswordAdminEntry {
   playerId: string;
   name: string;
   correctWordCount: number;
   totalWords: number;
+  /** Word points + placement bonus for the current leaderboard order. */
+  score: number;
   elapsedMs: number;
   activeSince: number | null;
   completedAt: number | null;
@@ -83,8 +91,43 @@ export interface CrosswordAdminEntry {
 export interface CrosswordAdminSnapshot {
   puzzleId: string;
   title: string;
+  /** Selected puzzle; becomes `puzzleId` on the next admin reset. */
+  pendingPuzzleId: string;
+  puzzles: CrosswordPuzzleInfo[];
   totalWords: number;
   players: CrosswordAdminEntry[];
 }
 
 export const MAX_CROSSWORD_CLUES_PER_DIRECTION = 5;
+
+/** Points awarded for each correctly completed word. */
+export const CROSSWORD_POINTS_PER_WORD = 100;
+
+/** Placement bonus for 1st on the leaderboard; decreases by `CROSSWORD_RANK_BONUS_STEP` per rank. */
+export const CROSSWORD_RANK_BONUS_FIRST = 1000;
+export const CROSSWORD_RANK_BONUS_STEP = 100;
+/** Last place that still receives a placement bonus (10th → 100 pts). */
+export const CROSSWORD_RANK_BONUS_MAX_PLACE = 10;
+
+export function crosswordWordPoints(correctWordCount: number): number {
+  return Math.max(0, correctWordCount) * CROSSWORD_POINTS_PER_WORD;
+}
+
+/** 1-based rank → placement bonus (1st=1000 … 10th=100; otherwise 0). */
+export function crosswordRankBonus(rank: number): number {
+  if (
+    !Number.isInteger(rank) ||
+    rank < 1 ||
+    rank > CROSSWORD_RANK_BONUS_MAX_PLACE
+  ) {
+    return 0;
+  }
+  return CROSSWORD_RANK_BONUS_FIRST - (rank - 1) * CROSSWORD_RANK_BONUS_STEP;
+}
+
+export function crosswordScore(
+  correctWordCount: number,
+  rank: number
+): number {
+  return crosswordWordPoints(correctWordCount) + crosswordRankBonus(rank);
+}

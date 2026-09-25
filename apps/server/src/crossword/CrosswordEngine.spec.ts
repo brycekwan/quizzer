@@ -117,7 +117,7 @@ describe('CrosswordEngine', () => {
     vi.useRealTimers();
   });
 
-  it('sorts admin by words completed then shortest play time', () => {
+  it('sorts admin by words completed then shortest play time and scores ranks', () => {
     vi.useFakeTimers();
     const engine = createEngine();
     engine.ensurePlayer('a', 'Ada');
@@ -148,7 +148,62 @@ describe('CrosswordEngine', () => {
     expect(admin.players.map((p) => p.name)).toEqual(['Bea', 'Ada', 'Cal']);
     expect(admin.players[0]?.elapsedMs).toBe(30_000);
     expect(admin.players[1]?.elapsedMs).toBe(60_000);
+    // Bea: 2 words + 1st = 200 + 1000; Ada: 2 + 2nd = 200 + 900; Cal: 1 + 3rd = 100 + 800
+    expect(admin.players.map((p) => p.score)).toEqual([1200, 1100, 900]);
     vi.useRealTimers();
+  });
+
+  it('holds a pending puzzle until reset applies it', () => {
+    const engine = createEngine();
+    engine.setPuzzles([
+      { id: 'mini', label: 'mini.json' },
+      { id: 'other', label: 'other.json' },
+    ]);
+    expect(engine.selectPuzzle('other')).toEqual({ ok: true });
+    expect(engine.getPendingPuzzleId()).toBe('other');
+    expect(engine.activePuzzleId).toBe('mini');
+    expect(engine.getAdminSnapshot().pendingPuzzleId).toBe('other');
+
+    const other: CrosswordPuzzleFile = {
+      id: 'other',
+      title: 'Other',
+      grid: [
+        ['C', 'A', 'T'],
+        ['U', null, null],
+        ['P', null, null],
+      ],
+      across: [{ number: 1, row: 0, col: 0, clue: 'Pet' }],
+      down: [{ number: 1, row: 0, col: 0, clue: 'Trophy' }],
+    };
+    const otherWords = deriveCrosswordWords(other);
+    if ('error' in otherWords) {
+      throw new Error(otherWords.error);
+    }
+
+    engine.ensurePlayer('p1', 'Buddy');
+    engine.setLetter('p1', 0, 0, 'P');
+    engine.setPuzzle(other, otherWords);
+    engine.reset();
+
+    expect(engine.activePuzzleId).toBe('other');
+    expect(engine.getPendingPuzzleId()).toBe('other');
+    const snap = engine.getPlayerSnapshot('p1');
+    expect(snap?.puzzle.title).toBe('Other');
+    expect(snap?.letters[0][0]).toBe('');
+    expect(snap?.totalWords).toBe(2);
+  });
+
+  it('recomputes scores when a new player joins', () => {
+    const engine = createEngine();
+    engine.ensurePlayer('a', 'Ada');
+    fillAll(engine, 'a');
+    expect(engine.getAdminSnapshot().players[0]?.score).toBe(1200); // 2*100 + 1000
+
+    engine.ensurePlayer('b', 'Bea');
+    const admin = engine.getAdminSnapshot();
+    expect(admin.players.map((p) => p.name)).toEqual(['Ada', 'Bea']);
+    expect(admin.players[0]?.score).toBe(1200); // still 1st
+    expect(admin.players[1]?.score).toBe(900); // 0 words + 2nd place = 900
   });
 
   it('clears progress on reset but keeps players', () => {
@@ -160,5 +215,6 @@ describe('CrosswordEngine', () => {
     expect(snap?.letters[0][0]).toBe('');
     expect(snap?.correctWordIds).toEqual([]);
     expect(engine.getAdminSnapshot().players).toHaveLength(1);
+    expect(engine.getAdminSnapshot().players[0]?.score).toBe(1000); // 0 words, sole 1st
   });
 });

@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import type { SessionRegistry } from '../session/SessionRegistry';
 import { CrosswordEngine } from './CrosswordEngine';
+import { loadCrosswordPuzzle } from './loadPuzzle';
 
 export function registerCrosswordHandlers(
   io: Server,
@@ -112,8 +113,32 @@ export function registerCrosswordHandlers(
     );
 
     socket.on(
+      'crossword:admin:selectPuzzle',
+      (
+        payload: { puzzleId?: string },
+        ack?: (result: unknown) => void
+      ) => {
+        const puzzleId = payload?.puzzleId?.trim();
+        if (!puzzleId) {
+          ack?.({ ok: false, error: 'Select a crossword' });
+          return;
+        }
+        ack?.(engine.selectPuzzle(puzzleId));
+      }
+    );
+
+    socket.on(
       'crossword:admin:reset',
       (_payload: unknown, ack?: (result: unknown) => void) => {
+        const pendingId = engine.getPendingPuzzleId();
+        if (pendingId !== engine.activePuzzleId) {
+          const loaded = loadCrosswordPuzzle(pendingId);
+          if (!loaded.ok) {
+            ack?.(loaded);
+            return;
+          }
+          engine.setPuzzle(loaded.puzzle, loaded.words);
+        }
         const result = engine.reset();
         ack?.(result);
       }

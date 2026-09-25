@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/brycekwan/quizzer/compare/v1.7.0...v1.8.0) (2026-09-25)
+
+
+### Features
+
+* **crossword:** show desktop clues beside the grid and grey finished words ([bf3afa0](https://github.com/brycekwan/quizzer/commit/bf3afa04d2a52ce379eabe4d0b790396b720f616))
+
 # [1.7.0](https://github.com/brycekwan/quizzer/compare/v1.6.0...v1.7.0) (2026-09-25)
 
 

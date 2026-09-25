@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   WORD_SEARCH_FONT_FRACTION,
+  WORD_SEARCH_MARK_PAD,
   appendTap,
-  ellipseForCells,
+  roundedRectForCells,
   selectionLine,
 } from './wordSearchClient';
 
@@ -58,22 +59,25 @@ describe('appendTap', () => {
   });
 });
 
-describe('ellipseForCells', () => {
-  it('extends half a glyph past the end letters of a horizontal word', () => {
-    const ellipse = ellipseForCells([
+describe('roundedRectForCells', () => {
+  it('boxes a horizontal word with rounded corners past the end letters', () => {
+    const mark = roundedRectForCells([
       { row: 0, col: 0 },
       { row: 0, col: 1 },
       { row: 0, col: 2 },
     ]);
-    expect(ellipse).not.toBeNull();
-    if (!ellipse) {
+    expect(mark).not.toBeNull();
+    if (!mark) {
       return;
     }
-    expect(ellipse.cx).toBeCloseTo(1.5);
-    expect(ellipse.cy).toBeCloseTo(0.5);
-    expect(ellipse.angle).toBeCloseTo(0);
-    const span = 2 + WORD_SEARCH_FONT_FRACTION + 0.08 * 2;
-    expect(ellipse.rx).toBeCloseTo(span / 2);
-    expect(ellipse.ry).toBeLessThan(0.5);
+    expect(mark.cx).toBeCloseTo(1.5);
+    expect(mark.cy).toBeCloseTo(0.5);
+    expect(mark.angle).toBeCloseTo(0);
+    const span = 2 + WORD_SEARCH_FONT_FRACTION + WORD_SEARCH_MARK_PAD * 2;
+    expect(mark.width).toBeCloseTo(span);
+    expect(mark.height).toBeLessThan(1);
+    expect(mark.radius).toBeGreaterThan(0);
+    expect(mark.radius).toBeLessThanOrEqual(mark.height / 2);
+    expect(mark.x).toBeCloseTo(mark.cx - mark.width / 2);
   });
 });

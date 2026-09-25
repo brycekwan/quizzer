@@ -3,7 +3,7 @@ import type { WordSearchCellRef, WordSearchFoundWord } from '@party/shared';
 import { cn } from '@/lib/utils';
 import {
   appendTap,
-  ellipseForCells,
+  roundedRectForCells,
   samePath,
   selectionLine,
 } from '@/lib/wordSearchClient';
@@ -188,23 +188,24 @@ export function WordSearchGrid({
         aria-hidden
       >
         {found.map((word, index) => {
-          const ellipse = ellipseForCells(word.cells);
-          if (!ellipse) {
+          const mark = roundedRectForCells(word.cells);
+          if (!mark) {
             return null;
           }
           const color = MARK_COLORS[index % MARK_COLORS.length];
           return (
-            <ellipse
+            <rect
               key={word.id}
-              cx={ellipse.cx}
-              cy={ellipse.cy}
-              rx={ellipse.rx}
-              ry={ellipse.ry}
-              transform={`rotate(${ellipse.angle} ${ellipse.cx} ${ellipse.cy})`}
-              fill={color}
-              fillOpacity={0.22}
+              x={mark.x}
+              y={mark.y}
+              width={mark.width}
+              height={mark.height}
+              rx={mark.radius}
+              ry={mark.radius}
+              transform={`rotate(${mark.angle} ${mark.cx} ${mark.cy})`}
+              fill="none"
               stroke={color}
-              strokeWidth={0.14}
+              strokeWidth={0.1}
             />
           );
         })}

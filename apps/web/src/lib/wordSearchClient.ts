@@ -1,19 +1,23 @@
 import type { WordSearchCellRef } from '@party/shared';
 
-/** Letter size as a fraction of one cell. The ellipse uses the same ratio. */
+/** Letter size as a fraction of one cell. The outline uses the same ratio. */
 export const WORD_SEARCH_FONT_FRACTION = 0.62;
 /** Cap height relative to the font size. */
 export const WORD_SEARCH_GLYPH_HEIGHT_RATIO = 0.8;
 /** Extra space so the stroke sits just outside the letters, in cell units. */
-export const WORD_SEARCH_ELLIPSE_PAD = 0.08;
+export const WORD_SEARCH_MARK_PAD = 0.1;
 
-export interface WordSearchEllipse {
-  cx: number;
-  cy: number;
-  rx: number;
-  ry: number;
+export interface WordSearchMark {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Corner radius in cell units. */
+  radius: number;
   /** Degrees, clockwise from east when row increases downward. */
   angle: number;
+  cx: number;
+  cy: number;
 }
 
 export function samePath(
@@ -115,12 +119,12 @@ export function appendTap(
 }
 
 /**
- * Ellipse in grid cell units. The center follows the ink of the letters,
- * extended by half a glyph past each end letter.
+ * Rounded rectangle in grid cell units. The box follows the ink of the
+ * letters, extended by half a glyph past each end letter.
  */
-export function ellipseForCells(
+export function roundedRectForCells(
   cells: readonly WordSearchCellRef[]
-): WordSearchEllipse | null {
+): WordSearchMark | null {
   if (cells.length < 2) {
     return null;
   }
@@ -134,12 +138,19 @@ export function ellipseForCells(
   }
 
   const glyph = WORD_SEARCH_FONT_FRACTION;
-  const pad = WORD_SEARCH_ELLIPSE_PAD;
+  const pad = WORD_SEARCH_MARK_PAD;
+  const width = distance + glyph + pad * 2;
+  const height = glyph * WORD_SEARCH_GLYPH_HEIGHT_RATIO + pad * 2;
+  const cx = (first.col + last.col) / 2 + 0.5;
+  const cy = (first.row + last.row) / 2 + 0.5;
   return {
-    cx: (first.col + last.col) / 2 + 0.5,
-    cy: (first.row + last.row) / 2 + 0.5,
-    rx: (distance + glyph + pad * 2) / 2,
-    ry: (glyph * WORD_SEARCH_GLYPH_HEIGHT_RATIO) / 2 + pad,
+    x: cx - width / 2,
+    y: cy - height / 2,
+    width,
+    height,
+    radius: Math.min(height / 2, 0.22),
     angle: (Math.atan2(dy, dx) * 180) / Math.PI,
+    cx,
+    cy,
   };
 }

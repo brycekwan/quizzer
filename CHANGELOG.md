@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/brycekwan/quizzer/compare/v1.5.0...v1.6.0) (2026-09-25)
+
+
+### Features
+
+* **crossword:** move to the next open clue after a correct guess ([69947d8](https://github.com/brycekwan/quizzer/commit/69947d8d46a8d1a4fe74f428239a8355f4420720))
+
 # [1.5.0](https://github.com/brycekwan/quizzer/compare/v1.4.0...v1.5.0) (2026-09-25)
 
 

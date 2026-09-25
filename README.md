@@ -4,10 +4,10 @@ Real-time, Kahoot-style quiz for mobile and web. Single room, Socket.IO sync, ti
 
 ## Stack
 
-- **Nx** monorepo (`apps/web`, `apps/server`, `libs/shared`)
+- **Nx** monorepo (`apps/web`, `apps/server-rs`, `libs/party`, `libs/shared`)
 - React + Vite + Tailwind + shadcn-style UI
-- Express + Socket.IO (server-authoritative game clock)
-- Vitest + ESLint (React hooks / a11y)
+- Rust server (Axum + Socket.IO) with a server-authoritative game clock
+- Vitest + ESLint (React hooks / a11y); Cargo tests for the server
 
 ## Quick start
 
@@ -31,7 +31,7 @@ npm run dev
 
 ## Docker
 
-The production image uses official `node:26-alpine` images from Docker Hub. One container serves the Express/Socket.IO API and the built React client on port **8080**.
+The production image builds the Vite client and the Rust server, then runs the binary on `gcr.io/distroless/cc-debian12:nonroot`. One container serves the API and the built React client on port **8080**.
 
 ```bash
 docker build -t quizzer .

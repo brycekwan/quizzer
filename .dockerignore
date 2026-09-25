@@ -1,6 +1,7 @@
 node_modules
 .git
 .nx
+target
 .vscode
 coverage
 dist

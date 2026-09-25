@@ -138,6 +138,14 @@ export function useWordSearchSocket(role: 'player' | 'admin' = 'player') {
             );
           }
         ),
+      pauseTimer: () =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit('wordsearch:pauseTimer', {}, resolve);
+        }),
+      resumeTimer: () =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit('wordsearch:resumeTimer', {}, resolve);
+        }),
       reset: () =>
         new Promise<{ ok: boolean; error?: string }>((resolve) => {
           socketRef.current?.emit('wordsearch:admin:reset', {}, resolve);

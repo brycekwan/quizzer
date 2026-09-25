@@ -1,4 +1,4 @@
-export const WORD_SEARCH_SIZE = 20;
+export const WORD_SEARCH_SIZE = 12;
 export const WORD_SEARCH_WORD_COUNT = 10;
 
 export const WORD_SEARCH_DIRECTIONS = [
@@ -30,7 +30,7 @@ export interface WordSearchPlacement {
 export interface WordSearchFile {
   id: string;
   title: string;
-  /** Exactly 20×20 uppercase letters. */
+  /** Exactly 12×12 uppercase letters. */
   grid: string[][];
   words: WordSearchPlacement[];
 }

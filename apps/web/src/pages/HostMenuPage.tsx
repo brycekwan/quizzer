@@ -19,6 +19,9 @@ export function HostMenuPage() {
         <Button asChild size="lg" variant="outline" className="w-full">
           <Link to="/host/crossword">Crossword</Link>
         </Button>
+        <Button asChild size="lg" variant="outline" className="w-full">
+          <Link to="/host/wordsearch">Word search</Link>
+        </Button>
       </div>
     </PageShell>
   );

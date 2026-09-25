@@ -6,6 +6,8 @@ import { AdminPage } from './pages/AdminPage';
 import { HostMenuPage } from './pages/HostMenuPage';
 import { CrosswordPage } from './pages/CrosswordPage';
 import { CrosswordAdminPage } from './pages/CrosswordAdminPage';
+import { WordSearchPage } from './pages/WordSearchPage';
+import { WordSearchAdminPage } from './pages/WordSearchAdminPage';
 
 export function App() {
   return (
@@ -15,9 +17,11 @@ export function App() {
       <Route path="/quizzer" element={<PlayPage />} />
       <Route path="/play" element={<Navigate to="/quizzer" replace />} />
       <Route path="/crossword" element={<CrosswordPage />} />
+      <Route path="/wordsearch" element={<WordSearchPage />} />
       <Route path="/host" element={<HostMenuPage />} />
       <Route path="/host/quizzer" element={<AdminPage />} />
       <Route path="/host/crossword" element={<CrosswordAdminPage />} />
+      <Route path="/host/wordsearch" element={<WordSearchAdminPage />} />
       <Route path="/host/admin" element={<Navigate to="/host/quizzer" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -44,7 +44,8 @@ describe('CrosswordEngine', () => {
     let snap = engine.getPlayerSnapshot('p1');
     expect(snap?.correctWordIds).toEqual([]);
 
-    engine.setLetter('p1', 0, 2, 'E');
+    const filled = engine.setLetter('p1', 0, 2, 'E');
+    expect(filled).toEqual({ ok: true, correctWordIds: ['across-1'] });
     snap = engine.getPlayerSnapshot('p1');
     expect(snap?.correctWordIds).toContain('across-1');
     expect(snap?.completed).toBe(false);

@@ -109,7 +109,11 @@ export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
   const api = useMemo(
     () => ({
       setLetter: (row: number, col: number, letter: string) =>
-        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        new Promise<{
+          ok: boolean;
+          error?: string;
+          correctWordIds?: string[];
+        }>((resolve) => {
           socketRef.current?.emit(
             'crossword:setLetter',
             { row, col, letter },
@@ -117,7 +121,11 @@ export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
           );
         }),
       clearLetter: (row: number, col: number) =>
-        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        new Promise<{
+          ok: boolean;
+          error?: string;
+          correctWordIds?: string[];
+        }>((resolve) => {
           socketRef.current?.emit(
             'crossword:clearLetter',
             { row, col },

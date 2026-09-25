@@ -63,6 +63,111 @@ export function wordsAtCell(
   );
 }
 
+function isSolved(
+  word: ClientCrosswordWord,
+  correctWordIds: readonly string[]
+): boolean {
+  return correctWordIds.includes(word.id);
+}
+
+function isWordStart(
+  word: ClientCrosswordWord,
+  row: number,
+  col: number
+): boolean {
+  const start = word.cells[0];
+  return start?.row === row && start?.col === col;
+}
+
+/**
+ * Clues in number order. The same number lists across before down.
+ */
+export function orderedClues(
+  words: ClientCrosswordWord[]
+): ClientCrosswordWord[] {
+  return [...words].sort((a, b) => {
+    if (a.number !== b.number) {
+      return a.number - b.number;
+    }
+    if (a.direction === b.direction) {
+      return 0;
+    }
+    return a.direction === 'across' ? -1 : 1;
+  });
+}
+
+/**
+ * Next unsolved clue after `currentId` in numbered order, wrapping to the
+ * start. Null when every other clue is already solved.
+ */
+export function nextUnsolvedClue(
+  words: ClientCrosswordWord[],
+  currentId: string,
+  correctWordIds: readonly string[]
+): ClientCrosswordWord | null {
+  const sequence = orderedClues(words);
+  const index = sequence.findIndex((word) => word.id === currentId);
+  if (index < 0) {
+    return null;
+  }
+  const later = sequence.slice(index + 1);
+  const earlier = sequence.slice(0, index);
+  return (
+    [...later, ...earlier].find((word) => !isSolved(word, correctWordIds)) ??
+    null
+  );
+}
+
+/**
+ * Direction to use when selecting a square.
+ * A shared square prefers the word that starts there, unless that word is
+ * already solved and the other is not. If both start here (or neither does)
+ * and exactly one is unsolved, pick the unsolved word. A tie on a shared
+ * start defaults to across.
+ */
+export function directionForCell(
+  covering: ClientCrosswordWord[],
+  row: number,
+  col: number,
+  current: CrosswordDirection,
+  correctWordIds: readonly string[]
+): CrosswordDirection {
+  if (covering.length === 0) {
+    return current;
+  }
+  if (covering.length === 1) {
+    return covering[0].direction;
+  }
+
+  const starts = covering.filter((word) => isWordStart(word, row, col));
+  const unsolved = covering.filter((word) => !isSolved(word, correctWordIds));
+
+  if (starts.length === 1) {
+    const start = starts[0];
+    const other = covering.find((word) => word.id !== start.id);
+    if (other && isSolved(start, correctWordIds) && !isSolved(other, correctWordIds)) {
+      return other.direction;
+    }
+    return start.direction;
+  }
+
+  if (unsolved.length === 1) {
+    return unsolved[0].direction;
+  }
+
+  if (starts.length > 1) {
+    return (
+      starts.find((word) => word.direction === 'across')?.direction ??
+      starts[0].direction
+    );
+  }
+
+  return (
+    covering.find((word) => word.direction === current)?.direction ??
+    covering[0].direction
+  );
+}
+
 export function isCellCorrect(
   correctWordIds: string[],
   words: ClientCrosswordWord[],

@@ -115,7 +115,7 @@ export class CrosswordEngine {
     row: number,
     col: number,
     letter: string
-  ): { ok: true } | { ok: false; error: string } {
+  ): { ok: true; correctWordIds: string[] } | { ok: false; error: string } {
     const player = this.players.get(playerId);
     if (!player) {
       return { ok: false, error: 'Join the crossword first' };
@@ -137,14 +137,14 @@ export class CrosswordEngine {
     player.letters[row][col] = normalized;
     this.recomputeWords(player);
     this.emit();
-    return { ok: true };
+    return { ok: true, correctWordIds: [...player.correctWordIds] };
   }
 
   clearLetter(
     playerId: string,
     row: number,
     col: number
-  ): { ok: true } | { ok: false; error: string } {
+  ): { ok: true; correctWordIds: string[] } | { ok: false; error: string } {
     const player = this.players.get(playerId);
     if (!player) {
       return { ok: false, error: 'Join the crossword first' };
@@ -155,7 +155,7 @@ export class CrosswordEngine {
     player.letters[row][col] = '';
     this.recomputeWords(player);
     this.emit();
-    return { ok: true };
+    return { ok: true, correctWordIds: [...player.correctWordIds] };
   }
 
   private isOpenCell(row: number, col: number): boolean {

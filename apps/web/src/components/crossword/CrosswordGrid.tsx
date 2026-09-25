@@ -55,7 +55,7 @@ export function CrosswordGrid({
               aria-selected={isSelected}
               onClick={() => onSelect(row, col)}
               className={cn(
-                'relative aspect-square rounded-sm border-2 border-ink/20 bg-white font-display text-base font-bold uppercase text-ink shadow-sm transition-colors sm:text-xl',
+                'relative aspect-square select-none rounded-sm border-2 border-ink/20 bg-white font-display text-base font-bold uppercase text-ink shadow-sm transition-colors touch-manipulation sm:text-xl',
                 isHighlighted && !isSelected && 'bg-sky/30',
                 isSelected && 'border-grape bg-sun/40 ring-2 ring-grape/40',
                 isCorrect && 'bg-mint/35 border-mint'

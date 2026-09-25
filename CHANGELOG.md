@@ -1,3 +1,15 @@
+# [2.0.0](https://github.com/brycekwan/quizzer/compare/v1.9.0...v2.0.0) (2026-09-25)
+
+
+* feat!: replace the Express server with a Rust binary ([ba2e209](https://github.com/brycekwan/quizzer/commit/ba2e209890d2e570379ac358467dfcbaa8a1059f))
+
+
+### BREAKING CHANGES
+
+* The production process is no longer Node. The image runs the party-server binary on port 8080.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
 # [1.9.0](https://github.com/brycekwan/quizzer/compare/v1.8.0...v1.9.0) (2026-09-25)
 
 

@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/brycekwan/quizzer/compare/v1.4.0...v1.5.0) (2026-09-25)
+
+
+### Features
+
+* **crossword:** add admin puzzle select and live scoring ([3b3bdbf](https://github.com/brycekwan/quizzer/commit/3b3bdbf4bd57c81ff7ab88d693bc3f48bdc65541))
+
 # [1.4.0](https://github.com/brycekwan/quizzer/compare/v1.3.1...v1.4.0) (2026-09-24)
 
 

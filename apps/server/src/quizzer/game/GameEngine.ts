@@ -283,7 +283,11 @@ export class GameEngine {
     this.players.delete(playerId);
     this.answers.delete(playerId);
     this.participants.delete(playerId);
-    this.emit();
+    if (this.phase === 'answering' && this.allPlayersAnswered()) {
+      this.enterReveal();
+    } else {
+      this.emit();
+    }
     return { ok: true, socketId };
   }
 

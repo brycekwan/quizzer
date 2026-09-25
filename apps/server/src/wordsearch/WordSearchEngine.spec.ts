@@ -182,6 +182,8 @@ describe('WordSearchEngine', () => {
     expect(admin.players[0]?.elapsedMs).toBe(30_000);
     expect(admin.players[1]?.elapsedMs).toBe(60_000);
     expect(admin.players[2]?.foundCount).toBe(1);
+    // Bea: 2 words + 1st = 200 + 1000; Ada: 2 + 2nd = 200 + 900; Cal: 1 + 3rd = 100 + 800
+    expect(admin.players.map((player) => player.score)).toEqual([1200, 1100, 900]);
     vi.useRealTimers();
   });
 

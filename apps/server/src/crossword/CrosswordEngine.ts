@@ -330,4 +330,11 @@ export class CrosswordEngine {
     this.emit();
     return { ok: true };
   }
+
+  removePlayer(playerId: string): void {
+    if (!this.players.delete(playerId)) {
+      return;
+    }
+    this.emit();
+  }
 }

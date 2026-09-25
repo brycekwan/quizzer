@@ -54,6 +54,7 @@ Prod: one Docker image serves API + built web on **8080**.
 | `/host/quizzer` | Quizzer admin (`/host/admin` redirects here) |
 | `/host/crossword` | Crossword admin + reset |
 | `/host/wordsearch` | Word search admin, leaderboard, per-player reset |
+| `/host/system` | Connected players, combined scores, remove from the party |
 
 ## Architecture rules
 
@@ -84,8 +85,11 @@ JSON under `apps/server/wordsearch/puzzles/`: `{ id, title, grid, words }`. `gri
 | `wordsearch:subscribe` | Enter word search (requires session) |
 | `wordsearch:submitSelection` | Submit a selected cell path |
 | `wordsearch:admin:subscribe` / `selectPuzzle` / `reset` / `resetPlayer` | Word search host |
+| `system:admin:subscribe` / `kick` | System host: connected players and remove from the party |
 
-Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`.
+Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `system:admin:state`.
+
+System removal emits `player:kicked` with reason `Removed from the system by admin`, clears that player's quiz, crossword, and word search progress, and sends them to login. Word search score is 100 points per word found plus a placement bonus of 1000 down to 100 for ranks 1–10 (most words, then shortest time). The system leaderboard sums crossword and word search scores and shows the quiz score separately.
 
 ## Conventions
 

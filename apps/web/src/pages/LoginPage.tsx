@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { isValidPlayerName } from '@party/shared';
 import { useSession } from '@/hooks/useSession';
+import { readSystemRemovalMessage } from '@/lib/systemRemoval';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,7 @@ export function LoginPage() {
     useSession();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [removalMessage] = useState(() => readSystemRemovalMessage());
 
   if (playerId && playerName) {
     return <Navigate to="/" replace />;
@@ -41,6 +43,11 @@ export function LoginPage() {
         Log in
       </h1>
       <p className="mt-2 text-ink/70">Pick a unique name to play.</p>
+      {removalMessage ? (
+        <p role="alert" className="mt-4 font-bold text-red-600">
+          {removalMessage}
+        </p>
+      ) : null}
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Display name</Label>

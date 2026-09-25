@@ -135,12 +135,13 @@ export function WordSearchAdminPage() {
           <div className="border-b-4 border-ink/10 px-5 py-3">
             <h2 className="font-display text-2xl font-bold">Leaderboard</h2>
             <p className="text-sm font-semibold text-ink/60">
-              Most words found, then shortest time
+              Most words found, then shortest time. 100 pts per word · placement
+              bonus 1000→100 for ranks 1–10
             </p>
           </div>
           {adminState.players.length === 0 ? (
             <p className="px-5 py-8 text-center font-semibold text-ink/50">
-              No players have entered the word search yet.
+              No players have played this word search yet.
             </p>
           ) : (
             <ul className="divide-y-2 divide-ink/10">
@@ -162,13 +163,23 @@ export function WordSearchAdminPage() {
                       />
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void onResetPlayer(player.playerId)}
-                  >
-                    Reset
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="font-display text-2xl font-bold text-grape">
+                        {player.score}
+                      </p>
+                      <p className="text-xs font-extrabold uppercase tracking-wide text-ink/45">
+                        points
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void onResetPlayer(player.playerId)}
+                    >
+                      Reset
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>

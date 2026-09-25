@@ -5,6 +5,11 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import {
+  clearSystemRemovalMessage,
+  isSystemRemoval,
+  noteSystemRemoval,
+} from '@/lib/systemRemoval';
 
 type LoginResult =
   | { ok: true; playerId: string; name: string }
@@ -29,6 +34,7 @@ export function useSession() {
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
+    let active = true;
 
     const clearSession = () => {
       clearStoredSession();
@@ -71,12 +77,22 @@ export function useSession() {
       rejoinIfNeeded();
     });
     socket.on('disconnect', () => setConnected(false));
-    socket.on('player:kicked', () => {
+    socket.on('player:kicked', (payload?: { reason?: string }) => {
+      if (!active) {
+        return;
+      }
+      if (isSystemRemoval(payload)) {
+        noteSystemRemoval();
+        setPlayerId(null);
+        setPlayerName(null);
+        return;
+      }
       setKicked(true);
       clearSession();
     });
 
     return () => {
+      active = false;
       socket.disconnect();
       socketRef.current = null;
     };
@@ -97,6 +113,7 @@ export function useSession() {
             }) => {
               if (result.ok && result.playerId && result.name) {
                 writeStoredSession(result.playerId, result.name);
+                clearSystemRemovalMessage();
                 setPlayerId(result.playerId);
                 setPlayerName(result.name);
                 setKicked(false);

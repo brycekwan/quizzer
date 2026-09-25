@@ -15,8 +15,26 @@ type LoginResult =
   | { ok: true; session: Session; replacedSocketId: string | null }
   | { ok: false; error: string };
 
+type Listener = () => void;
+
 export class SessionRegistry {
   private sessions = new Map<string, Session>();
+  private readonly listeners = new Set<Listener>();
+
+  onChange(listener: Listener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emit(): void {
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
+
+  list(): Session[] {
+    return [...this.sessions.values()];
+  }
 
   get(playerId: string): Session | undefined {
     return this.sessions.get(playerId);
@@ -63,6 +81,7 @@ export class SessionRegistry {
             : null;
         existing.socketId = socketId;
         existing.connected = true;
+        this.emit();
         return { ok: true, session: existing, replacedSocketId };
       }
       // Stale id after process restart — fall through to name-based login.
@@ -82,6 +101,7 @@ export class SessionRegistry {
           : null;
       byName.socketId = socketId;
       byName.connected = true;
+      this.emit();
       return { ok: true, session: byName, replacedSocketId };
     }
 
@@ -98,6 +118,7 @@ export class SessionRegistry {
       socketId,
     };
     this.sessions.set(id, session);
+    this.emit();
     return { ok: true, session, replacedSocketId: null };
   }
 
@@ -111,6 +132,7 @@ export class SessionRegistry {
     }
     session.connected = false;
     session.socketId = null;
+    this.emit();
   }
 
   remove(
@@ -122,10 +144,12 @@ export class SessionRegistry {
     }
     const socketId = session.socketId;
     this.sessions.delete(playerId);
+    this.emit();
     return { ok: true, socketId };
   }
 
   clear(): void {
     this.sessions.clear();
+    this.emit();
   }
 }

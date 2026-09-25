@@ -1,6 +1,7 @@
 import {
   selectionMatchesWord,
   toPublicWordSearch,
+  wordSearchScore,
   type WordSearchAdminEntry,
   type WordSearchAdminSnapshot,
   type WordSearchCellRef,
@@ -238,6 +239,7 @@ export class WordSearchEngine {
         name: player.name,
         foundCount: player.found.length,
         totalWords: this.words.length,
+        score: 0,
         elapsedMs: player.elapsedMs,
         activeSince: player.activeSince,
         completedAt: player.completedAt,
@@ -255,6 +257,11 @@ export class WordSearchEngine {
       }
       return a.name.localeCompare(b.name);
     });
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      entry.score = wordSearchScore(entry.foundCount, i + 1);
+    }
 
     return {
       puzzleId: this.puzzle.id,
@@ -290,5 +297,12 @@ export class WordSearchEngine {
     }
     this.emit();
     return { ok: true };
+  }
+
+  removePlayer(playerId: string): void {
+    if (!this.players.delete(playerId)) {
+      return;
+    }
+    this.emit();
   }
 }

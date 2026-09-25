@@ -1,0 +1,30 @@
+{
+  "name": "party",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/party/src",
+  "projectType": "library",
+  "tags": ["scope:server", "lang:rust"],
+  "targets": {
+    "build": {
+      "executor": "@monodon/rust:build",
+      "outputs": ["{workspaceRoot}/dist/target/party/build"],
+      "options": {
+        "target-dir": "dist/target/party/build"
+      }
+    },
+    "test": {
+      "executor": "@monodon/rust:test",
+      "outputs": ["{workspaceRoot}/dist/target/party/test"],
+      "options": {
+        "target-dir": "dist/target/party/test"
+      }
+    },
+    "lint": {
+      "executor": "@monodon/rust:lint",
+      "outputs": ["{workspaceRoot}/dist/target/party/lint"],
+      "options": {
+        "target-dir": "dist/target/party/lint"
+      }
+    }
+  }
+}

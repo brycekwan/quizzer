@@ -1,0 +1,48 @@
+{
+  "name": "server-rs",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/server-rs/src",
+  "projectType": "application",
+  "tags": ["scope:server", "lang:rust"],
+  "implicitDependencies": ["party"],
+  "targets": {
+    "build": {
+      "executor": "@monodon/rust:build",
+      "outputs": ["{workspaceRoot}/dist/target/server-rs/build"],
+      "dependsOn": ["^build"],
+      "options": {
+        "target-dir": "dist/target/server-rs/build"
+      }
+    },
+    "test": {
+      "executor": "@monodon/rust:test",
+      "outputs": ["{workspaceRoot}/dist/target/server-rs/test"],
+      "dependsOn": ["^build"],
+      "options": {
+        "target-dir": "dist/target/server-rs/test"
+      }
+    },
+    "lint": {
+      "executor": "@monodon/rust:lint",
+      "outputs": ["{workspaceRoot}/dist/target/server-rs/lint"],
+      "options": {
+        "target-dir": "dist/target/server-rs/lint"
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@monodon/rust:run",
+      "outputs": ["{workspaceRoot}/dist/target/server-rs/serve"],
+      "options": {
+        "target-dir": "dist/target/server-rs/serve"
+      }
+    },
+    "contract": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "PARTY_SERVER_BIN=dist/target/server-rs/build/debug/party-server vitest run --config apps/server-rs/vitest.config.ts"
+      }
+    }
+  }
+}

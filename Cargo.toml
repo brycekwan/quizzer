@@ -1,0 +1,6 @@
+[workspace]
+resolver = "2"
+members = ["libs/party", "apps/server-rs"]
+
+[profile.release]
+strip = "symbols"

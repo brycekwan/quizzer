@@ -4,10 +4,10 @@ Multi-game party platform: Kahoot-style quizzer, crossword, and word search. Ser
 
 ## Stack
 
-- **Nx** monorepo: `apps/web`, `apps/server`, `libs/shared`
+- **Nx** monorepo: `apps/web`, `apps/server-rs`, `libs/party`, `libs/shared`
 - React 19 + Vite + Tailwind + Radix/shadcn-style UI + React Router
-- Express + Socket.IO
-- Vitest + ESLint; TypeScript strict
+- Rust server (Axum + socketioxide) speaking the Socket.IO protocol; `@party/shared` stays TypeScript for the web app
+- Vitest + ESLint; TypeScript strict; Cargo tests for the server
 - Shared package import: `@party/shared` → `libs/shared/src`
 
 ## Layout
@@ -21,10 +21,8 @@ Multi-game party platform: Kahoot-style quizzer, crossword, and word search. Ser
 | `apps/web/src/hooks/useWordSearchSocket.ts` | Word search play/admin socket |
 | `apps/web/src/components/crossword/` | Grid + clue list |
 | `apps/web/src/components/wordsearch/` | Word search grid |
-| `apps/server/src/session/` | Unique name + one active connection |
-| `apps/server/src/quizzer/` | Game engine, socket handlers, question loader |
-| `apps/server/src/crossword/` | Crossword engine, handlers, puzzle loader |
-| `apps/server/src/wordsearch/` | Word search engine, handlers, puzzle loader |
+| `apps/server-rs/` | Rust binary: HTTP, static files, Socket.IO handlers (`party-server`) |
+| `libs/party/` | Session registry, quizzer, crossword, word search, system admin |
 | `apps/server/questions/*.json` | Quizzer question packs |
 | `apps/server/crossword/puzzles/*.json` | Crossword packs (grid-first) |
 | `apps/server/wordsearch/puzzles/*.json` | Word search packs (20×20 grid + placements) |

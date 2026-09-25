@@ -1,39 +1,36 @@
-# Multi-stage production image for Quizzer (official Node images from Docker Hub)
-# Serves Express + Socket.IO API and the built React client on port 8080.
+# Web assets, Rust server, distroless runtime. One image, port 8080.
 
-FROM node:26-alpine AS deps
+FROM node:26-alpine AS web
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-
-FROM deps AS build
-WORKDIR /app
 COPY . .
 ENV NX_DAEMON=false
-RUN npx nx run-many -t build --projects=web,server
+RUN npx nx build web
 
-FROM node:26-alpine AS runner
+FROM rust:1.98.1-bookworm AS rust
+WORKDIR /src
+COPY rust-toolchain.toml Cargo.toml Cargo.lock ./
+COPY libs/party libs/party
+COPY apps/server-rs apps/server-rs
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/src/target \
+    cargo build --release --locked -p server-rs \
+    && cp /src/target/release/party-server /party-server
+
+FROM gcr.io/distroless/cc-debian12:nonroot
 WORKDIR /app
-ENV NODE_ENV=production
+COPY --from=rust /party-server /app/party-server
+COPY --from=web /app/dist/apps/web /app/public
+COPY apps/server/questions /app/questions
+COPY apps/server/crossword/puzzles /app/crossword/puzzles
+COPY apps/server/wordsearch/puzzles /app/wordsearch/puzzles
 ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV STATIC_DIR=/app/public
-
-RUN addgroup -S quizzer && adduser -S quizzer -G quizzer
-
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-
-COPY --from=build /app/dist/apps/server/main.js ./main.js
-COPY --from=build /app/dist/apps/server/questions ./questions
-COPY --from=build /app/dist/apps/server/crossword/puzzles ./crossword/puzzles
-COPY --from=build /app/dist/apps/server/wordsearch/puzzles ./wordsearch/puzzles
-COPY --from=build /app/dist/apps/web ./public
-
 ENV QUESTIONS_DIR=/app/questions
 ENV CROSSWORD_PUZZLES_DIR=/app/crossword/puzzles
 ENV WORDSEARCH_PUZZLES_DIR=/app/wordsearch/puzzles
-
-USER quizzer
 EXPOSE 8080
-CMD ["node", "main.js"]
+ENTRYPOINT ["/app/party-server"]

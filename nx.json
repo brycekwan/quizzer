@@ -2,6 +2,7 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "analytics": false,
   "useDaemonProcess": false,
+  "plugins": ["@monodon/rust"],
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
@@ -11,7 +12,13 @@
       "!{projectRoot}/src/test-setup.[jt]s",
       "!{projectRoot}/eslint.config.mjs"
     ],
-    "sharedGlobals": []
+    "sharedGlobals": [],
+    "rust": [
+      "default",
+      "{workspaceRoot}/Cargo.toml",
+      "{workspaceRoot}/Cargo.lock",
+      "{workspaceRoot}/rust-toolchain.toml"
+    ]
   },
   "targetDefaults": {
     "build": {
@@ -25,6 +32,20 @@
     },
     "lint": {
       "cache": true
+    },
+    "@monodon/rust:build": {
+      "cache": true,
+      "inputs": ["rust", "^rust"],
+      "dependsOn": ["^build"]
+    },
+    "@monodon/rust:test": {
+      "cache": true,
+      "inputs": ["rust", "^rust"],
+      "dependsOn": ["^build"]
+    },
+    "@monodon/rust:lint": {
+      "cache": true,
+      "inputs": ["rust", "^rust"]
     },
     "serve": {
       "cache": false

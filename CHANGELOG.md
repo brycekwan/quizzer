@@ -1,3 +1,16 @@
+# [1.7.0](https://github.com/brycekwan/quizzer/compare/v1.6.0...v1.7.0) (2026-09-25)
+
+
+### Bug Fixes
+
+* **wordsearch:** outline found words with an unfilled rounded rectangle ([dd3dd87](https://github.com/brycekwan/quizzer/commit/dd3dd8736015092bfbebc95c09ce750d7a5a2c6d))
+
+
+### Features
+
+* add wordsearch app ([d29006a](https://github.com/brycekwan/quizzer/commit/d29006ac9b5b9444feb900a6ec2d30ce96f3e6cf))
+* **wordsearch:** explain selection and let players unselect end letters ([6264322](https://github.com/brycekwan/quizzer/commit/6264322adbfbc3912c99fb97a5da48810238a3b8))
+
 # [1.6.0](https://github.com/brycekwan/quizzer/compare/v1.5.0...v1.6.0) (2026-09-25)
 
 

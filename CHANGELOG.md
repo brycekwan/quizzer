@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/brycekwan/quizzer/compare/v1.8.0...v1.9.0) (2026-09-25)
+
+
+### Features
+
+* **host:** add a system leaderboard and word search scoring ([d8f3f75](https://github.com/brycekwan/quizzer/commit/d8f3f758b8f81be2fd120318c2259bf53bb9503a))
+
 # [1.8.0](https://github.com/brycekwan/quizzer/compare/v1.7.0...v1.8.0) (2026-09-25)
 
 

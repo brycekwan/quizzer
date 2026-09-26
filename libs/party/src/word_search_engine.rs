@@ -12,6 +12,8 @@ struct PlayerProgress {
     found: Vec<WordSearchFoundWord>,
     elapsed_ms: i64,
     active_since: Option<i64>,
+    /// Set by the first non-empty selection. Resume does not start the clock before that.
+    timer_started: bool,
     completed_at: Option<i64>,
 }
 
@@ -118,6 +120,7 @@ impl WordSearchEngine {
                 found: Vec::new(),
                 elapsed_ms: 0,
                 active_since: None,
+                timer_started: false,
                 completed_at: None,
             },
         );
@@ -141,7 +144,7 @@ impl WordSearchEngine {
         let Some(player) = self.players.get_mut(player_id) else {
             return;
         };
-        if player.completed_at.is_some() || player.active_since.is_some() {
+        if !player.timer_started || player.completed_at.is_some() || player.active_since.is_some() {
             return;
         }
         player.active_since = Some(now);
@@ -158,6 +161,7 @@ impl WordSearchEngine {
         if cells.is_empty() {
             return Ok(false);
         }
+        self.note_selection(player_id);
         let Some(matched) = self
             .words
             .iter()
@@ -194,6 +198,23 @@ impl WordSearchEngine {
             }
         }
         Ok(true)
+    }
+
+    /// Starts the clock on the first selection, and continues it if a later selection arrives while paused.
+    fn note_selection(&mut self, player_id: &str) {
+        let now = self.now();
+        let Some(player) = self.players.get_mut(player_id) else {
+            return;
+        };
+        if player.completed_at.is_some() {
+            return;
+        }
+        if !player.timer_started {
+            player.timer_started = true;
+            player.active_since = Some(now);
+        } else if player.active_since.is_none() {
+            player.active_since = Some(now);
+        }
     }
 
     pub fn player_snapshot(&self, player_id: &str) -> Option<WordSearchPlayerSnapshot> {
@@ -259,6 +280,7 @@ impl WordSearchEngine {
         player.found.clear();
         player.elapsed_ms = 0;
         player.active_since = None;
+        player.timer_started = false;
         player.completed_at = None;
         Ok(())
     }
@@ -268,12 +290,17 @@ impl WordSearchEngine {
             player.found.clear();
             player.elapsed_ms = 0;
             player.active_since = None;
+            player.timer_started = false;
             player.completed_at = None;
         }
     }
 
     pub fn remove_player(&mut self, player_id: &str) {
         self.players.shift_remove(player_id);
+    }
+
+    pub fn clear_players(&mut self) {
+        self.players.clear();
     }
 }
 
@@ -336,11 +363,36 @@ mod tests {
         WordSearchEngine::with_clock(puzzle(), words(), None, None, Clock::manual(start))
     }
 
+    fn arm_clock(engine: &mut WordSearchEngine, player_id: &str) {
+        engine
+            .submit_selection(player_id, &[WordSearchCellRef { row: 1, col: 1 }])
+            .unwrap();
+    }
+
+    #[test]
+    fn clock_stays_stopped_until_the_first_selection() {
+        let mut engine = engine_at(NOON_2026_MS);
+        engine.ensure_player("p1", "Buddy");
+        engine.resume_timer("p1");
+        let snap = engine.player_snapshot("p1").unwrap();
+        assert!(snap.active_since.is_none());
+        assert_eq!(snap.elapsed_ms, 0);
+        engine
+            .submit_selection("p1", &[WordSearchCellRef { row: 1, col: 1 }])
+            .unwrap();
+        assert_eq!(
+            engine.player_snapshot("p1").unwrap().active_since,
+            Some(NOON_2026_MS)
+        );
+        engine.reset_player("p1").unwrap();
+        engine.resume_timer("p1");
+        assert!(engine.player_snapshot("p1").unwrap().active_since.is_none());
+    }
+
     #[test]
     fn accepts_forward_or_reversed() {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("p1", "Buddy");
-        engine.resume_timer("p1");
         assert!(!engine
             .submit_selection("p1", &[WordSearchCellRef { row: 0, col: 0 }, WordSearchCellRef { row: 0, col: 1 }])
             .unwrap());
@@ -377,7 +429,7 @@ mod tests {
     fn clock_pauses_while_away() {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("p1", "Buddy");
-        engine.resume_timer("p1");
+        arm_clock(&mut engine, "p1");
         assert_eq!(engine.player_snapshot("p1").unwrap().active_since, Some(NOON_2026_MS));
         engine.clock().set(NOON_2026_MS + 30_000);
         engine.pause_timer("p1");
@@ -394,7 +446,7 @@ mod tests {
     fn freezes_when_every_word_found() {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("p1", "Buddy");
-        engine.resume_timer("p1");
+        arm_clock(&mut engine, "p1");
         engine.clock().set(NOON_2026_MS + 45_000);
         for word in words() {
             engine.submit_selection("p1", &word.cells).unwrap();
@@ -417,18 +469,18 @@ mod tests {
         engine.ensure_player("c", "Cal");
         let found = words();
         engine.clock().set(NOON_2026_MS);
-        engine.resume_timer("c");
+        arm_clock(&mut engine, "c");
         engine.clock().set(NOON_2026_MS + 10_000);
         engine.submit_selection("c", &found[0].cells).unwrap();
         engine.pause_timer("c");
         engine.clock().set(NOON_2026_MS + 60_000);
-        engine.resume_timer("a");
+        arm_clock(&mut engine, "a");
         engine.clock().set(NOON_2026_MS + 120_000);
         engine.submit_selection("a", &found[0].cells).unwrap();
         engine.submit_selection("a", &found[1].cells).unwrap();
         engine.pause_timer("a");
         engine.clock().set(NOON_2026_MS + 180_000);
-        engine.resume_timer("b");
+        arm_clock(&mut engine, "b");
         engine.clock().set(NOON_2026_MS + 210_000);
         engine.submit_selection("b", &found[0].cells).unwrap();
         engine.submit_selection("b", &found[1].cells).unwrap();
@@ -448,7 +500,6 @@ mod tests {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("a", "Ada");
         engine.ensure_player("b", "Bea");
-        engine.resume_timer("a");
         let found = words();
         engine.submit_selection("a", &found[0].cells).unwrap();
         engine.submit_selection("b", &found[1].cells).unwrap();

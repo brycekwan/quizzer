@@ -166,3 +166,4 @@ pub struct GameStateSnapshot {
 }
 
 pub const SYSTEM_REMOVAL_REASON: &str = "Removed from the system by admin";
+pub const QUIZ_REMOVAL_REASON: &str = "Removed from the quiz game";

@@ -3,8 +3,7 @@ import { clearStoredSession } from './sessionStorage';
 
 const SYSTEM_REMOVAL_KEY = 'party.systemRemoval';
 
-export const SYSTEM_REMOVAL_MESSAGE =
-  'The admin has removed you from the system.';
+export const SYSTEM_REMOVAL_MESSAGE = "You've been removed from the game.";
 
 export function noteSystemRemoval(): void {
   if (typeof window === 'undefined') {

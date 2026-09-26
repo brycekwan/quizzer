@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCrosswordSocket } from '@/hooks/useCrosswordSocket';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { computeElapsedMs, formatElapsedMs } from '@/lib/crosswordClient';
@@ -34,8 +35,12 @@ function ElapsedCell({
 }
 
 export function CrosswordAdminPage() {
-  const { connected, adminState, error, setError, reset, selectPuzzle } =
+  const { connected, adminState, error, setError, reset, resetPlayer, selectPuzzle } =
     useCrosswordSocket('admin');
+  const [confirm, setConfirm] = useState<
+    { kind: 'all' } | { kind: 'player'; playerId: string; name: string } | null
+  >(null);
+  const [confirming, setConfirming] = useState(false);
 
   if (!adminState) {
     return (
@@ -62,6 +67,13 @@ export function CrosswordAdminPage() {
     }
   };
 
+  const onResetPlayer = async (playerId: string) => {
+    const result = await resetPlayer(playerId);
+    if (!result.ok) {
+      setError(result.error ?? 'Could not reset player');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-playfield px-4 py-6 text-ink">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -81,7 +93,7 @@ export function CrosswordAdminPage() {
             <Button asChild variant="outline" size="sm">
               <Link to="/host">Back to host menu</Link>
             </Button>
-            <Button variant="coral" size="sm" onClick={() => void onReset()}>
+            <Button variant="coral" size="sm" onClick={() => setConfirm({ kind: 'all' })}>
               Reset crossword
             </Button>
           </div>
@@ -151,13 +163,28 @@ export function CrosswordAdminPage() {
                         />
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-display text-2xl font-bold text-grape">
-                        {player.score}
-                      </p>
-                      <p className="text-xs font-extrabold uppercase tracking-wide text-ink/45">
-                        points
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-display text-2xl font-bold text-grape">
+                          {player.score}
+                        </p>
+                        <p className="text-xs font-extrabold uppercase tracking-wide text-ink/45">
+                          points
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setConfirm({
+                            kind: 'player',
+                            playerId: player.playerId,
+                            name: player.name,
+                          })
+                        }
+                      >
+                        Reset
+                      </Button>
                     </div>
                   </li>
                 );
@@ -166,6 +193,41 @@ export function CrosswordAdminPage() {
           )}
         </section>
       </div>
+      <ConfirmDialog
+        open={confirm != null}
+        title={
+          confirm?.kind === 'player'
+            ? `Reset ${confirm.name}'s crossword?`
+            : 'Reset the crossword?'
+        }
+        description={
+          confirm?.kind === 'player'
+            ? `${confirm.name} goes back to the start of the puzzle and their score is cleared.`
+            : 'Every player goes back to the start of the puzzle and scores are cleared.'
+        }
+        confirmLabel="Reset"
+        pending={confirming}
+        onConfirm={() => {
+          void (async () => {
+            if (!confirm) {
+              return;
+            }
+            setConfirming(true);
+            if (confirm.kind === 'all') {
+              await onReset();
+            } else {
+              await onResetPlayer(confirm.playerId);
+            }
+            setConfirming(false);
+            setConfirm(null);
+          })();
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirm(null);
+          }
+        }}
+      />
     </div>
   );
 }

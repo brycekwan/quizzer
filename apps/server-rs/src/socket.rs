@@ -5,7 +5,7 @@ use party::load::{
     resolve_crossword_dir, resolve_questions_dir, resolve_word_search_dir,
 };
 use party::quizzer::SnapshotRole;
-use party::types::{QuestionSetMode, SYSTEM_REMOVAL_REASON};
+use party::types::{QuestionSetMode, QUIZ_REMOVAL_REASON, SYSTEM_REMOVAL_REASON};
 use party::word_search::WordSearchCellRef;
 use serde_json::{json, Value};
 use socketioxide::extract::{AckSender, Data, SocketRef, State};
@@ -114,7 +114,7 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
                     }
                     let _ = target.emit(
                         "game:reset",
-                        &json!({ "reason": "Game was reset — back to the menu" }),
+                        &json!({ "reason": "Game was reset — return to the lobby" }),
                     );
                 }
             }
@@ -177,6 +177,18 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         },
     );
     socket.on(
+        "crossword:pauseTimer",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_crossword_timer(app, socket, ack, true);
+        },
+    );
+    socket.on(
+        "crossword:resumeTimer",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_crossword_timer(app, socket, ack, false);
+        },
+    );
+    socket.on(
         "crossword:admin:subscribe",
         async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
             flag_mut(&app, &socket, |meta| meta.crossword_admin = true);
@@ -199,6 +211,25 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         "crossword:admin:reset",
         async |ack: AckSender, State(app): State<Arc<App>>| {
             let result = reset_crossword(&app);
+            let _ = ack.send(&result);
+            changed(&app);
+        },
+    );
+    socket.on(
+        "crossword:admin:resetPlayer",
+        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+            let player_id = payload.get("playerId").and_then(Value::as_str).unwrap_or("").trim();
+            if player_id.is_empty() {
+                let _ = ack.send(&fail("Choose a player"));
+                return;
+            }
+            let result = {
+                let mut party = app.party.lock().expect("party");
+                match party.crossword.reset_player(player_id) {
+                    Ok(()) => json!({ "ok": true }),
+                    Err(error) => fail(error),
+                }
+            };
             let _ = ack.send(&result);
             changed(&app);
         },
@@ -282,6 +313,12 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         "system:admin:kick",
         async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
             on_system_kick(app, payload, ack);
+        },
+    );
+    socket.on(
+        "system:admin:reset",
+        async |ack: AckSender, State(app): State<Arc<App>>| {
+            on_system_reset(app, ack);
         },
     );
 
@@ -438,17 +475,16 @@ fn on_quiz_kick(app: Arc<App>, payload: Value, ack: AckSender) {
     let player_id = payload.get("playerId").and_then(Value::as_str).unwrap_or("").to_string();
     let result = {
         let mut party = app.party.lock().expect("party");
-        let kicked = party.quiz.kick(&player_id);
-        let _ = party.sessions.remove(&player_id);
-        kicked
+        party.quiz.eject(&player_id)
     };
     match result {
         Ok(socket_id) => {
             if let Some(socket_id) = socket_id {
                 if let Some(target) = find_socket(&app, &socket_id) {
-                    clear_player_flags(&app, &target);
-                    let _ = target.emit("player:kicked", &json!({ "reason": "Removed by admin" }));
-                    let _ = target.disconnect();
+                    let _ = target.emit(
+                        "player:kicked",
+                        &json!({ "reason": QUIZ_REMOVAL_REASON }),
+                    );
                 }
             }
             let _ = ack.send(&json!({ "ok": true }));
@@ -476,7 +512,6 @@ fn on_crossword_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     {
         let mut party = app.party.lock().expect("party");
         party.crossword.ensure_player(&player_id, &name);
-        party.crossword.resume_timer(&player_id);
     }
     flag_mut(&app, &socket, |meta| meta.crossword_player = true);
     let _ = ack.send(&json!({ "ok": true }));
@@ -484,7 +519,40 @@ fn on_crossword_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     changed(&app);
 }
 
+fn on_crossword_timer(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
+    let sid = sid_of(&socket);
+    let meta = app
+        .meta
+        .lock()
+        .expect("meta")
+        .get(&sid)
+        .cloned()
+        .unwrap_or_default();
+    let Some(player_id) = meta.player_id.filter(|_| meta.crossword_player) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    {
+        let mut party = app.party.lock().expect("party");
+        if pause {
+            party.crossword.pause_timer(&player_id);
+        } else {
+            party.crossword.resume_timer(&player_id);
+        }
+    }
+    flag_mut(&app, &socket, |meta| meta.crossword_help = pause);
+    let _ = ack.send(&json!({ "ok": true }));
+    changed(&app);
+}
+
 fn on_crossword_letter(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender, clear: bool) {
+    let sid = sid_of(&socket);
+    let help_open = app
+        .meta
+        .lock()
+        .expect("meta")
+        .get(&sid)
+        .is_some_and(|meta| meta.crossword_help);
     let Some(player_id) = player_id_of(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -499,12 +567,16 @@ fn on_crossword_letter(app: Arc<App>, socket: SocketRef, payload: Value, ack: Ac
     };
     let result = {
         let mut party = app.party.lock().expect("party");
-        if clear {
+        let result = if clear {
             party.crossword.clear_letter(&player_id, row, col)
         } else {
             let letter = payload.get("letter").and_then(Value::as_str).unwrap_or("");
             party.crossword.set_letter(&player_id, row, col, letter)
+        };
+        if help_open {
+            party.crossword.pause_timer(&player_id);
         }
+        result
     };
     let _ = ack.send(&match result {
         Ok(ids) => json!({ "ok": true, "correctWordIds": ids }),
@@ -529,7 +601,6 @@ fn on_wordsearch_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     {
         let mut party = app.party.lock().expect("party");
         party.word_search.ensure_player(&player_id, &name);
-        party.word_search.resume_timer(&player_id);
     }
     flag_mut(&app, &socket, |meta| meta.wordsearch_player = true);
     let _ = ack.send(&json!({ "ok": true }));
@@ -576,7 +647,11 @@ fn on_wordsearch_selection(app: Arc<App>, socket: SocketRef, payload: Value, ack
     };
     let result = {
         let mut party = app.party.lock().expect("party");
-        party.word_search.submit_selection(&player_id, &cells)
+        let result = party.word_search.submit_selection(&player_id, &cells);
+        if meta.wordsearch_help {
+            party.word_search.pause_timer(&player_id);
+        }
+        result
     };
     let _ = ack.send(&match result {
         Ok(matched) => json!({ "ok": true, "matched": matched }),
@@ -614,6 +689,36 @@ fn on_system_kick(app: Arc<App>, payload: Value, ack: AckSender) {
             let _ = ack.send(&fail(error));
         }
     }
+    changed(&app);
+}
+
+fn on_system_reset(app: Arc<App>, ack: AckSender) {
+    let socket_ids = {
+        let mut party = app.party.lock().expect("party");
+        party.reset_all()
+    };
+    let sockets = app
+        .io
+        .get()
+        .map(|io| io.sockets())
+        .unwrap_or_default();
+    for socket in sockets {
+        let sid = sid_of(&socket);
+        let has_player = {
+            let meta = app.meta.lock().expect("meta");
+            meta.get(&sid).and_then(|entry| entry.player_id.clone()).is_some()
+        };
+        if !has_player && !socket_ids.iter().any(|id| id == &sid) {
+            continue;
+        }
+        clear_player_flags(&app, &socket);
+        let _ = socket.emit(
+            "player:kicked",
+            &json!({ "reason": SYSTEM_REMOVAL_REASON }),
+        );
+        let _ = socket.disconnect();
+    }
+    let _ = ack.send(&json!({ "ok": true }));
     changed(&app);
 }
 

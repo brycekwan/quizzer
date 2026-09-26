@@ -9,6 +9,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 
 export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
@@ -107,6 +108,9 @@ export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
         setPlayerName(null);
         return;
       }
+      if (isQuizRemoval(payload)) {
+        return;
+      }
       setKicked(true);
       clearSession();
     });
@@ -144,9 +148,25 @@ export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
             resolve
           );
         }),
+      pauseTimer: () =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit('crossword:pauseTimer', {}, resolve);
+        }),
+      resumeTimer: () =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit('crossword:resumeTimer', {}, resolve);
+        }),
       reset: () =>
         new Promise<{ ok: boolean; error?: string }>((resolve) => {
           socketRef.current?.emit('crossword:admin:reset', {}, resolve);
+        }),
+      resetPlayer: (playerId: string) =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit(
+            'crossword:admin:resetPlayer',
+            { playerId },
+            resolve
+          );
         }),
       selectPuzzle: (puzzleId: string) =>
         new Promise<{ ok: boolean; error?: string }>((resolve) => {

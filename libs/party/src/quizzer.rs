@@ -377,6 +377,25 @@ impl GameEngine {
         player.socket_id = None;
     }
 
+    /// Drop the player from the live quiz and keep their score and record.
+    pub fn eject(&mut self, player_id: &str) -> Result<Option<String>, String> {
+        let socket_id = {
+            let Some(player) = self.players.get_mut(player_id) else {
+                return Err("Player not found".into());
+            };
+            let socket_id = player.socket_id.clone();
+            player.connected = false;
+            player.socket_id = None;
+            socket_id
+        };
+        self.participants.remove(player_id);
+        self.answers.shift_remove(player_id);
+        if self.phase == Some(GamePhase::Answering) && self.all_players_answered() {
+            self.enter_reveal();
+        }
+        Ok(socket_id)
+    }
+
     pub fn kick(&mut self, player_id: &str) -> Result<Option<String>, String> {
         let Some(player) = self.players.shift_remove(player_id) else {
             return Err("Player not found".into());
@@ -535,6 +554,9 @@ impl GameEngine {
         if !self.players.contains_key(player_id) {
             return Err("Player not found".into());
         }
+        if !self.participants.contains(player_id) {
+            return Err("You are not in this quiz".into());
+        }
         if self.answers.contains_key(player_id) {
             return Err("Answer already locked".into());
         }
@@ -577,7 +599,10 @@ impl GameEngine {
         let relevant: Vec<_> = self
             .players
             .values()
-            .filter(|player| player.connected || self.answers.contains_key(&player.id))
+            .filter(|player| {
+                self.participants.contains(&player.id)
+                    && (player.connected || self.answers.contains_key(&player.id))
+            })
             .collect();
         if relevant.is_empty() {
             return false;
@@ -586,10 +611,14 @@ impl GameEngine {
     }
 
     fn answer_counts(&self) -> (i64, i64, i64) {
-        let total = self.players.len() as i64;
-        let answered = self
+        let playing: Vec<_> = self
             .players
             .values()
+            .filter(|player| self.participants.contains(&player.id))
+            .collect();
+        let total = playing.len() as i64;
+        let answered = playing
+            .iter()
             .filter(|player| self.answers.contains_key(&player.id))
             .count() as i64;
         let waiting = if self.phase == Some(GamePhase::Answering) {
@@ -1192,6 +1221,29 @@ mod tests {
         engine.advance(cycle);
         engine.advance(cycle);
         assert_eq!(engine.status(), GameStatus::Finished);
+    }
+
+    #[test]
+    fn ejects_from_quiz_without_clearing_score() {
+        let mut engine = engine();
+        let ada = engine.join("Ada", "s1", None).unwrap();
+        let bea = engine.join("Bea", "s2", None).unwrap();
+        engine.start(0.0).unwrap();
+        engine.submit_answer(&ada.player.id, "b").unwrap();
+        engine.submit_answer(&bea.player.id, "b").unwrap();
+        assert_eq!(engine.phase(), Some(GamePhase::Reveal));
+        let bea_score = engine.get_player(&bea.player.id).unwrap().score;
+        assert!(bea_score > 0);
+        engine.advance(REVEAL_DURATION_MS + LEADERBOARD_DURATION_MS);
+        assert_eq!(engine.phase(), Some(GamePhase::Answering));
+        engine.eject(&bea.player.id).unwrap();
+        assert_eq!(engine.get_player(&bea.player.id).unwrap().score, bea_score);
+        assert_eq!(engine.phase(), Some(GamePhase::Answering));
+        assert!(engine.submit_answer(&bea.player.id, "a").is_err());
+        engine.submit_answer(&ada.player.id, "a").unwrap();
+        assert_eq!(engine.phase(), Some(GamePhase::Reveal));
+        assert_eq!(engine.get_player(&bea.player.id).unwrap().score, bea_score);
+        assert!(engine.get_player(&ada.player.id).unwrap().score > bea_score);
     }
 
     #[test]

@@ -7,6 +7,7 @@ import type { GameConfig } from '@party/shared';
 import { useGameSocket, useSyncedCountdown } from '@/hooks/useGameSocket';
 import { AnswerGrid } from '@/components/AnswerGrid';
 import { Leaderboard } from '@/components/Leaderboard';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -40,6 +41,10 @@ export function AdminPage() {
     setQuestionSets,
   } = useGameSocket('admin');
   const [message, setMessage] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<
+    { kind: 'reset' } | { kind: 'kick'; playerId: string; name: string } | null
+  >(null);
+  const [confirming, setConfirming] = useState(false);
 
   const configForm = useForm<AdminConfigFormValues>({
     resolver: zodResolver(adminConfigSchema),
@@ -262,7 +267,7 @@ export function AdminPage() {
               >
                 Resume
               </Button>
-              <Button variant="coral" onClick={() => void run(reset, 'Game reset')}>
+              <Button variant="coral" onClick={() => setConfirm({ kind: 'reset' })}>
                 Reset
               </Button>
             </div>
@@ -463,7 +468,14 @@ export function AdminPage() {
               entries={state.leaderboard}
               title="Live scores"
               paused={state.status === 'paused'}
-              onKick={(id) => void kick(id)}
+              onKick={(id) => {
+                const player = state.leaderboard.find((entry) => entry.id === id);
+                setConfirm({
+                  kind: 'kick',
+                  playerId: id,
+                  name: player?.name ?? 'this player',
+                });
+              }}
             />
           </div>
 
@@ -501,6 +513,45 @@ export function AdminPage() {
           ) : null}
         </section>
       </div>
+      <ConfirmDialog
+        open={confirm != null}
+        title={confirm?.kind === 'kick' ? `Kick ${confirm.name} from the quiz?` : 'Reset the quiz?'}
+        description={
+          confirm?.kind === 'kick'
+            ? `${confirm.name} leaves the quiz and returns to the lobby. Their quiz score stays, and their login stays valid.`
+            : 'This clears the current quiz and sends players back to the lobby.'
+        }
+        confirmLabel={confirm?.kind === 'kick' ? 'Kick' : 'Reset'}
+        pending={confirming}
+        onConfirm={() => {
+          void (async () => {
+            if (!confirm) {
+              return;
+            }
+            setConfirming(true);
+            if (confirm.kind === 'reset') {
+              await run(reset, 'Game reset');
+            } else {
+              const result = (await kick(confirm.playerId)) as {
+                ok?: boolean;
+                error?: string;
+              };
+              setMessage(
+                result?.ok === false
+                  ? result.error ?? 'Could not kick player'
+                  : `${confirm.name} was removed from the quiz`
+              );
+            }
+            setConfirming(false);
+            setConfirm(null);
+          })();
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirm(null);
+          }
+        }}
+      />
     </div>
   );
 }

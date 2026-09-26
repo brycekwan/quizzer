@@ -1,3 +1,15 @@
+# [2.3.0](https://github.com/brycekwan/quizzer/compare/v2.2.0...v2.3.0) (2026-09-26)
+
+
+### Bug Fixes
+
+* formatting ([73bccc3](https://github.com/brycekwan/quizzer/commit/73bccc34c8e3d466d5f142fe255c931888b8001f))
+
+
+### Features
+
+* **sudoku:** add a scored puzzle with notes, hints, and host ranking ([bad4ba7](https://github.com/brycekwan/quizzer/commit/bad4ba7f0c364a31d43d9fc9aa44c676555e72d7))
+
 # [2.2.0](https://github.com/brycekwan/quizzer/compare/v2.1.0...v2.2.0) (2026-09-26)
 
 

@@ -1,3 +1,11 @@
+# [2.2.0](https://github.com/brycekwan/quizzer/compare/v2.1.0...v2.2.0) (2026-09-26)
+
+
+### Features
+
+* **party:** drop stale logins and confirm destructive host actions ([c6ea8b7](https://github.com/brycekwan/quizzer/commit/c6ea8b7cfe0c40ed1079c7abba15550af502b200))
+* **play:** hold the clock until instructions are dismissed ([31f89ae](https://github.com/brycekwan/quizzer/commit/31f89aece79a7a74bc049274038e305b30945bd9))
+
 # [2.1.0](https://github.com/brycekwan/quizzer/compare/v2.0.0...v2.1.0) (2026-09-26)
 
 

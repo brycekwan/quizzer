@@ -56,12 +56,24 @@ function emitAck(socket: Socket, event: string, payload: unknown): Promise<Ack> 
 }
 
 function waitFor<T>(socket: Socket, event: string): Promise<T> {
+  return waitForMatch(socket, event, () => true);
+}
+
+function waitForMatch<T>(socket: Socket, event: string, match: (payload: T) => boolean): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`event timeout: ${event}`)), 5_000);
-    socket.once(event, (payload: T) => {
+    const timer = setTimeout(() => {
+      socket.off(event, onEvent);
+      reject(new Error(`event timeout: ${event}`));
+    }, 5_000);
+    const onEvent = (payload: T) => {
+      if (!match(payload)) {
+        return;
+      }
       clearTimeout(timer);
+      socket.off(event, onEvent);
       resolve(payload);
-    });
+    };
+    socket.on(event, onEvent);
   });
 }
 
@@ -139,7 +151,11 @@ describe('rust socket contract', () => {
     await waitFor(admin, 'game:state');
     admin.emit('admin:subscribe');
 
-    const statePromise = waitFor<GameState>(player, 'game:state');
+    const statePromise = waitForMatch<GameState>(
+      player,
+      'game:state',
+      (snapshot) => snapshot.phase === 'answering'
+    );
     const started = await emitAck(admin, 'admin:start', {});
     expect(started.ok).toBe(true);
     const state = await statePromise;

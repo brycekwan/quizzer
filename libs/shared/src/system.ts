@@ -1,6 +1,9 @@
 /** Sent with `player:kicked` when the host removes someone from the party. */
 export const SYSTEM_REMOVAL_REASON = 'Removed from the system by admin';
 
+/** Sent with `player:kicked` when the quiz host ejects someone from the quiz only. */
+export const QUIZ_REMOVAL_REASON = 'Removed from the quiz game';
+
 export interface SystemPlayerEntry {
   rank: number;
   playerId: string;

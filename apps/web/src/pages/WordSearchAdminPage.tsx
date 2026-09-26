@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useWordSearchSocket } from '@/hooks/useWordSearchSocket';
@@ -43,6 +44,10 @@ export function WordSearchAdminPage() {
     resetPlayer,
     selectPuzzle,
   } = useWordSearchSocket('admin');
+  const [confirm, setConfirm] = useState<
+    { kind: 'all' } | { kind: 'player'; playerId: string; name: string } | null
+  >(null);
+  const [confirming, setConfirming] = useState(false);
 
   if (!adminState) {
     return (
@@ -95,7 +100,7 @@ export function WordSearchAdminPage() {
             <Button asChild variant="outline" size="sm">
               <Link to="/host">Back to host menu</Link>
             </Button>
-            <Button variant="coral" size="sm" onClick={() => void onReset()}>
+            <Button variant="coral" size="sm" onClick={() => setConfirm({ kind: 'all' })}>
               Reset all
             </Button>
           </div>
@@ -175,7 +180,13 @@ export function WordSearchAdminPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => void onResetPlayer(player.playerId)}
+                      onClick={() =>
+                        setConfirm({
+                          kind: 'player',
+                          playerId: player.playerId,
+                          name: player.name,
+                        })
+                      }
                     >
                       Reset
                     </Button>
@@ -186,6 +197,41 @@ export function WordSearchAdminPage() {
           )}
         </section>
       </div>
+      <ConfirmDialog
+        open={confirm != null}
+        title={
+          confirm?.kind === 'player'
+            ? `Reset ${confirm.name}'s word search?`
+            : 'Reset the word search?'
+        }
+        description={
+          confirm?.kind === 'player'
+            ? `${confirm.name} goes back to the start of the puzzle and their score is cleared.`
+            : 'Every player goes back to the start of the puzzle and scores are cleared.'
+        }
+        confirmLabel="Reset"
+        pending={confirming}
+        onConfirm={() => {
+          void (async () => {
+            if (!confirm) {
+              return;
+            }
+            setConfirming(true);
+            if (confirm.kind === 'all') {
+              await onReset();
+            } else {
+              await onResetPlayer(confirm.playerId);
+            }
+            setConfirming(false);
+            setConfirm(null);
+          })();
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirm(null);
+          }
+        }}
+      />
     </div>
   );
 }

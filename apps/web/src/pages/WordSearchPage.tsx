@@ -136,7 +136,7 @@ export function WordSearchPage() {
         {connected ? 'Loading word search…' : 'Connecting…'}
         {error ? <p className="mt-4 text-coral">{error}</p> : null}
         <Button asChild size="lg" variant="outline" className="mt-8">
-          <Link to="/">Back to menu</Link>
+          <Link to="/">Return to Lobby</Link>
         </Button>
       </div>
     );
@@ -199,7 +199,7 @@ export function WordSearchPage() {
                 </DialogContent>
               </Dialog>
               <Button asChild variant="outline" size="sm">
-                <Link to="/">Lobby</Link>
+                <Link to="/">Return to Lobby</Link>
               </Button>
             </div>
           </div>

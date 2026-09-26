@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { useSystemSocket } from '@/hooks/useSystemSocket';
 
@@ -9,8 +11,15 @@ function ScoreValue({ value }: { value: number | null }) {
   return <span className="tabular-nums">{value}</span>;
 }
 
+type PendingAction =
+  | { kind: 'reset' }
+  | { kind: 'kick'; playerId: string; name: string };
+
 export function SystemAdminPage() {
-  const { connected, adminState, error, setError, kick } = useSystemSocket();
+  const { connected, adminState, error, setError, kick, resetAll } =
+    useSystemSocket();
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const [working, setWorking] = useState(false);
 
   if (!adminState) {
     return (
@@ -21,11 +30,26 @@ export function SystemAdminPage() {
     );
   }
 
-  const onKick = async (playerId: string) => {
-    const result = await kick(playerId);
-    if (!result.ok) {
-      setError(result.error ?? 'Could not remove player');
+  const confirm = async () => {
+    if (!pending) {
+      return;
     }
+    setWorking(true);
+    const result =
+      pending.kind === 'reset'
+        ? await resetAll()
+        : await kick(pending.playerId);
+    setWorking(false);
+    if (!result.ok) {
+      setError(
+        result.error ??
+          (pending.kind === 'reset'
+            ? 'Could not reset the party'
+            : 'Could not remove player')
+      );
+      return;
+    }
+    setPending(null);
   };
 
   return (
@@ -42,9 +66,18 @@ export function SystemAdminPage() {
               {adminState.players.length === 1 ? 'player' : 'players'} connected
             </p>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/host">Back to host menu</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/host">Back to host menu</Link>
+            </Button>
+            <Button
+              variant="coral"
+              size="sm"
+              onClick={() => setPending({ kind: 'reset' })}
+            >
+              Reset all
+            </Button>
+          </div>
         </div>
 
         {error ? (
@@ -96,7 +129,13 @@ export function SystemAdminPage() {
                     <Button
                       variant="coral"
                       size="sm"
-                      onClick={() => void onKick(player.playerId)}
+                      onClick={() =>
+                        setPending({
+                          kind: 'kick',
+                          playerId: player.playerId,
+                          name: player.name,
+                        })
+                      }
                     >
                       Kick
                     </Button>
@@ -107,6 +146,24 @@ export function SystemAdminPage() {
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={pending != null}
+        title={pending?.kind === 'kick' ? `Kick ${pending.name}?` : 'Reset the party?'}
+        description={
+          pending?.kind === 'kick'
+            ? `${pending.name} will be removed from every game. Their scores will be wiped, and they will need to log in again.`
+            : 'Every player will be removed from the party. Scores in the quiz, crossword, and word search will be wiped, and everyone will need to log in again.'
+        }
+        confirmLabel={pending?.kind === 'kick' ? 'Kick' : 'Reset all'}
+        pending={working}
+        onConfirm={() => void confirm()}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPending(null);
+          }
+        }}
+      />
     </div>
   );
 }

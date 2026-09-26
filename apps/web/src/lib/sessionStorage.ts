@@ -1,5 +1,8 @@
+import { APP_BUILD_ID } from './buildId';
+
 const PLAYER_ID_KEY = 'party.playerId';
 const PLAYER_NAME_KEY = 'party.playerName';
+const BUILD_ID_KEY = 'party.buildId';
 
 function migrateLegacyKeys(): void {
   if (typeof window === 'undefined') {
@@ -21,11 +24,24 @@ function migrateLegacyKeys(): void {
   }
 }
 
+function adoptCurrentBuild(): boolean {
+  const stored = localStorage.getItem(BUILD_ID_KEY);
+  if (stored === APP_BUILD_ID) {
+    return true;
+  }
+  clearStoredSession();
+  localStorage.setItem(BUILD_ID_KEY, APP_BUILD_ID);
+  return false;
+}
+
 export function readStoredSession(): {
   playerId: string | null;
   playerName: string | null;
 } {
   if (typeof window === 'undefined') {
+    return { playerId: null, playerName: null };
+  }
+  if (!adoptCurrentBuild()) {
     return { playerId: null, playerName: null };
   }
   migrateLegacyKeys();
@@ -36,6 +52,7 @@ export function readStoredSession(): {
 }
 
 export function writeStoredSession(playerId: string, playerName: string): void {
+  localStorage.setItem(BUILD_ID_KEY, APP_BUILD_ID);
   localStorage.setItem(PLAYER_ID_KEY, playerId);
   localStorage.setItem(PLAYER_NAME_KEY, playerName);
 }

@@ -275,6 +275,10 @@ impl WordSearchEngine {
     pub fn remove_player(&mut self, player_id: &str) {
         self.players.shift_remove(player_id);
     }
+
+    pub fn clear_players(&mut self) {
+        self.players.clear();
+    }
 }
 
 #[cfg(test)]

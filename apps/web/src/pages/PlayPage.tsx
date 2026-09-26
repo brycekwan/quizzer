@@ -20,6 +20,7 @@ export function PlayPage() {
     playerId,
     playerName,
     kicked,
+    quizRemoved,
     gameReset,
     error,
     setError,
@@ -69,7 +70,7 @@ export function PlayPage() {
     return <Navigate to="/login" replace />;
   }
 
-  if (gameReset) {
+  if (quizRemoved || gameReset) {
     return <Navigate to="/" replace />;
   }
 
@@ -97,7 +98,7 @@ export function PlayPage() {
           </p>
         ) : null}
         <Button asChild size="lg" className="mt-8 w-full">
-          <Link to="/">Back to menu</Link>
+          <Link to="/">Return to Lobby</Link>
         </Button>
       </PageShell>
     );
@@ -158,7 +159,7 @@ export function PlayPage() {
         ) : null}
         <Leaderboard entries={rows} title="Top of the board" />
         <Button asChild size="lg" className="mt-6 w-full">
-          <Link to="/">Back to menu</Link>
+          <Link to="/">Return to Lobby</Link>
         </Button>
       </PageShell>
     );
@@ -371,7 +372,7 @@ function WaitingShell({
         </div>
       ) : null}
       <Button asChild size="lg" variant="outline" className="mt-6 w-full">
-        <Link to="/">Back to menu</Link>
+        <Link to="/">Return to Lobby</Link>
       </Button>
     </PageShell>
   );

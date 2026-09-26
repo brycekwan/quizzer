@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { returnPath } from '@/lib/returnPath';
 import { isValidPlayerName } from '@party/shared';
 import { useSession } from '@/hooks/useSession';
 import { readSystemRemovalMessage } from '@/lib/systemRemoval';
@@ -10,6 +11,8 @@ import { PageShell } from '@/components/PageShell';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const destination = returnPath(location.search);
   const { connected, playerId, playerName, error, setError, login } =
     useSession();
   const [name, setName] = useState('');
@@ -17,7 +20,7 @@ export function LoginPage() {
   const [removalMessage] = useState(() => readSystemRemovalMessage());
 
   if (playerId && playerName) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={destination} replace />;
   }
 
   const handleSubmit = async (event: FormEvent) => {
@@ -30,7 +33,7 @@ export function LoginPage() {
     const result = await login(name);
     setSubmitting(false);
     if (result.ok) {
-      navigate('/', { replace: true });
+      navigate(destination, { replace: true });
     }
   };
 

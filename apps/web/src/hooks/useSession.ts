@@ -5,6 +5,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import { isQuizRemoval } from '@/lib/quizRemoval';
 import {
   clearSystemRemovalMessage,
   isSystemRemoval,
@@ -85,6 +86,9 @@ export function useSession() {
         noteSystemRemoval();
         setPlayerId(null);
         setPlayerName(null);
+        return;
+      }
+      if (isQuizRemoval(payload)) {
         return;
       }
       setKicked(true);

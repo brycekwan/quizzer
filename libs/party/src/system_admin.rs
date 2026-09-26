@@ -74,6 +74,25 @@ impl SystemAdmin {
         self.word_search.remove_player(player_id);
         Ok(socket_id)
     }
+
+    /// Remove every login and wipe quiz, crossword, and word search progress.
+    pub fn reset_all(&mut self) -> Vec<String> {
+        let mut socket_ids: Vec<String> = self
+            .sessions
+            .list()
+            .into_iter()
+            .filter_map(|session| session.socket_id)
+            .collect();
+        for socket_id in self.quiz.reset() {
+            if !socket_ids.iter().any(|current| current == &socket_id) {
+                socket_ids.push(socket_id);
+            }
+        }
+        self.sessions.clear();
+        self.crossword.clear_players();
+        self.word_search.clear_players();
+        socket_ids
+    }
 }
 
 #[cfg(test)]
@@ -219,6 +238,28 @@ mod tests {
         assert!(admin.word_search.player_snapshot(&ada.session.id).is_none());
         assert_eq!(admin.snapshot().players[0].player_id, bea.session.id);
         assert_eq!(admin.word_search.admin_snapshot().players[0].name, "Bea");
+    }
+
+    #[test]
+    fn reset_all_clears_players_and_scores() {
+        let mut admin = admin();
+        let ada = admin.sessions.login("Ada", "s-ada", None).unwrap();
+        admin.crossword.ensure_player(&ada.session.id, "Ada");
+        admin.crossword.set_letter(&ada.session.id, 0, 0, "P").unwrap();
+        admin.word_search.ensure_player(&ada.session.id, "Ada");
+        admin
+            .word_search
+            .submit_selection(&ada.session.id, &cat().cells)
+            .unwrap();
+        admin.quiz.join("Ada", "s-quiz", Some(&ada.session.id)).unwrap();
+        let sockets = admin.reset_all();
+        assert!(sockets.contains(&"s-ada".to_string()));
+        assert!(sockets.contains(&"s-quiz".to_string()));
+        assert!(admin.sessions.list().is_empty());
+        assert!(admin.quiz.get_player(&ada.session.id).is_none());
+        assert!(admin.crossword.admin_snapshot().players.is_empty());
+        assert!(admin.word_search.admin_snapshot().players.is_empty());
+        assert!(admin.snapshot().players.is_empty());
     }
 
     #[test]

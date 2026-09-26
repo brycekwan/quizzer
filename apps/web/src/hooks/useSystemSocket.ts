@@ -48,6 +48,10 @@ export function useSystemSocket() {
             resolve
           );
         }),
+      resetAll: () =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit('system:admin:reset', {}, resolve);
+        }),
     }),
     []
   );

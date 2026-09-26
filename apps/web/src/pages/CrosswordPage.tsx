@@ -470,7 +470,7 @@ export function CrosswordPage() {
         {connected ? 'Loading crossword…' : 'Connecting…'}
         {error ? <p className="mt-4 text-coral">{error}</p> : null}
         <Button asChild size="lg" variant="outline" className="mt-8">
-          <Link to="/">Back to menu</Link>
+          <Link to="/">Return to Lobby</Link>
         </Button>
       </div>
     );
@@ -511,7 +511,7 @@ export function CrosswordPage() {
           </h1>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link to="/">Back to menu</Link>
+          <Link to="/">Return to Lobby</Link>
         </Button>
       </div>
 

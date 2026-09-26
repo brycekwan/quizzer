@@ -6,6 +6,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import { isQuizRemoval, noteQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 
 export function useGameSocket(role: 'player' | 'admin' = 'player') {
@@ -16,6 +17,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
   const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
   const [playerName, setPlayerName] = useState<string | null>(stored.playerName);
   const [kicked, setKicked] = useState(false);
+  const [quizRemoved, setQuizRemoved] = useState(false);
   const [gameReset, setGameReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [joinedQuizzer, setJoinedQuizzer] = useState(false);
@@ -115,13 +117,19 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
         setJoinedQuizzer(false);
         return;
       }
+      if (isQuizRemoval(payload)) {
+        noteQuizRemoval();
+        setQuizRemoved(true);
+        setJoinedQuizzer(false);
+        return;
+      }
       setKicked(true);
       clearSession();
     });
     socket.on('game:reset', () => {
       setJoinedQuizzer(false);
       setGameReset(true);
-      setError('Game was reset — back to the menu.');
+      setError('Game was reset — return to the lobby.');
     });
 
     return () => {
@@ -233,6 +241,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     playerId,
     playerName,
     kicked,
+    quizRemoved,
     gameReset,
     joinedQuizzer,
     error,

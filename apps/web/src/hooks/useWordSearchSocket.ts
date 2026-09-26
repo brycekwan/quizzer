@@ -9,6 +9,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 
 export function useWordSearchSocket(role: 'player' | 'admin' = 'player') {
@@ -113,6 +114,9 @@ export function useWordSearchSocket(role: 'player' | 'admin' = 'player') {
         noteSystemRemoval();
         setPlayerId(null);
         setPlayerName(null);
+        return;
+      }
+      if (isQuizRemoval(payload)) {
         return;
       }
       setKicked(true);

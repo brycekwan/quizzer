@@ -311,6 +311,20 @@ impl CrosswordEngine {
         }
     }
 
+    pub fn reset_player(&mut self, player_id: &str) -> Result<(), String> {
+        let grid = empty_letter_grid(&self.puzzle);
+        let Some(player) = self.players.get_mut(player_id) else {
+            return Err("Player not found".into());
+        };
+        player.letters = grid;
+        player.correct_word_ids.clear();
+        player.elapsed_ms = 0;
+        player.active_since = None;
+        player.timer_started = false;
+        player.completed_at = None;
+        Ok(())
+    }
+
     pub fn reset(&mut self) {
         let grid = empty_letter_grid(&self.puzzle);
         for player in self.players.values_mut() {
@@ -325,6 +339,10 @@ impl CrosswordEngine {
 
     pub fn remove_player(&mut self, player_id: &str) {
         self.players.shift_remove(player_id);
+    }
+
+    pub fn clear_players(&mut self) {
+        self.players.clear();
     }
 }
 
@@ -529,6 +547,26 @@ mod tests {
         assert_eq!(names, ["Ada", "Bea"]);
         assert_eq!(admin.players[0].score, 1200);
         assert_eq!(admin.players[1].score, 900);
+    }
+
+    #[test]
+    fn reset_player_clears_one_grid() {
+        let mut engine = engine_at(NOON_2026_MS);
+        engine.ensure_player("a", "Ada");
+        engine.ensure_player("b", "Bea");
+        engine.set_letter("a", 0, 0, "P").unwrap();
+        engine.set_letter("b", 0, 1, "I").unwrap();
+        engine.reset_player("a").unwrap();
+        let ada = engine.player_snapshot("a").unwrap();
+        assert_eq!(ada.letters[0][0].as_deref(), Some(""));
+        assert!(ada.correct_word_ids.is_empty());
+        assert_eq!(ada.elapsed_ms, 0);
+        assert!(!ada.completed);
+        assert_eq!(
+            engine.player_snapshot("b").unwrap().letters[0][1].as_deref(),
+            Some("I")
+        );
+        assert_eq!(engine.admin_snapshot().players[0].player_id, "b");
     }
 
     #[test]

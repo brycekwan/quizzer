@@ -1,3 +1,15 @@
+# [2.1.0](https://github.com/brycekwan/quizzer/compare/v2.0.0...v2.1.0) (2026-09-26)
+
+
+### Bug Fixes
+
+* **server-rs:** wait for the answering snapshot in the socket contract ([400166c](https://github.com/brycekwan/quizzer/commit/400166c615a54fd89768b029174f26e0da8aa49a))
+
+
+### Features
+
+* **wordsearch:** shrink the grid and pause the clock for instructions ([1d29d11](https://github.com/brycekwan/quizzer/commit/1d29d1100f74bad5cba52cdf0473d91b7755a74d))
+
 # [2.0.0](https://github.com/brycekwan/quizzer/compare/v1.9.0...v2.0.0) (2026-09-25)
 
 

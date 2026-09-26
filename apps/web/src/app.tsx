@@ -11,6 +11,8 @@ import { CrosswordPage } from './pages/CrosswordPage';
 import { CrosswordAdminPage } from './pages/CrosswordAdminPage';
 import { WordSearchPage } from './pages/WordSearchPage';
 import { WordSearchAdminPage } from './pages/WordSearchAdminPage';
+import { SudokuPage } from './pages/SudokuPage';
+import { SudokuAdminPage } from './pages/SudokuAdminPage';
 import { SystemAdminPage } from './pages/SystemAdminPage';
 
 function RequirePlayer({ children }: { children: ReactNode }) {
@@ -59,10 +61,19 @@ export function App() {
           </RequirePlayer>
         }
       />
+      <Route
+        path="/sudoku"
+        element={
+          <RequirePlayer>
+            <SudokuPage />
+          </RequirePlayer>
+        }
+      />
       <Route path="/host" element={<HostMenuPage />} />
       <Route path="/host/quizzer" element={<AdminPage />} />
       <Route path="/host/crossword" element={<CrosswordAdminPage />} />
       <Route path="/host/wordsearch" element={<WordSearchAdminPage />} />
+      <Route path="/host/sudoku" element={<SudokuAdminPage />} />
       <Route path="/host/system" element={<SystemAdminPage />} />
       <Route path="/host/admin" element={<Navigate to="/host/quizzer" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

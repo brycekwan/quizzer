@@ -6,6 +6,8 @@ pub mod names;
 pub mod quizzer;
 pub mod scoring;
 pub mod session;
+pub mod sudoku;
+pub mod sudoku_engine;
 pub mod system;
 pub mod system_admin;
 pub mod types;

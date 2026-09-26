@@ -2,6 +2,7 @@ use crate::crossword::{
     derive_crossword_words, validate_crossword_file, CrosswordPuzzleFile, CrosswordPuzzleInfo,
     CrosswordWord,
 };
+use crate::sudoku::{validate_sudoku_file, SudokuFile, SudokuPuzzleInfo};
 use crate::types::{Question, QuestionSetInfo, QuestionsFile};
 use crate::validation::validate_questions_file;
 use crate::word_search::{
@@ -48,6 +49,17 @@ pub fn resolve_crossword_dir() -> PathBuf {
         PathBuf::from("apps/server/crossword/puzzles"),
         PathBuf::from("crossword/puzzles"),
         manifest_relative(&["apps", "server", "crossword", "puzzles"]),
+    ])
+}
+
+pub fn resolve_sudoku_dir() -> PathBuf {
+    if let Ok(dir) = env::var("SUDOKU_PUZZLES_DIR") {
+        return PathBuf::from(dir);
+    }
+    first_existing(&[
+        PathBuf::from("apps/server/sudoku/puzzles"),
+        PathBuf::from("sudoku/puzzles"),
+        manifest_relative(&["apps", "server", "sudoku", "puzzles"]),
     ])
 }
 
@@ -124,7 +136,8 @@ pub fn load_question_set(id: &str, dir: &Path) -> Result<Vec<Question>, String> 
     if !path.is_file() {
         return Err(format!("Question set \"{id}\" not found"));
     }
-    let raw = fs::read_to_string(&path).map_err(|_| format!("Could not read question set \"{id}\""))?;
+    let raw =
+        fs::read_to_string(&path).map_err(|_| format!("Could not read question set \"{id}\""))?;
     let file: QuestionsFile =
         serde_json::from_str(&raw).map_err(|_| format!("Could not read question set \"{id}\""))?;
     if let Some(error) = validate_questions_file(&file) {
@@ -182,7 +195,8 @@ pub fn load_crossword_puzzle(
     if !path.is_file() {
         return Err(format!("Crossword \"{id}\" not found"));
     }
-    let raw = fs::read_to_string(&path).map_err(|_| format!("Could not read crossword \"{id}\""))?;
+    let raw =
+        fs::read_to_string(&path).map_err(|_| format!("Could not read crossword \"{id}\""))?;
     let mut puzzle: CrosswordPuzzleFile =
         serde_json::from_str(&raw).map_err(|_| format!("Could not read crossword \"{id}\""))?;
     if puzzle.id.trim().is_empty() {
@@ -197,7 +211,14 @@ pub fn load_crossword_puzzle(
 
 pub fn load_default_crossword(
     dir: &Path,
-) -> Result<(CrosswordPuzzleFile, Vec<CrosswordWord>, Vec<CrosswordPuzzleInfo>), String> {
+) -> Result<
+    (
+        CrosswordPuzzleFile,
+        Vec<CrosswordWord>,
+        Vec<CrosswordPuzzleInfo>,
+    ),
+    String,
+> {
     let puzzles = list_crossword_puzzles(dir);
     if puzzles.is_empty() {
         return Err(format!("No crossword puzzles found in {}", dir.display()));
@@ -231,7 +252,8 @@ pub fn load_word_search_puzzle(
     if !path.is_file() {
         return Err(format!("Word search \"{id}\" not found"));
     }
-    let raw = fs::read_to_string(&path).map_err(|_| format!("Could not read word search \"{id}\""))?;
+    let raw =
+        fs::read_to_string(&path).map_err(|_| format!("Could not read word search \"{id}\""))?;
     let mut puzzle: WordSearchFile =
         serde_json::from_str(&raw).map_err(|_| format!("Could not read word search \"{id}\""))?;
     if puzzle.id.trim().is_empty() {
@@ -244,9 +266,59 @@ pub fn load_word_search_puzzle(
     Ok((puzzle, words))
 }
 
+pub fn list_sudoku_puzzles(dir: &Path) -> Vec<SudokuPuzzleInfo> {
+    json_files(dir)
+        .into_iter()
+        .map(|file| SudokuPuzzleInfo {
+            id: file.trim_end_matches(".json").to_string(),
+            label: file,
+        })
+        .collect()
+}
+
+pub fn load_sudoku_puzzle(id: &str, dir: &Path) -> Result<SudokuFile, String> {
+    if !valid_pack_id(id) {
+        return Err("Invalid sudoku id".into());
+    }
+    let path = dir.join(format!("{id}.json"));
+    if !path.is_file() {
+        return Err(format!("Sudoku \"{id}\" not found"));
+    }
+    let raw = fs::read_to_string(&path).map_err(|_| format!("Could not read sudoku \"{id}\""))?;
+    let mut puzzle: SudokuFile =
+        serde_json::from_str(&raw).map_err(|_| format!("Could not read sudoku \"{id}\""))?;
+    if puzzle.id.trim().is_empty() {
+        puzzle.id = id.to_string();
+    }
+    if let Some(error) = validate_sudoku_file(&puzzle) {
+        return Err(error);
+    }
+    Ok(puzzle)
+}
+
+pub fn load_default_sudoku(dir: &Path) -> Result<(SudokuFile, Vec<SudokuPuzzleInfo>), String> {
+    let puzzles = list_sudoku_puzzles(dir);
+    if puzzles.is_empty() {
+        return Err(format!("No sudoku puzzles found in {}", dir.display()));
+    }
+    let preferred = puzzles
+        .iter()
+        .find(|puzzle| puzzle.id == "sample")
+        .unwrap_or(&puzzles[0]);
+    let puzzle = load_sudoku_puzzle(&preferred.id, dir)?;
+    Ok((puzzle, puzzles))
+}
+
 pub fn load_default_word_search(
     dir: &Path,
-) -> Result<(WordSearchFile, Vec<WordSearchWord>, Vec<WordSearchPuzzleInfo>), String> {
+) -> Result<
+    (
+        WordSearchFile,
+        Vec<WordSearchWord>,
+        Vec<WordSearchPuzzleInfo>,
+    ),
+    String,
+> {
     let puzzles = list_word_search_puzzles(dir);
     if puzzles.is_empty() {
         return Err(format!("No word search puzzles found in {}", dir.display()));
@@ -275,7 +347,13 @@ mod tests {
         let dir = resolve_questions_dir();
         let sets = list_question_sets(&dir);
         let ids: Vec<_> = sets.iter().map(|set| set.id.as_str()).collect();
-        for expected in ["canada", "cat-facts", "dog-facts", "geography", "world-foods"] {
+        for expected in [
+            "canada",
+            "cat-facts",
+            "dog-facts",
+            "geography",
+            "world-foods",
+        ] {
             assert!(ids.contains(&expected), "{expected} missing from {ids:?}");
         }
         assert_eq!(
@@ -291,7 +369,9 @@ mod tests {
         let combined =
             load_question_sets_in_order(&["dog-facts".into(), "cat-facts".into()], &dir).unwrap();
         assert!(combined[0].id.starts_with("dog-facts:"));
-        assert!(combined.iter().any(|question| question.id.starts_with("cat-facts:")));
+        assert!(combined
+            .iter()
+            .any(|question| question.id.starts_with("cat-facts:")));
         assert!(load_question_set("does-not-exist", &dir).is_err());
     }
 
@@ -303,6 +383,16 @@ mod tests {
         assert!(!words.is_empty());
         let listed = list_crossword_puzzles(&dir);
         assert!(listed.iter().any(|puzzle| puzzle.label == "foods.json"));
+    }
+
+    #[test]
+    fn loads_sample_sudoku() {
+        let dir = resolve_sudoku_dir();
+        let puzzle = load_sudoku_puzzle("sample", &dir).unwrap();
+        assert_eq!(puzzle.id, "sample");
+        assert_eq!(puzzle.solution.len(), 9);
+        let listed = list_sudoku_puzzles(&dir);
+        assert!(listed.iter().any(|puzzle| puzzle.label == "sample.json"));
     }
 
     #[test]

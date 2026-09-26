@@ -6,4 +6,6 @@ export * from './crossword';
 export * from './crosswordLogic';
 export * from './wordSearch';
 export * from './wordSearchLogic';
+export * from './sudoku';
+export * from './sudokuLogic';
 export * from './system';

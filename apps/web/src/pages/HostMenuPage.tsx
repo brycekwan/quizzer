@@ -23,6 +23,9 @@ export function HostMenuPage() {
           <Link to="/host/wordsearch">Word search</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="w-full">
+          <Link to="/host/sudoku">Sudoku</Link>
+        </Button>
+        <Button asChild size="lg" variant="outline" className="w-full">
           <Link to="/host/system">System</Link>
         </Button>
       </div>

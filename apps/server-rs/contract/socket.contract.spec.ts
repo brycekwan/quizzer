@@ -12,6 +12,7 @@ interface Ack {
   playerId?: string;
   name?: string;
   matched?: boolean;
+  correct?: boolean;
 }
 
 interface GameState {
@@ -93,6 +94,7 @@ describe('rust socket contract', () => {
         QUESTIONS_DIR: path.resolve('apps/server/questions'),
         CROSSWORD_PUZZLES_DIR: path.resolve('apps/server/crossword/puzzles'),
         WORDSEARCH_PUZZLES_DIR: path.resolve('apps/server/wordsearch/puzzles'),
+        SUDOKU_PUZZLES_DIR: path.resolve('apps/server/sudoku/puzzles'),
         STATIC_DIR: path.resolve('dist/apps/web'),
       },
       stdio: 'pipe',
@@ -183,6 +185,15 @@ describe('rust socket contract', () => {
       ],
     });
     expect(miss).toEqual({ ok: true, matched: false });
+
+    const sudoku = await emitAck(player, 'sudoku:subscribe', {});
+    expect(sudoku.ok).toBe(true);
+    const wrong = await emitAck(player, 'sudoku:commit', {
+      row: 0,
+      col: 2,
+      value: 1,
+    });
+    expect(wrong).toEqual({ ok: true, correct: false });
 
     const boardPromise = waitFor<SystemState>(admin, 'system:admin:state');
     const subscribed = await emitAck(admin, 'system:admin:subscribe', {});

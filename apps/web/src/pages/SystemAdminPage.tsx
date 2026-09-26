@@ -90,8 +90,8 @@ export function SystemAdminPage() {
           <div className="border-b-4 border-ink/10 px-5 py-3">
             <h2 className="font-display text-2xl font-bold">Leaderboard</h2>
             <p className="text-sm font-semibold text-ink/60">
-              Ranked by crossword and word search points combined. Quiz points
-              are shown separately and do not change rank.
+              Ranked by crossword, word search, and sudoku points combined. Quiz
+              points are shown separately and do not change rank.
             </p>
           </div>
           {adminState.players.length === 0 ? (
@@ -113,6 +113,8 @@ export function SystemAdminPage() {
                     <p className="text-sm font-semibold text-ink/55">
                       Crossword <ScoreValue value={player.crosswordScore} /> ·
                       Word search <ScoreValue value={player.wordSearchScore} />
+                      {' · '}
+                      Sudoku <ScoreValue value={player.sudokuScore} />
                       {' · '}
                       Quiz <ScoreValue value={player.quizScore} />
                     </p>
@@ -153,7 +155,7 @@ export function SystemAdminPage() {
         description={
           pending?.kind === 'kick'
             ? `${pending.name} will be removed from every game. Their scores will be wiped, and they will need to log in again.`
-            : 'Every player will be removed from the party. Scores in the quiz, crossword, and word search will be wiped, and everyone will need to log in again.'
+            : 'Every player will be removed from the party. Scores in the quiz, crossword, word search, and sudoku will be wiped, and everyone will need to log in again.'
         }
         confirmLabel={pending?.kind === 'kick' ? 'Kick' : 'Reset all'}
         pending={working}

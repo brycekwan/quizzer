@@ -8,12 +8,14 @@ export interface SystemPlayerEntry {
   rank: number;
   playerId: string;
   name: string;
-  /** Crossword score + word search score. Quiz points are excluded. */
+  /** Crossword, word search, and sudoku scores. Quiz points are excluded. */
   accumulatedScore: number;
   /** Null when the player has not entered the crossword. */
   crosswordScore: number | null;
   /** Null when the player has not entered the word search. */
   wordSearchScore: number | null;
+  /** Null when the player has not entered sudoku. */
+  sudokuScore: number | null;
   /** Null when the player has not joined the quiz. */
   quizScore: number | null;
 }
@@ -28,14 +30,19 @@ export interface SystemScoreInput {
   connected: boolean;
   crosswordScore: number | null;
   wordSearchScore: number | null;
+  sudokuScore: number | null;
   quizScore: number | null;
 }
 
 function accumulatedOf(player: SystemScoreInput): number {
-  return (player.crosswordScore ?? 0) + (player.wordSearchScore ?? 0);
+  return (
+    (player.crosswordScore ?? 0) +
+    (player.wordSearchScore ?? 0) +
+    (player.sudokuScore ?? 0)
+  );
 }
 
-/** Connected players, ranked by crossword + word search score. */
+/** Connected players, ranked by crossword, word search, and sudoku scores. */
 export function buildSystemLeaderboard(
   players: SystemScoreInput[]
 ): SystemAdminSnapshot {
@@ -57,6 +64,7 @@ export function buildSystemLeaderboard(
       accumulatedScore: accumulatedOf(player),
       crosswordScore: player.crosswordScore,
       wordSearchScore: player.wordSearchScore,
+      sudokuScore: player.sudokuScore,
       quizScore: player.quizScore,
     })),
   };

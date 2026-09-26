@@ -56,11 +56,15 @@ function useElapsedClock(
   }
 
   if (anchor.current?.holding) {
-    anchor.current = {
-      displayMs: anchor.current.displayMs,
-      at: Date.now(),
-      holding: false,
-    };
+    if (activeSince == null && elapsedMs === 0) {
+      anchor.current = null;
+    } else {
+      anchor.current = {
+        displayMs: anchor.current.displayMs,
+        at: Date.now(),
+        holding: false,
+      };
+    }
   }
 
   if (anchor.current) {
@@ -70,6 +74,50 @@ function useElapsedClock(
   }
 
   return formatElapsedMs(computeElapsedMs(elapsedMs, activeSince, now));
+}
+
+function WordSearchInstructions({
+  open,
+  onOpenChange,
+  intro,
+  showTrigger,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  intro: boolean;
+  showTrigger: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {showTrigger ? (
+        <DialogTrigger asChild>
+          <Button type="button" variant="outline" size="sm">
+            Instructions
+          </Button>
+        </DialogTrigger>
+      ) : null}
+      <DialogContent
+        className="m-0 flex h-[100dvh] max-h-none w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-playfield p-6 shadow-none md:m-auto md:h-fit md:max-h-[92dvh] md:w-[min(92vw,28rem)] md:overflow-y-auto md:rounded-3xl md:border-4 md:!bg-none md:!bg-cream md:shadow-pop"
+      >
+        <div className="flex min-h-0 flex-1 flex-col md:flex-none">
+          <DialogHeader>
+            <DialogTitle>How to play</DialogTitle>
+          </DialogHeader>
+          <p className="text-lg font-semibold leading-relaxed text-ink/80 md:text-base">
+            Words run in any of eight directions, including backwards and
+            diagonally. Drag across the letters, or tap them one at a time. The
+            clock starts with your first selection and stays stopped while these
+            instructions are open.
+          </p>
+          <DialogClose asChild>
+            <Button type="button" size="lg" className="mt-auto w-full md:mt-6">
+              {intro ? 'Start' : 'Close'}
+            </Button>
+          </DialogClose>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function WordSearchPage() {
@@ -85,8 +133,9 @@ export function WordSearchPage() {
     resumeTimer,
   } = useWordSearchSocket('player');
   const [selection, setSelection] = useState<WordSearchCellRef[]>([]);
-  const [instructionsOpen, setInstructionsOpen] = useState(false);
-  const instructionsOpenRef = useRef(false);
+  const [instructionsOpen, setInstructionsOpen] = useState(true);
+  const [intro, setIntro] = useState(true);
+  const instructionsOpenRef = useRef(true);
   const timerChain = useRef(Promise.resolve());
 
   const elapsedLabel = useElapsedClock(
@@ -101,9 +150,25 @@ export function WordSearchPage() {
     setSelection([]);
   }, [puzzleId]);
 
+  useEffect(() => {
+    if (!puzzleId) {
+      return;
+    }
+    timerChain.current = timerChain.current.then(async () => {
+      if (instructionsOpenRef.current) {
+        await pauseTimer();
+      } else {
+        await resumeTimer();
+      }
+    });
+  }, [puzzleId, pauseTimer, resumeTimer]);
+
   const onInstructionsOpenChange = (open: boolean) => {
     setInstructionsOpen(open);
     instructionsOpenRef.current = open;
+    if (!open) {
+      setIntro(false);
+    }
     timerChain.current = timerChain.current.then(async () => {
       if (instructionsOpenRef.current) {
         await pauseTimer();
@@ -138,6 +203,12 @@ export function WordSearchPage() {
         <Button asChild size="lg" variant="outline" className="mt-8">
           <Link to="/">Return to Lobby</Link>
         </Button>
+        <WordSearchInstructions
+          open={instructionsOpen}
+          onOpenChange={onInstructionsOpenChange}
+          intro={intro}
+          showTrigger={false}
+        />
       </div>
     );
   }
@@ -169,35 +240,12 @@ export function WordSearchPage() {
               {elapsedLabel}
             </p>
             <div className="flex items-center gap-2">
-              <Dialog
+              <WordSearchInstructions
                 open={instructionsOpen}
                 onOpenChange={onInstructionsOpenChange}
-              >
-                <DialogTrigger asChild>
-                  <Button type="button" variant="outline" size="sm">
-                    Instructions
-                  </Button>
-                </DialogTrigger>
-                <DialogContent
-                  className="inset-0 left-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col rounded-none border-0 bg-playfield p-6 shadow-none md:inset-auto md:left-1/2 md:top-1/2 md:h-auto md:w-[min(92vw,28rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-3xl md:border-4 md:!bg-none md:!bg-cream md:shadow-pop"
-                >
-                  <div className="flex min-h-0 flex-1 flex-col md:flex-none">
-                    <DialogHeader>
-                      <DialogTitle>How to play</DialogTitle>
-                    </DialogHeader>
-                    <p className="text-lg font-semibold leading-relaxed text-ink/80 md:text-base">
-                      Words run in any of eight directions, including backwards
-                      and diagonally. Drag across the letters, or tap them one
-                      at a time.
-                    </p>
-                    <DialogClose asChild>
-                      <Button type="button" size="lg" className="mt-auto w-full md:mt-6">
-                        Close
-                      </Button>
-                    </DialogClose>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                intro={intro}
+                showTrigger
+              />
               <Button asChild variant="outline" size="sm">
                 <Link to="/">Return to Lobby</Link>
               </Button>
@@ -225,6 +273,9 @@ export function WordSearchPage() {
               found={playerState.found}
               onSelectionChange={setSelection}
               onCommit={(cells) => {
+                if (instructionsOpenRef.current || cells.length === 0) {
+                  return;
+                }
                 void submitSelection(cells).then((result) => {
                   if (result?.matched) {
                     setSelection([]);

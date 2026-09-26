@@ -11,6 +11,14 @@ import { LetterKeyboard } from '@/components/crossword/LetterKeyboard';
 import { WinnerConfetti } from '@/components/WinnerConfetti';
 import { Button } from '@/components/ui/button';
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
   buildClientWords,
   computeElapsedMs,
   directionForCell,
@@ -48,19 +56,107 @@ function isGridEmpty(letters: (string | null)[][]): boolean {
 
 function useElapsedClock(
   elapsedMs: number,
-  activeSince: number | null
+  activeSince: number | null,
+  hold: boolean
 ): string {
   const [now, setNow] = useState(() => Date.now());
+  const anchor = useRef<{
+    displayMs: number;
+    at: number;
+    holding: boolean;
+  } | null>(null);
+  const previousElapsed = useRef(elapsedMs);
 
   useEffect(() => {
-    if (activeSince == null) {
+    if (hold || activeSince == null) {
       return;
     }
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [activeSince]);
+  }, [hold, activeSince]);
+
+  if (elapsedMs < previousElapsed.current) {
+    anchor.current = null;
+  }
+  previousElapsed.current = elapsedMs;
+
+  if (hold) {
+    if (!anchor.current?.holding) {
+      const displayMs = anchor.current
+        ? anchor.current.displayMs + (Date.now() - anchor.current.at)
+        : computeElapsedMs(elapsedMs, activeSince, Date.now());
+      anchor.current = { displayMs, at: Date.now(), holding: true };
+    }
+    return formatElapsedMs(anchor.current.displayMs);
+  }
+
+  if (anchor.current?.holding) {
+    if (activeSince == null && elapsedMs === 0) {
+      anchor.current = null;
+    } else {
+      anchor.current = {
+        displayMs: anchor.current.displayMs,
+        at: Date.now(),
+        holding: false,
+      };
+    }
+  }
+
+  if (anchor.current) {
+    return formatElapsedMs(
+      anchor.current.displayMs + Math.max(0, Date.now() - anchor.current.at)
+    );
+  }
 
   return formatElapsedMs(computeElapsedMs(elapsedMs, activeSince, now));
+}
+
+function CrosswordInstructions({
+  open,
+  onOpenChange,
+  intro,
+  showTrigger,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  intro: boolean;
+  showTrigger: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {showTrigger ? (
+        <DialogTrigger asChild>
+          <Button type="button" variant="outline" size="sm">
+            Instructions
+          </Button>
+        </DialogTrigger>
+      ) : null}
+      <DialogContent
+        className="m-0 flex h-[100dvh] max-h-none w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-playfield p-6 shadow-none md:m-auto md:h-fit md:max-h-[92dvh] md:w-[min(92vw,28rem)] md:overflow-y-auto md:rounded-3xl md:border-4 md:!bg-none md:!bg-cream md:shadow-pop"
+      >
+        <div className="flex min-h-0 flex-1 flex-col md:flex-none">
+          <DialogHeader>
+            <DialogTitle>How to play</DialogTitle>
+          </DialogHeader>
+          <ul className="space-y-3 text-lg font-semibold leading-relaxed text-ink/80 md:text-base">
+            <li>Touch or click a square to start entering a letter.</li>
+            <li>Double-click a square to toggle the direction.</li>
+            <li>
+              Click a clue to highlight that word and start entering letters.
+            </li>
+          </ul>
+          <p className="mt-3 text-sm font-semibold text-ink/60">
+            The clock stays stopped while these instructions are open.
+          </p>
+          <DialogClose asChild>
+            <Button type="button" size="lg" className="mt-auto w-full md:mt-6">
+              {intro ? 'Start' : 'Close'}
+            </Button>
+          </DialogClose>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function CrosswordPage() {
@@ -73,6 +169,8 @@ export function CrosswordPage() {
     kicked,
     setLetter,
     clearLetter,
+    pauseTimer,
+    resumeTimer,
   } = useCrosswordSocket('player');
 
   const isMobile = useIsMobileViewport();
@@ -115,12 +213,47 @@ export function CrosswordPage() {
     }
   }
 
+  const [instructionsOpen, setInstructionsOpen] = useState(true);
+  const [intro, setIntro] = useState(true);
+  const instructionsOpenRef = useRef(true);
+  const timerChain = useRef(Promise.resolve());
+
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
-    playerState?.activeSince ?? null
+    playerState?.activeSince ?? null,
+    instructionsOpen
   );
 
-  const showKeyboard = isMobile && selected != null;
+  const puzzleClockId = playerState?.puzzle.id;
+  useEffect(() => {
+    if (!puzzleClockId) {
+      return;
+    }
+    timerChain.current = timerChain.current.then(async () => {
+      if (instructionsOpenRef.current) {
+        await pauseTimer();
+      } else {
+        await resumeTimer();
+      }
+    });
+  }, [puzzleClockId, pauseTimer, resumeTimer]);
+
+  const onInstructionsOpenChange = (open: boolean) => {
+    setInstructionsOpen(open);
+    instructionsOpenRef.current = open;
+    if (!open) {
+      setIntro(false);
+    }
+    timerChain.current = timerChain.current.then(async () => {
+      if (instructionsOpenRef.current) {
+        await pauseTimer();
+      } else {
+        await resumeTimer();
+      }
+    });
+  };
+
+  const showKeyboard = isMobile && selected != null && !instructionsOpen;
 
   const words = useMemo(
     () => (playerState ? buildClientWords(playerState.puzzle) : []),
@@ -258,6 +391,9 @@ export function CrosswordPage() {
   };
 
   const selectCell = (row: number, col: number) => {
+    if (instructionsOpenRef.current) {
+      return;
+    }
     collapseClues();
     const now = performance.now();
     const previousClick = lastClickRef.current;
@@ -296,7 +432,7 @@ export function CrosswordPage() {
   };
 
   const selectClue = (clue: CrosswordCluePublic, dir: CrosswordDirection) => {
-    if (!playerState) {
+    if (!playerState || instructionsOpenRef.current) {
       return;
     }
     collapseClues();
@@ -322,6 +458,9 @@ export function CrosswordPage() {
   };
 
   const applyKey = async (key: string) => {
+    if (instructionsOpenRef.current) {
+      return;
+    }
     const current = selectedRef.current;
     if (!current || !playerState) {
       return;
@@ -419,7 +558,7 @@ export function CrosswordPage() {
   handleKeyRef.current = handleKey;
 
   useEffect(() => {
-    if (isMobile || !selected) {
+    if (isMobile || !selected || instructionsOpen) {
       return;
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -445,7 +584,7 @@ export function CrosswordPage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isMobile, selected]);
+  }, [isMobile, selected, instructionsOpen]);
 
   if (!playerId || !playerName) {
     return <Navigate to="/login" replace />;
@@ -472,6 +611,12 @@ export function CrosswordPage() {
         <Button asChild size="lg" variant="outline" className="mt-8">
           <Link to="/">Return to Lobby</Link>
         </Button>
+        <CrosswordInstructions
+          open={instructionsOpen}
+          onOpenChange={onInstructionsOpenChange}
+          intro={intro}
+          showTrigger={false}
+        />
       </div>
     );
   }
@@ -510,9 +655,17 @@ export function CrosswordPage() {
             {playerState.puzzle.title}
           </h1>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/">Return to Lobby</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <CrosswordInstructions
+            open={instructionsOpen}
+            onOpenChange={onInstructionsOpenChange}
+            intro={intro}
+            showTrigger
+          />
+          <Button asChild variant="outline" size="sm">
+            <Link to="/">Return to Lobby</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-baseline justify-between gap-3">
@@ -545,10 +698,6 @@ export function CrosswordPage() {
           {error}
         </p>
       ) : null}
-
-      <p className="flex h-5 items-center justify-center text-center text-xs font-semibold leading-none text-ink/55">
-        Double-click a square to toggle direction
-      </p>
 
       {isMobile ? (
         <>

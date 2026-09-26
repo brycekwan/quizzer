@@ -148,6 +148,14 @@ export function useCrosswordSocket(role: 'player' | 'admin' = 'player') {
             resolve
           );
         }),
+      pauseTimer: () =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit('crossword:pauseTimer', {}, resolve);
+        }),
+      resumeTimer: () =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          socketRef.current?.emit('crossword:resumeTimer', {}, resolve);
+        }),
       reset: () =>
         new Promise<{ ok: boolean; error?: string }>((resolve) => {
           socketRef.current?.emit('crossword:admin:reset', {}, resolve);

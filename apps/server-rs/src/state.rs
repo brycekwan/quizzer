@@ -19,6 +19,8 @@ pub struct SocketMeta {
     pub in_quizzer: bool,
     pub crossword_player: bool,
     pub crossword_admin: bool,
+    /// Play clock is paused because this socket has the crossword instructions open.
+    pub crossword_help: bool,
     pub wordsearch_player: bool,
     pub wordsearch_admin: bool,
     /// Play clock is paused because this socket has the instructions open.

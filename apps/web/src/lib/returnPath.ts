@@ -1,4 +1,10 @@
-const PLAYER_PATHS = new Set(['/', '/quizzer', '/crossword', '/wordsearch']);
+const PLAYER_PATHS = new Set([
+  '/',
+  '/quizzer',
+  '/crossword',
+  '/wordsearch',
+  '/sudoku',
+]);
 
 /** Where a successful login should continue. Direct visits to login go to the lobby. */
 export function returnPath(search: string): string {

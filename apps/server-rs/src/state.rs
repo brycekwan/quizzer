@@ -25,6 +25,10 @@ pub struct SocketMeta {
     pub wordsearch_admin: bool,
     /// Play clock is paused because this socket has the instructions open.
     pub wordsearch_help: bool,
+    pub sudoku_player: bool,
+    pub sudoku_admin: bool,
+    /// Play clock is paused because this socket has the sudoku instructions open.
+    pub sudoku_help: bool,
     pub system_admin: bool,
 }
 

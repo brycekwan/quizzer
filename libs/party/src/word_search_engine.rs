@@ -17,7 +17,12 @@ struct PlayerProgress {
     completed_at: Option<i64>,
 }
 
-fn current_elapsed_ms(elapsed_ms: i64, active_since: Option<i64>, completed_at: Option<i64>, now: i64) -> i64 {
+fn current_elapsed_ms(
+    elapsed_ms: i64,
+    active_since: Option<i64>,
+    completed_at: Option<i64>,
+    now: i64,
+) -> i64 {
     if completed_at.is_some() {
         return elapsed_ms;
     }
@@ -134,8 +139,12 @@ impl WordSearchEngine {
         if player.active_since.is_none() || player.completed_at.is_some() {
             return;
         }
-        player.elapsed_ms =
-            current_elapsed_ms(player.elapsed_ms, player.active_since, player.completed_at, now);
+        player.elapsed_ms = current_elapsed_ms(
+            player.elapsed_ms,
+            player.active_since,
+            player.completed_at,
+            now,
+        );
         player.active_since = None;
     }
 
@@ -231,10 +240,16 @@ impl WordSearchEngine {
     }
 
     fn sort_elapsed(player: &WordSearchAdminEntry, now: i64) -> i64 {
-        if player.completed_at.is_none() && player.active_since.is_none() && player.elapsed_ms == 0 {
+        if player.completed_at.is_none() && player.active_since.is_none() && player.elapsed_ms == 0
+        {
             return i64::MAX;
         }
-        current_elapsed_ms(player.elapsed_ms, player.active_since, player.completed_at, now)
+        current_elapsed_ms(
+            player.elapsed_ms,
+            player.active_since,
+            player.completed_at,
+            now,
+        )
     }
 
     pub fn admin_snapshot(&self) -> WordSearchAdminSnapshot {
@@ -308,7 +323,9 @@ impl WordSearchEngine {
 mod tests {
     use super::*;
     use crate::clock::NOON_2026_MS;
-    use crate::word_search::{WordSearchCellRef, WordSearchDirection, WordSearchFile, WordSearchPlacement, WordSearchWord};
+    use crate::word_search::{
+        WordSearchCellRef, WordSearchDirection, WordSearchFile, WordSearchPlacement, WordSearchWord,
+    };
 
     fn puzzle() -> WordSearchFile {
         WordSearchFile {
@@ -328,7 +345,12 @@ mod tests {
         }
     }
 
-    fn placement(word: &str, row: i64, col: i64, direction: WordSearchDirection) -> WordSearchPlacement {
+    fn placement(
+        word: &str,
+        row: i64,
+        col: i64,
+        direction: WordSearchDirection,
+    ) -> WordSearchPlacement {
         WordSearchPlacement {
             word: word.into(),
             row,
@@ -339,13 +361,37 @@ mod tests {
 
     fn words() -> Vec<WordSearchWord> {
         vec![
-            word("CAT", 0, 0, WordSearchDirection::E, &[(0, 0), (0, 1), (0, 2)]),
-            word("DOG", 0, 3, WordSearchDirection::S, &[(0, 3), (1, 3), (2, 3)]),
-            word("GOD", 3, 2, WordSearchDirection::W, &[(3, 2), (3, 1), (3, 0)]),
+            word(
+                "CAT",
+                0,
+                0,
+                WordSearchDirection::E,
+                &[(0, 0), (0, 1), (0, 2)],
+            ),
+            word(
+                "DOG",
+                0,
+                3,
+                WordSearchDirection::S,
+                &[(0, 3), (1, 3), (2, 3)],
+            ),
+            word(
+                "GOD",
+                3,
+                2,
+                WordSearchDirection::W,
+                &[(3, 2), (3, 1), (3, 0)],
+            ),
         ]
     }
 
-    fn word(name: &str, row: i64, col: i64, direction: WordSearchDirection, cells: &[(i64, i64)]) -> WordSearchWord {
+    fn word(
+        name: &str,
+        row: i64,
+        col: i64,
+        direction: WordSearchDirection,
+        cells: &[(i64, i64)],
+    ) -> WordSearchWord {
         WordSearchWord {
             id: name.into(),
             word: name.into(),
@@ -354,7 +400,10 @@ mod tests {
             direction,
             cells: cells
                 .iter()
-                .map(|(row, col)| WordSearchCellRef { row: *row, col: *col })
+                .map(|(row, col)| WordSearchCellRef {
+                    row: *row,
+                    col: *col,
+                })
                 .collect(),
         }
     }
@@ -394,7 +443,13 @@ mod tests {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("p1", "Buddy");
         assert!(!engine
-            .submit_selection("p1", &[WordSearchCellRef { row: 0, col: 0 }, WordSearchCellRef { row: 0, col: 1 }])
+            .submit_selection(
+                "p1",
+                &[
+                    WordSearchCellRef { row: 0, col: 0 },
+                    WordSearchCellRef { row: 0, col: 1 }
+                ]
+            )
             .unwrap());
         assert!(engine.player_snapshot("p1").unwrap().found.is_empty());
         assert!(engine
@@ -430,7 +485,10 @@ mod tests {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("p1", "Buddy");
         arm_clock(&mut engine, "p1");
-        assert_eq!(engine.player_snapshot("p1").unwrap().active_since, Some(NOON_2026_MS));
+        assert_eq!(
+            engine.player_snapshot("p1").unwrap().active_since,
+            Some(NOON_2026_MS)
+        );
         engine.clock().set(NOON_2026_MS + 30_000);
         engine.pause_timer("p1");
         assert_eq!(engine.player_snapshot("p1").unwrap().elapsed_ms, 30_000);
@@ -486,7 +544,11 @@ mod tests {
         engine.submit_selection("b", &found[1].cells).unwrap();
         engine.pause_timer("b");
         let admin = engine.admin_snapshot();
-        let names: Vec<_> = admin.players.iter().map(|player| player.name.as_str()).collect();
+        let names: Vec<_> = admin
+            .players
+            .iter()
+            .map(|player| player.name.as_str())
+            .collect();
         assert_eq!(names, ["Bea", "Ada", "Cal"]);
         assert_eq!(admin.players[0].elapsed_ms, 30_000);
         assert_eq!(admin.players[1].elapsed_ms, 60_000);
@@ -506,10 +568,7 @@ mod tests {
         engine.reset_player("a").unwrap();
         assert!(engine.player_snapshot("a").unwrap().found.is_empty());
         assert_eq!(engine.player_snapshot("a").unwrap().elapsed_ms, 0);
-        assert_eq!(
-            engine.player_snapshot("b").unwrap().found[0].word,
-            "DOG"
-        );
+        assert_eq!(engine.player_snapshot("b").unwrap().found[0].word, "DOG");
     }
 
     #[test]

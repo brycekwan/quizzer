@@ -10,11 +10,13 @@ use std::time::Duration;
 
 use party::crossword_engine::CrosswordEngine;
 use party::load::{
-    load_default_crossword, load_default_question_set, load_default_word_search,
-    resolve_crossword_dir, resolve_questions_dir, resolve_word_search_dir,
+    load_default_crossword, load_default_question_set, load_default_sudoku,
+    load_default_word_search, resolve_crossword_dir, resolve_questions_dir, resolve_sudoku_dir,
+    resolve_word_search_dir,
 };
 use party::quizzer::GameEngine;
 use party::session::SessionRegistry;
+use party::sudoku_engine::SudokuEngine;
 use party::system_admin::SystemAdmin;
 use party::types::QuestionSetMode;
 use party::word_search_engine::WordSearchEngine;
@@ -103,11 +105,15 @@ fn load_party() -> Result<SystemAdmin, Box<dyn std::error::Error>> {
         party::Clock::system(),
     );
 
+    let (sudoku, puzzles) = load_default_sudoku(&resolve_sudoku_dir())?;
+    let sudoku = SudokuEngine::with_clock(sudoku, Some(puzzles), None, party::Clock::system())?;
+
     Ok(SystemAdmin::new(
         SessionRegistry::new(),
         quiz,
         crossword,
         word_search,
+        sudoku,
     ))
 }
 

@@ -9,6 +9,7 @@ pub struct SystemPlayerEntry {
     pub accumulated_score: i64,
     pub crossword_score: Option<i64>,
     pub word_search_score: Option<i64>,
+    pub sudoku_score: Option<i64>,
     pub quiz_score: Option<i64>,
 }
 
@@ -25,15 +26,19 @@ pub struct SystemScoreInput {
     pub connected: bool,
     pub crossword_score: Option<i64>,
     pub word_search_score: Option<i64>,
+    pub sudoku_score: Option<i64>,
     pub quiz_score: Option<i64>,
 }
 
 fn accumulated_of(player: &SystemScoreInput) -> i64 {
-    player.crossword_score.unwrap_or(0) + player.word_search_score.unwrap_or(0)
+    player.crossword_score.unwrap_or(0)
+        + player.word_search_score.unwrap_or(0)
+        + player.sudoku_score.unwrap_or(0)
 }
 
 pub fn build_system_leaderboard(players: &[SystemScoreInput]) -> SystemAdminSnapshot {
-    let mut ranked: Vec<&SystemScoreInput> = players.iter().filter(|player| player.connected).collect();
+    let mut ranked: Vec<&SystemScoreInput> =
+        players.iter().filter(|player| player.connected).collect();
     ranked.sort_by(|a, b| {
         accumulated_of(b)
             .cmp(&accumulated_of(a))
@@ -51,6 +56,7 @@ pub fn build_system_leaderboard(players: &[SystemScoreInput]) -> SystemAdminSnap
                 accumulated_score: accumulated_of(player),
                 crossword_score: player.crossword_score,
                 word_search_score: player.word_search_score,
+                sudoku_score: player.sudoku_score,
                 quiz_score: player.quiz_score,
             })
             .collect(),
@@ -68,6 +74,7 @@ mod tests {
             connected: true,
             crossword_score: None,
             word_search_score: None,
+            sudoku_score: None,
             quiz_score: None,
         }
     }
@@ -93,9 +100,17 @@ mod tests {
             player("new", "New"),
         ]);
 
-        let names: Vec<_> = board.players.iter().map(|entry| entry.name.as_str()).collect();
+        let names: Vec<_> = board
+            .players
+            .iter()
+            .map(|entry| entry.name.as_str())
+            .collect();
         assert_eq!(names, ["Search", "Quiz", "New"]);
-        let scores: Vec<_> = board.players.iter().map(|entry| entry.accumulated_score).collect();
+        let scores: Vec<_> = board
+            .players
+            .iter()
+            .map(|entry| entry.accumulated_score)
+            .collect();
         assert_eq!(scores, [1300, 100, 0]);
         let quiz: Vec<_> = board.players.iter().map(|entry| entry.quiz_score).collect();
         assert_eq!(quiz, [None, Some(5000), None]);
@@ -115,7 +130,11 @@ mod tests {
                 ..player("a", "Ada")
             },
         ]);
-        let names: Vec<_> = board.players.iter().map(|entry| entry.name.as_str()).collect();
+        let names: Vec<_> = board
+            .players
+            .iter()
+            .map(|entry| entry.name.as_str())
+            .collect();
         assert_eq!(names, ["Ada", "Bea"]);
         let ranks: Vec<_> = board.players.iter().map(|entry| entry.rank).collect();
         assert_eq!(ranks, [1, 2]);

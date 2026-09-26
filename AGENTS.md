@@ -1,6 +1,6 @@
 # Party (Quizzer + more)
 
-Multi-game party platform: Kahoot-style quizzer, crossword, and word search. Server-authoritative via Socket.IO; one React SPA for players and host admin.
+Multi-game party platform: Kahoot-style quizzer, crossword, word search, and sudoku. Server-authoritative via Socket.IO; one React SPA for players and host admin.
 
 ## Stack
 
@@ -14,19 +14,22 @@ Multi-game party platform: Kahoot-style quizzer, crossword, and word search. Ser
 
 | Path | Role |
 |------|------|
-| `apps/web/src/pages/` | Login, menus, `PlayPage` (`/quizzer`), crossword and word search play/admin |
+| `apps/web/src/pages/` | Login, menus, `PlayPage` (`/quizzer`), crossword, word search, and sudoku play/admin |
 | `apps/web/src/hooks/useSession.ts` | Platform login (`session:login`) |
 | `apps/web/src/hooks/useGameSocket.ts` | Quizzer socket |
 | `apps/web/src/hooks/useCrosswordSocket.ts` | Crossword play/admin socket |
 | `apps/web/src/hooks/useWordSearchSocket.ts` | Word search play/admin socket |
+| `apps/web/src/hooks/useSudokuSocket.ts` | Sudoku play/admin socket |
 | `apps/web/src/components/crossword/` | Grid + clue list |
 | `apps/web/src/components/wordsearch/` | Word search grid |
+| `apps/web/src/components/sudoku/` | Sudoku grid and number keyboard |
 | `apps/server-rs/` | Rust binary: HTTP, static files, Socket.IO handlers (`party-server`) |
-| `libs/party/` | Session registry, quizzer, crossword, word search, system admin |
+| `libs/party/` | Session registry, quizzer, crossword, word search, sudoku, system admin |
 | `apps/server/questions/*.json` | Quizzer question packs |
 | `apps/server/crossword/puzzles/*.json` | Crossword packs (grid-first) |
 | `apps/server/wordsearch/puzzles/*.json` | Word search packs (12×12 grid + placements) |
-| `libs/shared/src/` | Types, scoring, names, crossword and word search validation |
+| `apps/server/sudoku/puzzles/*.json` | Sudoku packs (solution + givens) |
+| `libs/shared/src/` | Types, scoring, names, crossword, word search, and sudoku validation |
 
 ## Commands
 
@@ -48,19 +51,21 @@ Prod: one Docker image serves API + built web on **8080**.
 | `/quizzer` | Quiz play (`/play` redirects here) |
 | `/crossword` | Crossword play |
 | `/wordsearch` | Word search play |
+| `/sudoku` | Sudoku play |
 | `/host` | Host menu |
 | `/host/quizzer` | Quizzer admin (`/host/admin` redirects here) |
 | `/host/crossword` | Crossword admin + reset |
 | `/host/wordsearch` | Word search admin, leaderboard, per-player reset |
+| `/host/sudoku` | Sudoku admin, leaderboard, per-player reset |
 | `/host/system` | Connected players, combined scores, remove from the party |
 
 ## Architecture rules
 
 - **Platform session first.** `session:login` owns name uniqueness and single-connection displace.
-- **Server owns time** for quizzer timers; crossword and word search progress are server-authoritative.
-- **Shared logic in `@party/shared`.** Crossword answers are derived from the grid; word search placements are validated against the grid. Clients get a public puzzle without solutions.
-- **One quiz room / one crossword / one word search.** In-process singletons; no multi-room or DB.
-- Quiz reset clears quiz players (session kept). Crossword reset clears letters/completions for current players. Word search reset clears found words and play time.
+- **Server owns time** for quizzer timers; crossword, word search, and sudoku progress are server-authoritative.
+- **Shared logic in `@party/shared`.** Crossword answers are derived from the grid; word search placements are validated against the grid. Sudoku files carry a private solution and a starting grid. Clients get a public puzzle without solutions.
+- **One quiz room / one crossword / one word search / one sudoku.** In-process singletons; no multi-room or DB.
+- Quiz reset clears quiz players (session kept). Crossword reset clears letters/completions for current players. Word search reset clears found words and play time. Sudoku reset clears the board, score, hints, and clock.
 
 ## Crossword packs
 
@@ -69,6 +74,10 @@ JSON under `apps/server/crossword/puzzles/`: `{ id, title, grid, across, down }`
 ## Word search packs
 
 JSON under `apps/server/wordsearch/puzzles/`: `{ id, title, grid, words }`. `grid` is a 12×12 array of letters. Each of the ten `words` is `{ word, row, col, direction }` with `direction` one of `E W N S NE NW SE SW`. The word is walked from that cell; filler letters fill the rest. Validate via `validateWordSearchFile`. The server accepts only those declared placements.
+
+## Sudoku packs
+
+JSON under `apps/server/sudoku/puzzles/`: `{ id, title, solution, givens }`. Both grids are 9×9. `solution` is the finished board. `givens` uses those digits or `null` for blanks. The solution must be a valid sudoku and the only board that fits the givens. Validate via `validateSudokuFile`. Players receive givens and their own entries, not the solution.
 
 ## Socket events (high level)
 
@@ -84,11 +93,15 @@ JSON under `apps/server/wordsearch/puzzles/`: `{ id, title, grid, words }`. `gri
 | `wordsearch:submitSelection` | Submit a selected cell path |
 | `wordsearch:pauseTimer` / `resumeTimer` | Pause the play clock while instructions are open |
 | `wordsearch:admin:subscribe` / `selectPuzzle` / `reset` / `resetPlayer` | Word search host |
+| `sudoku:subscribe` | Enter sudoku (requires session) |
+| `sudoku:commit` / `draft` / `erase` / `hint` | Fill a cell, toggle a note, clear a wrong note, or reveal one digit |
+| `sudoku:pauseTimer` / `resumeTimer` | Pause the play clock while instructions are open |
+| `sudoku:admin:subscribe` / `selectPuzzle` / `reset` / `resetPlayer` | Sudoku host |
 | `system:admin:subscribe` / `kick` | System host: connected players and remove from the party |
 
-Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `system:admin:state`.
+Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `sudoku:state`, `sudoku:admin:state`, `system:admin:state`.
 
-System removal emits `player:kicked` with reason `Removed from the system by admin`, clears that player's quiz, crossword, and word search progress, and sends them to login. Word search score is 100 points per word found plus a placement bonus of 1000 down to 100 for ranks 1–10 (most words, then shortest time). The system leaderboard sums crossword and word search scores and shows the quiz score separately.
+System removal emits `player:kicked` with reason `Removed from the system by admin`, clears that player's quiz, crossword, word search, and sudoku progress, and sends them to login. Word search score is 100 points per word found plus a placement bonus of 1000 down to 100 for ranks 1–10 (most words, then shortest time). Sudoku awards 10 points for each correct digit and −10 for each distinct wrong note in a cell. Finishing adds 100 points plus 10 for each unused hint (maximum 3). Players see that score only. Sudoku admin ranking uses that score, then shorter time, and adds a placement bonus of 1000 down to 100 for ranks 1–10. The system leaderboard sums crossword, word search, and sudoku scores (including those placement bonuses) and shows the quiz score separately.
 
 ## Conventions
 

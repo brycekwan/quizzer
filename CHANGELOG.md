@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/brycekwan/quizzer/compare/v2.3.0...v2.4.0) (2026-09-28)
+
+
+### Features
+
+* **server:** lock host controls and stop early score leaks ([9ab0744](https://github.com/brycekwan/quizzer/commit/9ab074458e6243e499081f4b2cfeb6b0ab048466))
+
 # [2.3.0](https://github.com/brycekwan/quizzer/compare/v2.2.0...v2.3.0) (2026-09-26)
 
 

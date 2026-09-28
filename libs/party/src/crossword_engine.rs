@@ -17,7 +17,12 @@ struct PlayerProgress {
     completed_at: Option<i64>,
 }
 
-fn current_elapsed_ms(elapsed_ms: i64, active_since: Option<i64>, completed_at: Option<i64>, now: i64) -> i64 {
+fn current_elapsed_ms(
+    elapsed_ms: i64,
+    active_since: Option<i64>,
+    completed_at: Option<i64>,
+    now: i64,
+) -> i64 {
     if completed_at.is_some() {
         return elapsed_ms;
     }
@@ -136,7 +141,12 @@ impl CrosswordEngine {
         if player.active_since.is_none() || player.completed_at.is_some() {
             return;
         }
-        player.elapsed_ms = current_elapsed_ms(player.elapsed_ms, player.active_since, player.completed_at, now);
+        player.elapsed_ms = current_elapsed_ms(
+            player.elapsed_ms,
+            player.active_since,
+            player.completed_at,
+            now,
+        );
         player.active_since = None;
     }
 
@@ -202,7 +212,12 @@ impl CrosswordEngine {
         self.players.get_mut(player_id).expect("player").letters[row as usize][col as usize] =
             Some(String::new());
         self.recompute_words(player_id);
-        Ok(self.players.get(player_id).unwrap().correct_word_ids.clone())
+        Ok(self
+            .players
+            .get(player_id)
+            .unwrap()
+            .correct_word_ids
+            .clone())
     }
 
     fn is_open_cell(&self, row: i64, col: i64) -> bool {
@@ -269,10 +284,16 @@ impl CrosswordEngine {
     }
 
     fn sort_elapsed(player: &CrosswordAdminEntry, now: i64) -> i64 {
-        if player.completed_at.is_none() && player.active_since.is_none() && player.elapsed_ms == 0 {
+        if player.completed_at.is_none() && player.active_since.is_none() && player.elapsed_ms == 0
+        {
             return i64::MAX;
         }
-        current_elapsed_ms(player.elapsed_ms, player.active_since, player.completed_at, now)
+        current_elapsed_ms(
+            player.elapsed_ms,
+            player.active_since,
+            player.completed_at,
+            now,
+        )
     }
 
     pub fn admin_snapshot(&self) -> CrosswordAdminSnapshot {
@@ -292,11 +313,13 @@ impl CrosswordEngine {
             })
             .collect();
         entries.sort_by(|a, b| {
-            b.correct_word_count.cmp(&a.correct_word_count).then_with(|| {
-                Self::sort_elapsed(a, now)
-                    .cmp(&Self::sort_elapsed(b, now))
-                    .then_with(|| a.name.cmp(&b.name))
-            })
+            b.correct_word_count
+                .cmp(&a.correct_word_count)
+                .then_with(|| {
+                    Self::sort_elapsed(a, now)
+                        .cmp(&Self::sort_elapsed(b, now))
+                        .then_with(|| a.name.cmp(&b.name))
+                })
         });
         for (index, entry) in entries.iter_mut().enumerate() {
             entry.score = crossword_score(entry.correct_word_count, (index + 1) as i64);
@@ -383,7 +406,13 @@ mod tests {
     }
 
     fn fill_all(engine: &mut CrosswordEngine, player_id: &str) {
-        for (row, col, letter) in [(0, 0, "P"), (0, 1, "I"), (0, 2, "E"), (1, 0, "A"), (2, 0, "N")] {
+        for (row, col, letter) in [
+            (0, 0, "P"),
+            (0, 1, "I"),
+            (0, 2, "E"),
+            (1, 0, "A"),
+            (2, 0, "N"),
+        ] {
             engine.set_letter(player_id, row, col, letter).unwrap();
         }
     }
@@ -394,7 +423,11 @@ mod tests {
         engine.ensure_player("p1", "Buddy");
         engine.set_letter("p1", 0, 0, "P").unwrap();
         engine.set_letter("p1", 0, 1, "I").unwrap();
-        assert!(engine.player_snapshot("p1").unwrap().correct_word_ids.is_empty());
+        assert!(engine
+            .player_snapshot("p1")
+            .unwrap()
+            .correct_word_ids
+            .is_empty());
         let filled = engine.set_letter("p1", 0, 2, "E").unwrap();
         assert_eq!(filled, vec!["across-1".to_string()]);
         let snap = engine.player_snapshot("p1").unwrap();
@@ -419,7 +452,10 @@ mod tests {
         assert_eq!(engine.player_snapshot("p1").unwrap().elapsed_ms, 0);
         assert!(engine.player_snapshot("p1").unwrap().active_since.is_none());
         engine.set_letter("p1", 0, 0, "P").unwrap();
-        assert_eq!(engine.player_snapshot("p1").unwrap().active_since, Some(NOON_2026_MS));
+        assert_eq!(
+            engine.player_snapshot("p1").unwrap().active_since,
+            Some(NOON_2026_MS)
+        );
         engine.clock().set(NOON_2026_MS + 30_000);
         engine.pause_timer("p1");
         let snap = engine.player_snapshot("p1").unwrap();
@@ -478,7 +514,11 @@ mod tests {
         engine.clock().set(NOON_2026_MS + 150_000);
         fill_all(&mut engine, "b");
         let admin = engine.admin_snapshot();
-        let names: Vec<_> = admin.players.iter().map(|player| player.name.as_str()).collect();
+        let names: Vec<_> = admin
+            .players
+            .iter()
+            .map(|player| player.name.as_str())
+            .collect();
         assert_eq!(names, ["Bea", "Ada", "Cal"]);
         assert_eq!(admin.players[0].elapsed_ms, 30_000);
         assert_eq!(admin.players[1].elapsed_ms, 60_000);
@@ -543,7 +583,11 @@ mod tests {
         assert_eq!(engine.admin_snapshot().players[0].score, 1200);
         engine.ensure_player("b", "Bea");
         let admin = engine.admin_snapshot();
-        let names: Vec<_> = admin.players.iter().map(|player| player.name.as_str()).collect();
+        let names: Vec<_> = admin
+            .players
+            .iter()
+            .map(|player| player.name.as_str())
+            .collect();
         assert_eq!(names, ["Ada", "Bea"]);
         assert_eq!(admin.players[0].score, 1200);
         assert_eq!(admin.players[1].score, 900);

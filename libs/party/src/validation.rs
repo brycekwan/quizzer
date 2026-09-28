@@ -49,7 +49,11 @@ pub fn validate_question(question: &Question, index: usize) -> Option<String> {
             question.id
         ));
     }
-    let correct_count = question.answers.iter().filter(|answer| answer.correct).count();
+    let correct_count = question
+        .answers
+        .iter()
+        .filter(|answer| answer.correct)
+        .count();
     if correct_count != 1 {
         return Some(format!(
             "Question {} must have exactly one correct answer",

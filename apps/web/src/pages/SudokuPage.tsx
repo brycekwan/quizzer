@@ -157,8 +157,6 @@ export function SudokuPage() {
     toggleDraft,
     erase,
     hint,
-    pauseTimer,
-    resumeTimer,
   } = useSudokuSocket('player');
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(
     null
@@ -167,12 +165,11 @@ export function SudokuPage() {
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const [intro, setIntro] = useState(true);
   const instructionsOpenRef = useRef(true);
-  const timerChain = useRef(Promise.resolve());
 
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
-    instructionsOpen,
+    false,
     playerState?.completed ?? false
   );
 
@@ -181,32 +178,12 @@ export function SudokuPage() {
     setSelected(null);
   }, [puzzleId]);
 
-  useEffect(() => {
-    if (!puzzleId) {
-      return;
-    }
-    timerChain.current = timerChain.current.then(async () => {
-      if (instructionsOpenRef.current) {
-        await pauseTimer();
-      } else {
-        await resumeTimer();
-      }
-    });
-  }, [puzzleId, pauseTimer, resumeTimer]);
-
   const onInstructionsOpenChange = (open: boolean) => {
     setInstructionsOpen(open);
     instructionsOpenRef.current = open;
     if (!open) {
       setIntro(false);
     }
-    timerChain.current = timerChain.current.then(async () => {
-      if (instructionsOpenRef.current) {
-        await pauseTimer();
-      } else {
-        await resumeTimer();
-      }
-    });
   };
 
   const selectedCell: SudokuCellState | null =

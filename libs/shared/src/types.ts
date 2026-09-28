@@ -97,8 +97,10 @@ export interface QuestionPublic {
 
 export interface ViewerAnswer {
   answerId: string;
-  points: number;
-  correct: boolean;
+  /** Omitted until the reveal phase. */
+  points?: number;
+  /** Omitted until the reveal phase. */
+  correct?: boolean;
 }
 
 export interface GameStateSnapshot {

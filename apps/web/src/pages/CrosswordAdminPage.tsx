@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCrosswordSocket } from '@/hooks/useCrosswordSocket';
+import { useHostSecret } from '@/hooks/useHostSecret';
+import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -35,12 +37,23 @@ function ElapsedCell({
 }
 
 export function CrosswordAdminPage() {
-  const { connected, adminState, error, setError, reset, resetPlayer, selectPuzzle } =
-    useCrosswordSocket('admin');
+  const host = useHostSecret();
+  const { connected, adminState, error, setError, reset, resetPlayer, selectPuzzle, hostReady } =
+    useCrosswordSocket('admin', host.secret, host.attempt);
   const [confirm, setConfirm] = useState<
     { kind: 'all' } | { kind: 'player'; playerId: string; name: string } | null
   >(null);
   const [confirming, setConfirming] = useState(false);
+
+  if (!hostReady) {
+    return (
+      <HostPassphrasePrompt
+        checking={Boolean(host.secret) && !error}
+        error={error}
+        onSubmit={host.save}
+      />
+    );
+  }
 
   if (!adminState) {
     return (

@@ -3,23 +3,85 @@ use std::path::{Component, Path, PathBuf};
 use axum::body::Body;
 use axum::extract::Request;
 use axum::http::{header, StatusCode, Uri};
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::Json;
 use axum::Router;
 use serde_json::json;
-use tower_http::cors::CorsLayer;
 
 pub fn http_router(public_dir: PathBuf) -> Router {
     let dir = public_dir.clone();
     Router::new()
         .route("/api/health", get(health))
         .fallback(move |request: Request| serve(dir.clone(), request))
-        .layer(CorsLayer::permissive())
 }
 
 async fn health() -> impl IntoResponse {
     Json(json!({ "ok": true }))
+}
+
+/// Rejects browser requests whose Origin host is not this server.
+/// Socket.IO has no origin allowlist, so this runs in front of that layer too.
+/// A missing Origin is allowed for non-browser clients such as the contract tests.
+pub async fn reject_cross_origin(request: Request, next: Next) -> Response {
+    let allowed = request
+        .headers()
+        .get(header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .is_none_or(|origin| {
+            let host = request
+                .headers()
+                .get(header::HOST)
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("");
+            origin_matches_host(origin, host)
+        });
+    if !allowed {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    next.run(request).await
+}
+
+fn origin_matches_host(origin: &str, host_header: &str) -> bool {
+    let Ok(origin) = origin.parse::<Uri>() else {
+        return false;
+    };
+    let Some(origin_host) = origin.host() else {
+        return false;
+    };
+    let (name, port) = split_host(host_header);
+    if !origin_host.eq_ignore_ascii_case(name) {
+        return false;
+    }
+    let origin_port = origin.port_u16().unwrap_or(match origin.scheme_str() {
+        Some("https") => 443,
+        Some("http") => 80,
+        _ => return false,
+    });
+    match port {
+        Some(host_port) => origin_port == host_port,
+        None => matches!(origin_port, 80 | 443),
+    }
+}
+
+fn split_host(host_header: &str) -> (&str, Option<u16>) {
+    if let Some(rest) = host_header.strip_prefix('[') {
+        if let Some((name, port)) = rest.split_once("]:") {
+            return (name, port.parse().ok());
+        }
+        if let Some(name) = rest.strip_suffix(']') {
+            return (name, None);
+        }
+    }
+    if let Some((name, port)) = host_header.rsplit_once(':') {
+        if !name.contains(':') {
+            if let Ok(port) = port.parse::<u16>() {
+                return (name, Some(port));
+            }
+        }
+    }
+    (host_header, None)
 }
 
 async fn serve(public_dir: PathBuf, request: Request) -> Response {
@@ -88,5 +150,34 @@ fn content_type(path: &Path) -> &'static str {
         Some("woff2") => "font/woff2",
         Some("wasm") => "application/wasm",
         _ => "application/octet-stream",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::origin_matches_host;
+
+    #[test]
+    fn allows_the_same_host_and_port() {
+        assert!(origin_matches_host(
+            "http://localhost:4200",
+            "localhost:4200"
+        ));
+        assert!(origin_matches_host(
+            "https://party.example",
+            "party.example"
+        ));
+    }
+
+    #[test]
+    fn rejects_a_different_origin() {
+        assert!(!origin_matches_host(
+            "http://evil.example",
+            "party.example:8080"
+        ));
+        assert!(!origin_matches_host(
+            "http://localhost:4200",
+            "localhost:8080"
+        ));
     }
 }

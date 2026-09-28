@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { useSystemSocket } from '@/hooks/useSystemSocket';
+import { useHostSecret } from '@/hooks/useHostSecret';
+import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
 
 function ScoreValue({ value }: { value: number | null }) {
   if (value == null) {
@@ -16,10 +18,21 @@ type PendingAction =
   | { kind: 'kick'; playerId: string; name: string };
 
 export function SystemAdminPage() {
-  const { connected, adminState, error, setError, kick, resetAll } =
-    useSystemSocket();
+  const host = useHostSecret();
+  const { connected, adminState, error, setError, kick, resetAll, hostReady } =
+    useSystemSocket(host.secret, host.attempt);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [working, setWorking] = useState(false);
+
+  if (!hostReady) {
+    return (
+      <HostPassphrasePrompt
+        checking={Boolean(host.secret) && !error}
+        error={error}
+        onSubmit={host.save}
+      />
+    );
+  }
 
   if (!adminState) {
     return (

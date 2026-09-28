@@ -13,6 +13,12 @@ Real-time, Kahoot-style quiz for mobile and web. Single room, Socket.IO sync, ti
 
 ```bash
 npm install
+cp .env.example .env
+```
+
+Set `HOST_SECRET` in `.env`, then:
+
+```bash
 npm run dev
 ```
 
@@ -35,7 +41,7 @@ The production image builds the Vite client and the Rust server, then runs the b
 
 ```bash
 docker build -t quizzer .
-docker run -p 8080:8080 quizzer
+docker run -p 8080:8080 -e HOST_SECRET=<passphrase> quizzer
 ```
 
 Then open `http://localhost:8080/play` and `http://localhost:8080/host/admin`.

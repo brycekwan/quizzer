@@ -133,8 +133,10 @@ pub struct AnswerPublic {
 #[serde(rename_all = "camelCase")]
 pub struct ViewerAnswer {
     pub answer_id: String,
-    pub points: i64,
-    pub correct: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub points: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub correct: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

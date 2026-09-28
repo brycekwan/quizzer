@@ -201,9 +201,10 @@ pub fn selection_matches_word(cells: &[WordSearchCellRef], word: &WordSearchWord
     if forward {
         return true;
     }
-    cells.iter().enumerate().all(|(index, cell)| {
-        same_cell(cell, &word.cells[word.cells.len() - 1 - index])
-    })
+    cells
+        .iter()
+        .enumerate()
+        .all(|(index, cell)| same_cell(cell, &word.cells[word.cells.len() - 1 - index]))
 }
 
 pub fn derive_word_search_words(puzzle: &WordSearchFile) -> Result<Vec<WordSearchWord>, String> {
@@ -216,7 +217,14 @@ pub fn derive_word_search_words(puzzle: &WordSearchFile) -> Result<Vec<WordSearc
         if seen.iter().any(|existing: &String| existing == &word) {
             return Err(format!("Duplicate word {word}"));
         }
-        let cells = cells_for_placement(&word, placement.row, placement.col, placement.direction, rows, cols)?;
+        let cells = cells_for_placement(
+            &word,
+            placement.row,
+            placement.col,
+            placement.direction,
+            rows,
+            cols,
+        )?;
         for (index, cell) in cells.iter().enumerate() {
             let letter = puzzle
                 .grid
@@ -244,7 +252,10 @@ pub fn derive_word_search_words(puzzle: &WordSearchFile) -> Result<Vec<WordSearc
     Ok(words)
 }
 
-pub fn to_public_word_search(puzzle: &WordSearchFile, words: &[WordSearchWord]) -> WordSearchPublicPuzzle {
+pub fn to_public_word_search(
+    puzzle: &WordSearchFile,
+    words: &[WordSearchWord],
+) -> WordSearchPublicPuzzle {
     WordSearchPublicPuzzle {
         id: puzzle.id.clone(),
         title: puzzle.title.clone(),
@@ -273,7 +284,9 @@ pub fn validate_word_search_file(puzzle: &WordSearchFile) -> Option<String> {
     }
     for (row_index, row) in puzzle.grid.iter().enumerate() {
         if row.len() != WORD_SEARCH_SIZE {
-            return Some(format!("Grid row {row_index} must have {WORD_SEARCH_SIZE} letters"));
+            return Some(format!(
+                "Grid row {row_index} must have {WORD_SEARCH_SIZE} letters"
+            ));
         }
         for (col_index, letter) in row.iter().enumerate() {
             if letter.chars().count() != 1 || !letter.chars().all(|ch| ch.is_ascii_alphabetic()) {
@@ -308,7 +321,12 @@ mod tests {
         ]
     }
 
-    fn placement(word: &str, row: i64, col: i64, direction: WordSearchDirection) -> WordSearchPlacement {
+    fn placement(
+        word: &str,
+        row: i64,
+        col: i64,
+        direction: WordSearchDirection,
+    ) -> WordSearchPlacement {
         WordSearchPlacement {
             word: word.into(),
             row,

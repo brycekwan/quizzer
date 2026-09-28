@@ -3,6 +3,7 @@ mod socket;
 mod state;
 
 use std::env;
+use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -34,8 +35,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .init();
 
+    let host_secret = require_host_secret()?;
     let party = load_party()?;
-    let app = Arc::new(App::new(party));
+    let app = Arc::new(App::new(party, host_secret));
 
     let (layer, io) = SocketIo::builder().with_state(app.clone()).build_layer();
     app.io.set(io.clone()).expect("socket io set once");
@@ -66,12 +68,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let public_dir = static_dir();
-    let router = http::http_router(public_dir).layer(layer);
+    let router = http::http_router(public_dir)
+        .layer(layer)
+        .layer(axum::middleware::from_fn(http::reject_cross_origin));
     let addr = bind_addr();
     let listener = TcpListener::bind(addr).await?;
     info!("party server listening on http://{addr}");
     axum::serve(listener, router).await?;
     Ok(())
+}
+
+fn require_host_secret() -> Result<String, Box<dyn std::error::Error>> {
+    match dotenvy::dotenv() {
+        Ok(_) => {}
+        Err(dotenvy::Error::Io(error)) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    let secret = env::var("HOST_SECRET").unwrap_or_default();
+    let secret = secret.trim().to_string();
+    if secret.is_empty() {
+        eprintln!("HOST_SECRET is required");
+        std::process::exit(1);
+    }
+    Ok(secret)
 }
 
 fn load_party() -> Result<SystemAdmin, Box<dyn std::error::Error>> {

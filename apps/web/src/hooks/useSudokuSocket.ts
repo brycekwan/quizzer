@@ -8,10 +8,15 @@ import {
 } from '@/lib/sessionStorage';
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
+import { unlockHost } from '@/lib/hostSecret';
 
 type Ack = { ok: boolean; error?: string; correct?: boolean };
 
-export function useSudokuSocket(role: 'player' | 'admin' = 'player') {
+export function useSudokuSocket(
+  role: 'player' | 'admin' = 'player',
+  hostSecret: string | null = null,
+  hostAttempt = 0
+) {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const stored = readStoredSession();
@@ -23,6 +28,7 @@ export function useSudokuSocket(role: 'player' | 'admin' = 'player') {
   const [adminState, setAdminState] = useState<SudokuAdminSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [kicked, setKicked] = useState(false);
+  const [hostReady, setHostReady] = useState(role !== 'admin');
   const playerIdRef = useRef(playerId);
   playerIdRef.current = playerId;
   const playerNameRef = useRef(playerName);
@@ -73,11 +79,34 @@ export function useSudokuSocket(role: 'player' | 'admin' = 'player') {
     socket.on('connect', () => {
       setConnected(true);
       if (role === 'admin') {
-        socket.emit('sudoku:admin:subscribe', {}, (result: { ok?: boolean }) => {
-          if (result?.ok === false) {
-            setError('Could not subscribe as sudoku admin');
+        unlockHost(
+          socket,
+          hostSecret,
+          () => {
+            if (!active) {
+              return;
+            }
+            socket.emit('sudoku:admin:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
+              if (!active) {
+                return;
+              }
+              if (result?.ok === false) {
+                setHostReady(false);
+                setError(result.error ?? 'Could not subscribe as sudoku admin');
+                return;
+              }
+              setError(null);
+              setHostReady(true);
+            });
+          },
+          (message) => {
+            if (!active) {
+              return;
+            }
+            setHostReady(false);
+            setError(message);
           }
-        });
+        );
       } else {
         ensureSession(() => {
           socket.emit(
@@ -121,7 +150,7 @@ export function useSudokuSocket(role: 'player' | 'admin' = 'player') {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [role]);
+  }, [role, hostSecret, hostAttempt]);
 
   const api = useMemo(() => {
     const emit = (event: string, payload: unknown) =>
@@ -154,6 +183,7 @@ export function useSudokuSocket(role: 'player' | 'admin' = 'player') {
     error,
     kicked,
     setError,
+    hostReady,
     ...api,
   };
 }

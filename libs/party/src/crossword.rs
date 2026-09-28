@@ -190,9 +190,8 @@ fn derive_direction(
             ));
         }
         seen.push(clue.number);
-        let (answer, cells) = walk_answer(grid, clue.row, clue.col, direction).map_err(|error| {
-            format!("{} {}: {error}", direction_name(direction), clue.number)
-        })?;
+        let (answer, cells) = walk_answer(grid, clue.row, clue.col, direction)
+            .map_err(|error| format!("{} {}: {error}", direction_name(direction), clue.number))?;
         words.push(CrosswordWord {
             id: format!("{}-{}", direction_name(direction), clue.number),
             number: clue.number,
@@ -382,7 +381,11 @@ pub fn to_public_crossword_puzzle(
 pub fn words_covering_cell(words: &[CrosswordWord], row: i64, col: i64) -> Vec<CrosswordWord> {
     words
         .iter()
-        .filter(|word| word.cells.iter().any(|cell| cell.row == row && cell.col == col))
+        .filter(|word| {
+            word.cells
+                .iter()
+                .any(|cell| cell.row == row && cell.col == col)
+        })
         .cloned()
         .collect()
 }
@@ -393,7 +396,13 @@ pub fn empty_letter_grid(puzzle: &CrosswordPuzzleFile) -> Vec<Vec<Option<String>
         .iter()
         .map(|row| {
             row.iter()
-                .map(|cell| if cell.is_none() { None } else { Some(String::new()) })
+                .map(|cell| {
+                    if cell.is_none() {
+                        None
+                    } else {
+                        Some(String::new())
+                    }
+                })
                 .collect()
         })
         .collect()

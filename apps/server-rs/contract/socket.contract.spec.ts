@@ -27,6 +27,11 @@ interface SystemState {
   players: Array<{ playerId: string; name: string }>;
 }
 
+interface SudokuState {
+  elapsedMs: number;
+  activeSince: number | null;
+}
+
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer();
@@ -95,6 +100,7 @@ describe('rust socket contract', () => {
         CROSSWORD_PUZZLES_DIR: path.resolve('apps/server/crossword/puzzles'),
         WORDSEARCH_PUZZLES_DIR: path.resolve('apps/server/wordsearch/puzzles'),
         SUDOKU_PUZZLES_DIR: path.resolve('apps/server/sudoku/puzzles'),
+        HOST_SECRET: 'test-host-secret',
         STATIC_DIR: path.resolve('dist/apps/web'),
       },
       stdio: 'pipe',
@@ -151,7 +157,18 @@ describe('rust socket contract', () => {
 
     const admin = connect();
     await waitFor(admin, 'game:state');
+    const unlocked = await emitAck(admin, 'host:unlock', { secret: 'test-host-secret' });
+    expect(unlocked.ok).toBe(true);
     admin.emit('admin:subscribe');
+
+    const lockedAdmin = connect();
+    await waitFor(lockedAdmin, 'game:state');
+    lockedAdmin.emit('admin:subscribe');
+    const hiddenPromise = waitForMatch<GameState>(
+      lockedAdmin,
+      'game:state',
+      (snapshot) => snapshot.phase === 'answering'
+    );
 
     const statePromise = waitForMatch<GameState>(
       player,
@@ -163,6 +180,10 @@ describe('rust socket contract', () => {
     const state = await statePromise;
     expect(state.phase).toBe('answering');
     expect(state.currentQuestion?.answers.every((answer) => answer.correct === undefined)).toBe(
+      true
+    );
+    const hidden = await hiddenPromise;
+    expect(hidden.currentQuestion?.answers.every((answer) => answer.correct === undefined)).toBe(
       true
     );
     expect(typeof state.serverNow).toBe('number');
@@ -185,15 +206,33 @@ describe('rust socket contract', () => {
       ],
     });
     expect(miss).toEqual({ ok: true, matched: false });
+    const oversized = await emitAck(player, 'wordsearch:submitSelection', {
+      cells: Array.from({ length: 145 }, () => ({ row: 0, col: 0 })),
+    });
+    expect(oversized).toEqual({ ok: false, error: 'Invalid selection' });
 
     const sudoku = await emitAck(player, 'sudoku:subscribe', {});
     expect(sudoku.ok).toBe(true);
+    const clockPromise = waitForMatch<SudokuState>(
+      player,
+      'sudoku:state',
+      (snapshot) => snapshot.activeSince != null
+    );
     const wrong = await emitAck(player, 'sudoku:commit', {
       row: 0,
       col: 2,
       value: 1,
     });
     expect(wrong).toEqual({ ok: true, correct: false });
+    const clock = await clockPromise;
+    const paused = await emitAck(player, 'sudoku:pauseTimer', {});
+    expect(paused).toEqual({ ok: true });
+    const stillPromise = waitFor<SudokuState>(player, 'sudoku:state');
+    const resubscribed = await emitAck(player, 'sudoku:subscribe', {});
+    expect(resubscribed.ok).toBe(true);
+    const still = await stillPromise;
+    expect(still.activeSince).toBe(clock.activeSince);
+    expect(still.elapsedMs).toBe(clock.elapsedMs);
 
     const boardPromise = waitFor<SystemState>(admin, 'system:admin:state');
     const subscribed = await emitAck(admin, 'system:admin:subscribe', {});
@@ -205,6 +244,17 @@ describe('rust socket contract', () => {
     const removal = await emitAck(admin, 'system:admin:kick', { playerId: login.playerId });
     expect(removal.ok).toBe(true);
     expect(await kicked).toEqual({ reason: SYSTEM_REMOVAL_REASON });
+  });
+
+  it('refuses host controls until the passphrase is unlocked', async () => {
+    const intruder = connect();
+    await waitFor(intruder, 'game:state');
+    const started = await emitAck(intruder, 'admin:start', {});
+    expect(started).toEqual({ ok: false, error: 'Host passphrase required' });
+    const reset = await emitAck(intruder, 'system:admin:reset', {});
+    expect(reset).toEqual({ ok: false, error: 'Host passphrase required' });
+    const paused = await emitAck(intruder, 'sudoku:pauseTimer', {});
+    expect(paused).toEqual({ ok: true });
   });
 });
 
@@ -225,3 +275,32 @@ async function waitForHealth(url: string) {
   }
   throw new Error(lastError);
 }
+
+describe('HOST_SECRET', () => {
+  it('exits when the secret is missing', async () => {
+    const port = await freePort();
+    const child = spawn(binaryPath(), [], {
+      env: {
+        ...process.env,
+        HOST: '127.0.0.1',
+        PORT: String(port),
+        HOST_SECRET: '   ',
+        QUESTIONS_DIR: path.resolve('apps/server/questions'),
+        CROSSWORD_PUZZLES_DIR: path.resolve('apps/server/crossword/puzzles'),
+        WORDSEARCH_PUZZLES_DIR: path.resolve('apps/server/wordsearch/puzzles'),
+        SUDOKU_PUZZLES_DIR: path.resolve('apps/server/sudoku/puzzles'),
+        STATIC_DIR: path.resolve('dist/apps/web'),
+      },
+      stdio: 'pipe',
+    });
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    const code = await new Promise<number | null>((resolve) => {
+      child.once('exit', (status) => resolve(status));
+    });
+    expect(code).not.toBe(0);
+    expect(stderr).toContain('HOST_SECRET is required');
+  });
+});

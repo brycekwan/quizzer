@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { QRCodeSVG } from 'qrcode.react';
 import type { GameConfig } from '@party/shared';
 import { useGameSocket, useSyncedCountdown } from '@/hooks/useGameSocket';
+import { useHostSecret } from '@/hooks/useHostSecret';
+import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
 import { AnswerGrid } from '@/components/AnswerGrid';
 import { Leaderboard } from '@/components/Leaderboard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -29,6 +31,7 @@ import {
 } from './adminFormSchema';
 
 export function AdminPage() {
+  const host = useHostSecret();
   const {
     connected,
     state,
@@ -39,7 +42,9 @@ export function AdminPage() {
     config,
     kick,
     setQuestionSets,
-  } = useGameSocket('admin');
+    error,
+    hostReady,
+  } = useGameSocket('admin', host.secret, host.attempt);
   const [message, setMessage] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<
     { kind: 'reset' } | { kind: 'kick'; playerId: string; name: string } | null
@@ -165,6 +170,16 @@ export function AdminPage() {
     }
     await run(() => start({}), 'Game started');
   });
+
+  if (!hostReady) {
+    return (
+      <HostPassphrasePrompt
+        checking={Boolean(host.secret) && !error}
+        error={error}
+        onSubmit={host.save}
+      />
+    );
+  }
 
   if (!state) {
     return (

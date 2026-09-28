@@ -282,26 +282,26 @@ impl GameEngine {
         let normalized = normalize_player_name(name);
 
         if let Some(player_id) = player_id {
-        if self.players.contains_key(player_id) {
-            let replaced_socket_id = {
-                let existing = self.players.get_mut(player_id).expect("player");
-                let replaced_socket_id = existing
-                    .socket_id
-                    .clone()
-                    .filter(|current| current != socket_id);
-                existing.socket_id = Some(socket_id.to_string());
-                existing.connected = true;
-                replaced_socket_id
-            };
-            let player = self.players.get(player_id).expect("player").clone();
-            if self.status != GameStatus::Finished {
-                self.participants.insert(player.id.clone());
+            if self.players.contains_key(player_id) {
+                let replaced_socket_id = {
+                    let existing = self.players.get_mut(player_id).expect("player");
+                    let replaced_socket_id = existing
+                        .socket_id
+                        .clone()
+                        .filter(|current| current != socket_id);
+                    existing.socket_id = Some(socket_id.to_string());
+                    existing.connected = true;
+                    replaced_socket_id
+                };
+                let player = self.players.get(player_id).expect("player").clone();
+                if self.status != GameStatus::Finished {
+                    self.participants.insert(player.id.clone());
+                }
+                return Ok(JoinOk {
+                    player,
+                    replaced_socket_id,
+                });
             }
-            return Ok(JoinOk {
-                player,
-                replaced_socket_id,
-            });
-        }
         }
 
         if let Some(id) = self.find_player_by_name(&normalized) {
@@ -332,7 +332,11 @@ impl GameEngine {
             });
         }
 
-        let names: Vec<String> = self.players.values().map(|player| player.name.clone()).collect();
+        let names: Vec<String> = self
+            .players
+            .values()
+            .map(|player| player.name.clone())
+            .collect();
         if is_name_taken(&normalized, names.iter().map(String::as_str)) {
             return Err("That name is already taken".into());
         }
@@ -567,7 +571,11 @@ impl GameEngine {
         let Some(question) = self.questions.get(self.question_index as usize) else {
             return Err("No active question".into());
         };
-        let Some(option) = question.answers.iter().find(|answer| answer.id == answer_id) else {
+        let Some(option) = question
+            .answers
+            .iter()
+            .find(|answer| answer.id == answer_id)
+        else {
             return Err("Invalid answer".into());
         };
         let elapsed_ms = (now - self.question_started_at.unwrap_or(now)).max(0);
@@ -607,7 +615,9 @@ impl GameEngine {
         if relevant.is_empty() {
             return false;
         }
-        relevant.iter().all(|player| self.answers.contains_key(&player.id))
+        relevant
+            .iter()
+            .all(|player| self.answers.contains_key(&player.id))
     }
 
     fn answer_counts(&self) -> (i64, i64, i64) {
@@ -804,14 +814,15 @@ impl GameEngine {
         0
     }
 
-    pub fn snapshot(&self, role: SnapshotRole, viewer_player_id: Option<&str>) -> GameStateSnapshot {
-        let include_correct = role == SnapshotRole::Admin
-            || matches!(
-                self.phase,
-                Some(GamePhase::Reveal | GamePhase::Leaderboard)
-            )
+    pub fn snapshot(
+        &self,
+        role: SnapshotRole,
+        viewer_player_id: Option<&str>,
+    ) -> GameStateSnapshot {
+        let phase_public = matches!(self.phase, Some(GamePhase::Reveal | GamePhase::Leaderboard))
             || self.status == GameStatus::Paused
             || self.status == GameStatus::Finished;
+        let include_correct = role == SnapshotRole::Admin || phase_public;
 
         let viewer_answer = viewer_player_id.and_then(|viewer_id| {
             let pending = self.answers.get(viewer_id)?;
@@ -828,12 +839,13 @@ impl GameEngine {
             };
             Some(ViewerAnswer {
                 answer_id: pending.answer_id.clone(),
-                points: pending.points,
-                correct: option.is_some_and(|answer| answer.correct),
+                points: phase_public.then_some(pending.points),
+                correct: phase_public.then_some(option.is_some_and(|answer| answer.correct)),
             })
         });
 
-        let (answered_player_count, total_player_count, waiting_player_count) = self.answer_counts();
+        let (answered_player_count, total_player_count, waiting_player_count) =
+            self.answer_counts();
         let viewer_finished_game = self.status == GameStatus::Finished
             && viewer_player_id.is_some_and(|id| self.participants.contains(id));
 
@@ -959,7 +971,10 @@ mod tests {
         assert_eq!(engine.phase(), Some(GamePhase::Leaderboard));
         engine.advance(LEADERBOARD_DURATION_MS);
         assert_eq!(engine.phase(), Some(GamePhase::Answering));
-        assert_eq!(engine.snapshot(SnapshotRole::Player, None).question_index, 1);
+        assert_eq!(
+            engine.snapshot(SnapshotRole::Player, None).question_index,
+            1
+        );
     }
 
     #[test]
@@ -973,12 +988,16 @@ mod tests {
         assert_eq!(engine.get_player(&join.player.id).unwrap().score, 0);
         assert!(points > 0);
         let snap = engine.snapshot(SnapshotRole::Player, Some(&join.player.id));
-        assert_eq!(snap.viewer_answer.as_ref().unwrap().correct, true);
-        assert_eq!(snap.viewer_answer.unwrap().points, points);
+        assert_eq!(snap.viewer_answer.as_ref().unwrap().answer_id, "b");
+        assert!(snap.viewer_answer.as_ref().unwrap().correct.is_none());
+        assert!(snap.viewer_answer.as_ref().unwrap().points.is_none());
         assert_eq!(snap.waiting_player_count, 1);
         let other = player_id(&engine, "Other");
         engine.submit_answer(&other, "a").unwrap();
         assert_eq!(engine.phase(), Some(GamePhase::Reveal));
+        let revealed = engine.snapshot(SnapshotRole::Player, Some(&join.player.id));
+        assert_eq!(revealed.viewer_answer.as_ref().unwrap().correct, Some(true));
+        assert_eq!(revealed.viewer_answer.unwrap().points, Some(points));
         assert_eq!(engine.get_player(&join.player.id).unwrap().score, points);
     }
 
@@ -991,11 +1010,12 @@ mod tests {
         let points = engine.submit_answer(&join.player.id, "a").unwrap();
         assert_eq!(points, 0);
         assert_eq!(engine.get_player(&join.player.id).unwrap().score, 0);
-        assert!(!engine
+        assert!(engine
             .snapshot(SnapshotRole::Player, Some(&join.player.id))
             .viewer_answer
             .unwrap()
-            .correct);
+            .correct
+            .is_none());
     }
 
     #[test]
@@ -1025,7 +1045,10 @@ mod tests {
         assert_eq!(engine.phase(), Some(GamePhase::Leaderboard));
         engine.advance(1);
         assert_eq!(engine.phase(), Some(GamePhase::Answering));
-        assert_eq!(engine.snapshot(SnapshotRole::Player, None).question_index, 1);
+        assert_eq!(
+            engine.snapshot(SnapshotRole::Player, None).question_index,
+            1
+        );
     }
 
     #[test]
@@ -1089,7 +1112,10 @@ mod tests {
         assert_eq!(sockets, vec!["s1".to_string()]);
         assert_eq!(engine.status(), GameStatus::Waiting);
         assert!(engine.get_player(&join.player.id).is_none());
-        assert!(engine.snapshot(SnapshotRole::Player, None).players.is_empty());
+        assert!(engine
+            .snapshot(SnapshotRole::Player, None)
+            .players
+            .is_empty());
     }
 
     #[test]
@@ -1108,16 +1134,22 @@ mod tests {
         engine.advance(cycle);
         engine.advance(cycle);
         assert_eq!(engine.status(), GameStatus::Finished);
-        assert!(engine
-            .snapshot(SnapshotRole::Player, Some(&buddy.player.id))
-            .viewer_finished_game);
+        assert!(
+            engine
+                .snapshot(SnapshotRole::Player, Some(&buddy.player.id))
+                .viewer_finished_game
+        );
         let late = engine.join("Late", "s2", None).unwrap();
-        assert!(!engine
-            .snapshot(SnapshotRole::Player, Some(&late.player.id))
-            .viewer_finished_game);
-        assert!(engine
-            .snapshot(SnapshotRole::Player, Some(&buddy.player.id))
-            .viewer_finished_game);
+        assert!(
+            !engine
+                .snapshot(SnapshotRole::Player, Some(&late.player.id))
+                .viewer_finished_game
+        );
+        assert!(
+            engine
+                .snapshot(SnapshotRole::Player, Some(&buddy.player.id))
+                .viewer_finished_game
+        );
     }
 
     #[test]
@@ -1311,7 +1343,11 @@ mod tests {
         let takeover = engine.join("Buddy", "s2", Some(&join.player.id)).unwrap();
         assert_eq!(takeover.replaced_socket_id.as_deref(), Some("s1"));
         assert_eq!(
-            engine.get_player(&join.player.id).unwrap().socket_id.as_deref(),
+            engine
+                .get_player(&join.player.id)
+                .unwrap()
+                .socket_id
+                .as_deref(),
             Some("s2")
         );
     }

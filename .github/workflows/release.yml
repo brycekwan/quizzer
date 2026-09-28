@@ -107,7 +107,7 @@ jobs:
             '' \
             '```bash' \
             "docker pull ${IMAGE}:${VERSION}" \
-            "docker run --rm -p 8080:8080 ${IMAGE}:${VERSION}" \
+            "docker run --rm -p 8080:8080 -e HOST_SECRET=<passphrase> ${IMAGE}:${VERSION}" \
             '```' \
             '' \
             "Also tagged as \`${IMAGE}:latest\`.")

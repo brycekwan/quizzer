@@ -32,6 +32,21 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     emit_game(&app, &socket);
 
     socket.on(
+        "host:unlock",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            let provided = payload.get("secret").and_then(Value::as_str).unwrap_or("");
+            if !secrets_match(&app.host_secret, provided) {
+                let _ = ack.send(&fail("Incorrect host passphrase"));
+                return;
+            }
+            flag_mut(&app, &socket, |meta| meta.host = true);
+            let _ = ack.send(&json!({ "ok": true }));
+        },
+    );
+    socket.on(
         "session:login",
         async |socket: SocketRef,
                Data(payload): Data<Value>,
@@ -61,6 +76,9 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     socket.on(
         "admin:subscribe",
         async |socket: SocketRef, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                return;
+            }
             let sid = sid_of(&socket);
             {
                 let mut meta = app.meta.lock().expect("meta");
@@ -75,6 +93,10 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
                Data(payload): Data<Value>,
                ack: AckSender,
                State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let delay = payload
                 .get("delayMinutes")
                 .and_then(value_f64)
@@ -93,7 +115,11 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "admin:pause",
-        async |ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = {
                 let mut party = app.party.lock().expect("party");
                 match party.quiz.pause() {
@@ -107,7 +133,11 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "admin:resume",
-        async |ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = {
                 let mut party = app.party.lock().expect("party");
                 match party.quiz.resume() {
@@ -121,7 +151,11 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "admin:reset",
-        async |ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let socket_ids = {
                 let mut party = app.party.lock().expect("party");
                 party.quiz.reset()
@@ -148,7 +182,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "admin:config",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = {
                 let mut party = app.party.lock().expect("party");
                 match party.quiz.update_config_partial(
@@ -169,7 +210,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "admin:questionSet",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = select_question_sets(&app, &payload);
             let _ = ack.send(&result);
             changed(&app);
@@ -177,7 +225,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "admin:kick",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             on_quiz_kick(app, payload, ack);
         },
     );
@@ -206,21 +261,19 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
             on_crossword_letter(app, socket, payload, ack, true);
         },
     );
-    socket.on(
-        "crossword:pauseTimer",
-        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
-            on_crossword_timer(app, socket, ack, true);
-        },
-    );
-    socket.on(
-        "crossword:resumeTimer",
-        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
-            on_crossword_timer(app, socket, ack, false);
-        },
-    );
+    socket.on("crossword:pauseTimer", async |ack: AckSender| {
+        let _ = ack.send(&json!({ "ok": true }));
+    });
+    socket.on("crossword:resumeTimer", async |ack: AckSender| {
+        let _ = ack.send(&json!({ "ok": true }));
+    });
     socket.on(
         "crossword:admin:subscribe",
         async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             flag_mut(&app, &socket, |meta| meta.crossword_admin = true);
             let _ = ack.send(&json!({ "ok": true }));
             emit_crossword_admin(&app, &socket);
@@ -228,7 +281,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "crossword:admin:selectPuzzle",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = select_named(&payload, "puzzleId", "Select a crossword", |id| {
                 let mut party = app.party.lock().expect("party");
                 party.crossword.select_puzzle(id)
@@ -239,7 +299,11 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "crossword:admin:reset",
-        async |ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = reset_crossword(&app);
             let _ = ack.send(&result);
             changed(&app);
@@ -247,7 +311,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "crossword:admin:resetPlayer",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let player_id = payload
                 .get("playerId")
                 .and_then(Value::as_str)
@@ -284,21 +355,19 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
             on_wordsearch_selection(app, socket, payload, ack);
         },
     );
-    socket.on(
-        "wordsearch:pauseTimer",
-        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
-            on_wordsearch_timer(app, socket, ack, true);
-        },
-    );
-    socket.on(
-        "wordsearch:resumeTimer",
-        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
-            on_wordsearch_timer(app, socket, ack, false);
-        },
-    );
+    socket.on("wordsearch:pauseTimer", async |ack: AckSender| {
+        let _ = ack.send(&json!({ "ok": true }));
+    });
+    socket.on("wordsearch:resumeTimer", async |ack: AckSender| {
+        let _ = ack.send(&json!({ "ok": true }));
+    });
     socket.on(
         "wordsearch:admin:subscribe",
         async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             flag_mut(&app, &socket, |meta| meta.wordsearch_admin = true);
             let _ = ack.send(&json!({ "ok": true }));
             emit_wordsearch_admin(&app, &socket);
@@ -306,7 +375,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "wordsearch:admin:selectPuzzle",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = select_named(&payload, "puzzleId", "Select a word search", |id| {
                 let mut party = app.party.lock().expect("party");
                 party.word_search.select_puzzle(id)
@@ -317,7 +393,11 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "wordsearch:admin:reset",
-        async |ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = reset_word_search(&app, None);
             let _ = ack.send(&result);
             changed(&app);
@@ -325,7 +405,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "wordsearch:admin:resetPlayer",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let player_id = payload
                 .get("playerId")
                 .and_then(Value::as_str)
@@ -384,21 +471,19 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
             on_sudoku_hint(app, socket, payload, ack);
         },
     );
-    socket.on(
-        "sudoku:pauseTimer",
-        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
-            on_sudoku_timer(app, socket, ack, true);
-        },
-    );
-    socket.on(
-        "sudoku:resumeTimer",
-        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
-            on_sudoku_timer(app, socket, ack, false);
-        },
-    );
+    socket.on("sudoku:pauseTimer", async |ack: AckSender| {
+        let _ = ack.send(&json!({ "ok": true }));
+    });
+    socket.on("sudoku:resumeTimer", async |ack: AckSender| {
+        let _ = ack.send(&json!({ "ok": true }));
+    });
     socket.on(
         "sudoku:admin:subscribe",
         async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             flag_mut(&app, &socket, |meta| meta.sudoku_admin = true);
             let _ = ack.send(&json!({ "ok": true }));
             emit_sudoku_admin(&app, &socket);
@@ -406,7 +491,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "sudoku:admin:selectPuzzle",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = select_named(&payload, "puzzleId", "Select a sudoku", |id| {
                 let mut party = app.party.lock().expect("party");
                 party.sudoku.select_puzzle(id)
@@ -417,7 +509,11 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "sudoku:admin:reset",
-        async |ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let result = reset_sudoku(&app, None);
             let _ = ack.send(&result);
             changed(&app);
@@ -425,7 +521,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "sudoku:admin:resetPlayer",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             let player_id = payload
                 .get("playerId")
                 .and_then(Value::as_str)
@@ -445,6 +548,10 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     socket.on(
         "system:admin:subscribe",
         async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             flag_mut(&app, &socket, |meta| meta.system_admin = true);
             let _ = ack.send(&json!({ "ok": true }));
             emit_system(&app, &socket);
@@ -452,13 +559,24 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
     socket.on(
         "system:admin:kick",
-        async |Data(payload): Data<Value>, ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             on_system_kick(app, payload, ack);
         },
     );
     socket.on(
         "system:admin:reset",
-        async |ack: AckSender, State(app): State<Arc<App>>| {
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
             on_system_reset(app, ack);
         },
     );
@@ -472,21 +590,6 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
                 party.quiz.mark_disconnected(&sid);
             }
             party.sessions.mark_disconnected(&sid);
-            if meta.crossword_player {
-                if let Some(player_id) = &meta.player_id {
-                    party.crossword.pause_timer(player_id);
-                }
-            }
-            if meta.wordsearch_player {
-                if let Some(player_id) = &meta.player_id {
-                    party.word_search.pause_timer(player_id);
-                }
-            }
-            if meta.sudoku_player {
-                if let Some(player_id) = &meta.player_id {
-                    party.sudoku.pause_timer(player_id);
-                }
-            }
         }
         app.meta.lock().expect("meta").remove(&sid);
         drop(socket);
@@ -598,25 +701,15 @@ fn on_player_join(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSend
 }
 
 fn on_player_answer(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
-    let fallback = payload
-        .get("playerId")
-        .and_then(Value::as_str)
-        .map(str::to_string);
     let sid = sid_of(&socket);
     let player_id = {
         let meta = app.meta.lock().expect("meta");
-        meta.get(&sid)
-            .and_then(|meta| meta.player_id.clone())
-            .or(fallback)
+        meta.get(&sid).and_then(|meta| meta.player_id.clone())
     };
     let Some(player_id) = player_id else {
         let _ = ack.send(&fail("Join the game first"));
         return;
     };
-    {
-        let mut meta = app.meta.lock().expect("meta");
-        meta.entry(sid).or_default().player_id = Some(player_id.clone());
-    }
     let answer_id = payload
         .get("answerId")
         .and_then(Value::as_str)
@@ -624,7 +717,7 @@ fn on_player_answer(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSe
     let result = {
         let mut party = app.party.lock().expect("party");
         match party.quiz.submit_answer(&player_id, answer_id) {
-            Ok(points) => json!({ "ok": true, "points": points }),
+            Ok(_) => json!({ "ok": true }),
             Err(error) => fail(error),
         }
     };
@@ -684,32 +777,6 @@ fn on_crossword_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     changed(&app);
 }
 
-fn on_crossword_timer(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
-    let sid = sid_of(&socket);
-    let meta = app
-        .meta
-        .lock()
-        .expect("meta")
-        .get(&sid)
-        .cloned()
-        .unwrap_or_default();
-    let Some(player_id) = meta.player_id.filter(|_| meta.crossword_player) else {
-        let _ = ack.send(&fail("Log in first"));
-        return;
-    };
-    {
-        let mut party = app.party.lock().expect("party");
-        if pause {
-            party.crossword.pause_timer(&player_id);
-        } else {
-            party.crossword.resume_timer(&player_id);
-        }
-    }
-    flag_mut(&app, &socket, |meta| meta.crossword_help = pause);
-    let _ = ack.send(&json!({ "ok": true }));
-    changed(&app);
-}
-
 fn on_crossword_letter(
     app: Arc<App>,
     socket: SocketRef,
@@ -717,13 +784,6 @@ fn on_crossword_letter(
     ack: AckSender,
     clear: bool,
 ) {
-    let sid = sid_of(&socket);
-    let help_open = app
-        .meta
-        .lock()
-        .expect("meta")
-        .get(&sid)
-        .is_some_and(|meta| meta.crossword_help);
     let Some(player_id) = player_id_of(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -738,16 +798,12 @@ fn on_crossword_letter(
     };
     let result = {
         let mut party = app.party.lock().expect("party");
-        let result = if clear {
+        if clear {
             party.crossword.clear_letter(&player_id, row, col)
         } else {
             let letter = payload.get("letter").and_then(Value::as_str).unwrap_or("");
             party.crossword.set_letter(&player_id, row, col, letter)
-        };
-        if help_open {
-            party.crossword.pause_timer(&player_id);
         }
-        result
     };
     let _ = ack.send(&match result {
         Ok(ids) => json!({ "ok": true, "correctWordIds": ids }),
@@ -782,32 +838,6 @@ fn on_wordsearch_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     changed(&app);
 }
 
-fn on_wordsearch_timer(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
-    let sid = sid_of(&socket);
-    let meta = app
-        .meta
-        .lock()
-        .expect("meta")
-        .get(&sid)
-        .cloned()
-        .unwrap_or_default();
-    let Some(player_id) = meta.player_id.filter(|_| meta.wordsearch_player) else {
-        let _ = ack.send(&fail("Log in first"));
-        return;
-    };
-    {
-        let mut party = app.party.lock().expect("party");
-        if pause {
-            party.word_search.pause_timer(&player_id);
-        } else {
-            party.word_search.resume_timer(&player_id);
-        }
-    }
-    flag_mut(&app, &socket, |meta| meta.wordsearch_help = pause);
-    let _ = ack.send(&json!({ "ok": true }));
-    changed(&app);
-}
-
 fn on_wordsearch_selection(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
     let sid = sid_of(&socket);
     let meta = app
@@ -827,11 +857,7 @@ fn on_wordsearch_selection(app: Arc<App>, socket: SocketRef, payload: Value, ack
     };
     let result = {
         let mut party = app.party.lock().expect("party");
-        let result = party.word_search.submit_selection(&player_id, &cells);
-        if meta.wordsearch_help {
-            party.word_search.pause_timer(&player_id);
-        }
-        result
+        party.word_search.submit_selection(&player_id, &cells)
     };
     let _ = ack.send(&match result {
         Ok(matched) => json!({ "ok": true, "matched": matched }),
@@ -866,32 +892,6 @@ fn on_sudoku_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     changed(&app);
 }
 
-fn on_sudoku_timer(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
-    let sid = sid_of(&socket);
-    let meta = app
-        .meta
-        .lock()
-        .expect("meta")
-        .get(&sid)
-        .cloned()
-        .unwrap_or_default();
-    let Some(player_id) = meta.player_id.filter(|_| meta.sudoku_player) else {
-        let _ = ack.send(&fail("Log in first"));
-        return;
-    };
-    {
-        let mut party = app.party.lock().expect("party");
-        if pause {
-            party.sudoku.pause_timer(&player_id);
-        } else {
-            party.sudoku.resume_timer(&player_id);
-        }
-    }
-    flag_mut(&app, &socket, |meta| meta.sudoku_help = pause);
-    let _ = ack.send(&json!({ "ok": true }));
-    changed(&app);
-}
-
 fn on_sudoku_commit(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
     let sid = sid_of(&socket);
     let meta = app
@@ -911,11 +911,7 @@ fn on_sudoku_commit(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSe
     };
     let result = {
         let mut party = app.party.lock().expect("party");
-        let result = party.sudoku.commit(&player_id, row, col, value);
-        if meta.sudoku_help {
-            party.sudoku.pause_timer(&player_id);
-        }
-        result
+        party.sudoku.commit(&player_id, row, col, value)
     };
     let _ = ack.send(&match result {
         Ok(correct) => json!({ "ok": true, "correct": correct }),
@@ -943,11 +939,7 @@ fn on_sudoku_draft(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSen
     };
     let result = {
         let mut party = app.party.lock().expect("party");
-        let result = party.sudoku.toggle_draft(&player_id, row, col, value);
-        if meta.sudoku_help {
-            party.sudoku.pause_timer(&player_id);
-        }
-        result
+        party.sudoku.toggle_draft(&player_id, row, col, value)
     };
     let _ = ack.send(&match result {
         Ok(()) => json!({ "ok": true }),
@@ -1000,15 +992,11 @@ fn on_sudoku_hint(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSend
     let cell = placed_cell(&payload);
     let result = {
         let mut party = app.party.lock().expect("party");
-        let result = party.sudoku.hint(
+        party.sudoku.hint(
             &player_id,
             cell.map(|(row, _)| row),
             cell.map(|(_, col)| col),
-        );
-        if meta.sudoku_help {
-            party.sudoku.pause_timer(&player_id);
-        }
-        result
+        )
     };
     let _ = ack.send(&match result {
         Ok(()) => json!({ "ok": true }),
@@ -1138,7 +1126,6 @@ fn reset_crossword(app: &App) -> Value {
 
 fn reset_word_search(app: &App, only_player: Option<&str>) -> Value {
     let resume_ids = subscribed_wordsearch(app, only_player);
-    let help_paused = help_paused_players(app);
     let mut party = app.party.lock().expect("party");
     if only_player.is_none() {
         let pending = party.word_search.pending_puzzle_id().to_string();
@@ -1156,9 +1143,6 @@ fn reset_word_search(app: &App, only_player: Option<&str>) -> Value {
         }
     }
     for player_id in resume_ids {
-        if help_paused.iter().any(|paused| paused == &player_id) {
-            continue;
-        }
         party.word_search.resume_timer(&player_id);
     }
     json!({ "ok": true })
@@ -1166,7 +1150,6 @@ fn reset_word_search(app: &App, only_player: Option<&str>) -> Value {
 
 fn reset_sudoku(app: &App, only_player: Option<&str>) -> Value {
     let resume_ids = subscribed_sudoku(app, only_player);
-    let help_paused = help_paused_sudoku(app);
     let mut party = app.party.lock().expect("party");
     if only_player.is_none() {
         let pending = party.sudoku.pending_puzzle_id().to_string();
@@ -1188,22 +1171,9 @@ fn reset_sudoku(app: &App, only_player: Option<&str>) -> Value {
         }
     }
     for player_id in resume_ids {
-        if help_paused.iter().any(|paused| paused == &player_id) {
-            continue;
-        }
         party.sudoku.resume_timer(&player_id);
     }
     json!({ "ok": true })
-}
-
-fn help_paused_sudoku(app: &App) -> Vec<String> {
-    app.meta
-        .lock()
-        .expect("meta")
-        .values()
-        .filter(|meta| meta.sudoku_help)
-        .filter_map(|meta| meta.player_id.clone())
-        .collect()
 }
 
 fn subscribed_sudoku(app: &App, only_player: Option<&str>) -> Vec<String> {
@@ -1214,16 +1184,6 @@ fn subscribed_sudoku(app: &App, only_player: Option<&str>) -> Vec<String> {
         .filter(|meta| meta.sudoku_player)
         .filter_map(|meta| meta.player_id.clone())
         .filter(|id| only_player.is_none_or(|wanted| wanted == id))
-        .collect()
-}
-
-fn help_paused_players(app: &App) -> Vec<String> {
-    app.meta
-        .lock()
-        .expect("meta")
-        .values()
-        .filter(|meta| meta.wordsearch_help)
-        .filter_map(|meta| meta.player_id.clone())
         .collect()
 }
 
@@ -1265,6 +1225,9 @@ fn selection_cells(value: Option<&Value>) -> Option<Vec<WordSearchCellRef>> {
     let Some(list) = value.as_array() else {
         return None;
     };
+    if list.len() > 144 {
+        return None;
+    }
     let mut cells = Vec::new();
     for cell in list {
         let Some(cell) = cell.as_object() else {
@@ -1459,6 +1422,27 @@ fn emit_system(app: &App, socket: &SocketRef) {
     let snapshot = party.snapshot();
     drop(party);
     let _ = socket.emit("system:admin:state", &snapshot);
+}
+
+fn is_host(app: &App, socket: &SocketRef) -> bool {
+    app.meta
+        .lock()
+        .expect("meta")
+        .get(&sid_of(socket))
+        .is_some_and(|meta| meta.host)
+}
+
+fn secrets_match(expected: &str, provided: &str) -> bool {
+    let expected = expected.as_bytes();
+    let provided = provided.as_bytes();
+    if expected.len() != provided.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (left, right) in expected.iter().zip(provided) {
+        diff |= left ^ right;
+    }
+    diff == 0
 }
 
 fn player_id_of(app: &App, socket: &SocketRef) -> Option<String> {

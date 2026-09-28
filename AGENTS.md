@@ -61,8 +61,9 @@ Prod: one Docker image serves API + built web on **8080**.
 
 ## Architecture rules
 
-- **Platform session first.** `session:login` owns name uniqueness and single-connection displace.
-- **Server owns time** for quizzer timers; crossword, word search, and sudoku progress are server-authoritative.
+- **Platform session first.** `session:login` owns name uniqueness and single-connection displace. A stored player id can reclaim a session only after that socket has disconnected.
+- **Host passphrase.** `HOST_SECRET` is required at process start. Host pages send it with `host:unlock`; admin and system events are rejected until that socket unlocks. Local dev reads a gitignored `.env`. Production passes `-e HOST_SECRET` when the container starts.
+- **Server owns time** for quizzer timers; crossword, word search, and sudoku progress are server-authoritative. Those play clocks run from the first move until the puzzle is finished. Quiz correctness and points stay hidden until the reveal phase.
 - **Shared logic in `@party/shared`.** Crossword answers are derived from the grid; word search placements are validated against the grid. Sudoku files carry a private solution and a starting grid. Clients get a public puzzle without solutions.
 - **One quiz room / one crossword / one word search / one sudoku.** In-process singletons; no multi-room or DB.
 - Quiz reset clears quiz players (session kept). Crossword reset clears letters/completions for current players. Word search reset clears found words and play time. Sudoku reset clears the board, score, hints, and clock.
@@ -84,20 +85,19 @@ JSON under `apps/server/sudoku/puzzles/`: `{ id, title, solution, givens }`. Bot
 | Client → server | Purpose |
 |-----------------|---------|
 | `session:login` | Platform join / rejoin |
+| `host:unlock` | Present `HOST_SECRET` before any admin event |
 | `player:join` / `player:answer` | Quizzer |
-| `admin:*` | Quizzer host controls |
+| `admin:*` | Quizzer host controls (requires unlock) |
 | `crossword:subscribe` | Enter crossword (requires session) |
 | `crossword:setLetter` / `clearLetter` | Fill cells |
-| `crossword:admin:subscribe` / `reset` | Crossword host |
+| `crossword:admin:subscribe` / `reset` | Crossword host (requires unlock) |
 | `wordsearch:subscribe` | Enter word search (requires session) |
 | `wordsearch:submitSelection` | Submit a selected cell path |
-| `wordsearch:pauseTimer` / `resumeTimer` | Pause the play clock while instructions are open |
-| `wordsearch:admin:subscribe` / `selectPuzzle` / `reset` / `resetPlayer` | Word search host |
+| `wordsearch:admin:subscribe` / `selectPuzzle` / `reset` / `resetPlayer` | Word search host (requires unlock) |
 | `sudoku:subscribe` | Enter sudoku (requires session) |
 | `sudoku:commit` / `draft` / `erase` / `hint` | Fill a cell, toggle a note, clear a wrong note, or reveal one digit |
-| `sudoku:pauseTimer` / `resumeTimer` | Pause the play clock while instructions are open |
-| `sudoku:admin:subscribe` / `selectPuzzle` / `reset` / `resetPlayer` | Sudoku host |
-| `system:admin:subscribe` / `kick` | System host: connected players and remove from the party |
+| `sudoku:admin:subscribe` / `selectPuzzle` / `reset` / `resetPlayer` | Sudoku host (requires unlock) |
+| `system:admin:subscribe` / `kick` | System host: connected players and remove from the party (requires unlock) |
 
 Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `sudoku:state`, `sudoku:admin:state`, `system:admin:state`.
 

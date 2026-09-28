@@ -8,8 +8,13 @@ import {
 } from '@/lib/sessionStorage';
 import { isQuizRemoval, noteQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
+import { unlockHost } from '@/lib/hostSecret';
 
-export function useGameSocket(role: 'player' | 'admin' = 'player') {
+export function useGameSocket(
+  role: 'player' | 'admin' = 'player',
+  hostSecret: string | null = null,
+  hostAttempt = 0
+) {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [state, setState] = useState<GameStateSnapshot | null>(null);
@@ -21,6 +26,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
   const [gameReset, setGameReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [joinedQuizzer, setJoinedQuizzer] = useState(false);
+  const [hostReady, setHostReady] = useState(role !== 'admin');
   const playerIdRef = useRef(playerId);
   playerIdRef.current = playerId;
   const playerNameRef = useRef(playerName);
@@ -97,7 +103,25 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     socket.on('connect', () => {
       setConnected(true);
       if (role === 'admin') {
-        socket.emit('admin:subscribe');
+        unlockHost(
+          socket,
+          hostSecret,
+          () => {
+            if (!active) {
+              return;
+            }
+            setError(null);
+            setHostReady(true);
+            socket.emit('admin:subscribe');
+          },
+          (message) => {
+            if (!active) {
+              return;
+            }
+            setHostReady(false);
+            setError(message);
+          }
+        );
       } else {
         ensureSessionThenJoinQuiz();
       }
@@ -137,7 +161,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [role]);
+  }, [role, hostSecret, hostAttempt]);
 
   const api = useMemo(
     () => ({
@@ -202,7 +226,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
         new Promise<{ ok: boolean; error?: string; points?: number }>((resolve) => {
           socketRef.current?.emit(
             'player:answer',
-            { answerId, playerId: playerIdRef.current ?? undefined },
+            { answerId },
             resolve
           );
         }),
@@ -246,6 +270,7 @@ export function useGameSocket(role: 'player' | 'admin' = 'player') {
     joinedQuizzer,
     error,
     setError,
+    hostReady,
     ...api,
   };
 }

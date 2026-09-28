@@ -19,17 +19,13 @@ pub struct SocketMeta {
     pub in_quizzer: bool,
     pub crossword_player: bool,
     pub crossword_admin: bool,
-    /// Play clock is paused because this socket has the crossword instructions open.
-    pub crossword_help: bool,
     pub wordsearch_player: bool,
     pub wordsearch_admin: bool,
-    /// Play clock is paused because this socket has the instructions open.
-    pub wordsearch_help: bool,
     pub sudoku_player: bool,
     pub sudoku_admin: bool,
-    /// Play clock is paused because this socket has the sudoku instructions open.
-    pub sudoku_help: bool,
     pub system_admin: bool,
+    /// This socket presented the host passphrase.
+    pub host: bool,
 }
 
 pub struct App {
@@ -37,15 +33,17 @@ pub struct App {
     pub meta: Mutex<HashMap<String, SocketMeta>>,
     pub io: OnceLock<SocketIo>,
     pub notify: Notify,
+    pub host_secret: String,
 }
 
 impl App {
-    pub fn new(party: SystemAdmin) -> Self {
+    pub fn new(party: SystemAdmin, host_secret: String) -> Self {
         Self {
             party: Mutex::new(party),
             meta: Mutex::new(HashMap::new()),
             io: OnceLock::new(),
             notify: Notify::new(),
+            host_secret,
         }
     }
 }

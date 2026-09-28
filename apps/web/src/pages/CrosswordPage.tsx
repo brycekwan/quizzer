@@ -169,8 +169,6 @@ export function CrosswordPage() {
     kicked,
     setLetter,
     clearLetter,
-    pauseTimer,
-    resumeTimer,
   } = useCrosswordSocket('player');
 
   const isMobile = useIsMobileViewport();
@@ -216,27 +214,11 @@ export function CrosswordPage() {
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const [intro, setIntro] = useState(true);
   const instructionsOpenRef = useRef(true);
-  const timerChain = useRef(Promise.resolve());
-
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
-    instructionsOpen
+    false
   );
-
-  const puzzleClockId = playerState?.puzzle.id;
-  useEffect(() => {
-    if (!puzzleClockId) {
-      return;
-    }
-    timerChain.current = timerChain.current.then(async () => {
-      if (instructionsOpenRef.current) {
-        await pauseTimer();
-      } else {
-        await resumeTimer();
-      }
-    });
-  }, [puzzleClockId, pauseTimer, resumeTimer]);
 
   const onInstructionsOpenChange = (open: boolean) => {
     setInstructionsOpen(open);
@@ -244,13 +226,6 @@ export function CrosswordPage() {
     if (!open) {
       setIntro(false);
     }
-    timerChain.current = timerChain.current.then(async () => {
-      if (instructionsOpenRef.current) {
-        await pauseTimer();
-      } else {
-        await resumeTimer();
-      }
-    });
   };
 
   const showKeyboard = isMobile && selected != null && !instructionsOpen;

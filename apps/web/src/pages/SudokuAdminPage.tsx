@@ -4,6 +4,8 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useSudokuSocket } from '@/hooks/useSudokuSocket';
+import { useHostSecret } from '@/hooks/useHostSecret';
+import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
 import { computeElapsedMs, formatElapsedMs } from '@/lib/crosswordClient';
 
 function ElapsedCell({
@@ -35,6 +37,7 @@ function ElapsedCell({
 }
 
 export function SudokuAdminPage() {
+  const host = useHostSecret();
   const {
     connected,
     adminState,
@@ -43,11 +46,22 @@ export function SudokuAdminPage() {
     reset,
     resetPlayer,
     selectPuzzle,
-  } = useSudokuSocket('admin');
+    hostReady,
+  } = useSudokuSocket('admin', host.secret, host.attempt);
   const [confirm, setConfirm] = useState<
     { kind: 'all' } | { kind: 'player'; playerId: string; name: string } | null
   >(null);
   const [confirming, setConfirming] = useState(false);
+
+  if (!hostReady) {
+    return (
+      <HostPassphrasePrompt
+        checking={Boolean(host.secret) && !error}
+        error={error}
+        onSubmit={host.save}
+      />
+    );
+  }
 
   if (!adminState) {
     return (

@@ -249,7 +249,6 @@ export function PlayPage() {
     const totalMs = state.config.timeLimitSeconds * 1000;
     const viewer = state.viewerAnswer;
     const hasAnswered = Boolean(viewer);
-    const gotItRight = viewer?.correct === true;
 
     return (
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-playfield px-4 py-3">
@@ -282,14 +281,8 @@ export function PlayPage() {
           <Countdown remainingMs={remainingMs} totalMs={totalMs} />
           {hasAnswered ? (
             <div className="animate-popin rounded-2xl border-4 border-ink/10 bg-white/80 px-4 py-3 text-center shadow-pop-sm">
-              <p
-                className={`font-display text-xl font-bold ${
-                  gotItRight ? 'text-mint' : 'text-coral'
-                }`}
-              >
-                {gotItRight
-                  ? `You got it! +${viewer?.points ?? 0}`
-                  : 'Wrong answer'}
+              <p className="font-display text-xl font-bold text-ink">
+                Answer locked
               </p>
               <p className="mt-1 text-sm font-bold text-ink/60">
                 {state.waitingPlayerCount > 0

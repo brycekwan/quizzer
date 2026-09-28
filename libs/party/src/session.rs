@@ -66,6 +66,9 @@ impl SessionRegistry {
                 {
                     return Err("Session expired — please join again".into());
                 }
+                if existing.connected && existing.socket_id.as_deref() != Some(socket_id) {
+                    return Err("That name is already in use by another player".into());
+                }
                 let replaced_socket_id = existing
                     .socket_id
                     .clone()
@@ -96,7 +99,11 @@ impl SessionRegistry {
             });
         }
 
-        let names: Vec<String> = self.sessions.values().map(|session| session.name.clone()).collect();
+        let names: Vec<String> = self
+            .sessions
+            .values()
+            .map(|session| session.name.clone())
+            .collect();
         if is_name_taken(&normalized, names.iter().map(String::as_str)) {
             return Err("That name is already taken".into());
         }
@@ -192,12 +199,30 @@ mod tests {
     }
 
     #[test]
-    fn reports_replaced_socket_on_takeover() {
+    fn refuses_takeover_while_the_session_is_connected() {
         let mut registry = SessionRegistry::new();
         let first = registry.login("Buddy", "s1", None).unwrap();
-        let takeover = registry
+        let takeover = registry.login("Buddy", "s2", Some(&first.session.id));
+        assert!(takeover.is_err());
+        assert_eq!(
+            registry
+                .get(&first.session.id)
+                .unwrap()
+                .socket_id
+                .as_deref(),
+            Some("s1")
+        );
+    }
+
+    #[test]
+    fn reclaims_a_disconnected_session_by_id() {
+        let mut registry = SessionRegistry::new();
+        let first = registry.login("Buddy", "s1", None).unwrap();
+        registry.mark_disconnected("s1");
+        let reclaim = registry
             .login("Buddy", "s2", Some(&first.session.id))
             .unwrap();
-        assert_eq!(takeover.replaced_socket_id.as_deref(), Some("s1"));
+        assert_eq!(reclaim.session.id, first.session.id);
+        assert_eq!(reclaim.replaced_socket_id, None);
     }
 }

@@ -1,8 +1,25 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { PageShell } from '@/components/PageShell';
+import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
+import { useHostSecret } from '@/hooks/useHostSecret';
 
 export function HostMenuPage() {
+  const host = useHostSecret();
+  const [editing, setEditing] = useState(false);
+  if (!host.secret || editing) {
+    return (
+      <HostPassphrasePrompt
+        checking={false}
+        error={null}
+        onSubmit={(secret) => {
+          host.save(secret);
+          setEditing(false);
+        }}
+      />
+    );
+  }
   return (
     <PageShell>
       <p className="mb-2 text-sm font-extrabold uppercase tracking-widest text-grape">
@@ -27,6 +44,9 @@ export function HostMenuPage() {
         </Button>
         <Button asChild size="lg" variant="outline" className="w-full">
           <Link to="/host/system">System</Link>
+        </Button>
+        <Button type="button" size="lg" variant="outline" className="w-full" onClick={() => setEditing(true)}>
+          Change passphrase
         </Button>
       </div>
     </PageShell>

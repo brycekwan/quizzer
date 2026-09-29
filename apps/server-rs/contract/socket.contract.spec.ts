@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { io, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -30,6 +31,12 @@ interface SystemState {
 interface SudokuState {
   elapsedMs: number;
   activeSince: number | null;
+}
+
+interface MazeState {
+  phase: string;
+  position: { row: number; col: number };
+  puzzle: { walls: Array<Array<{ n: boolean; e: boolean; s: boolean; w: boolean }>> };
 }
 
 function freePort(): Promise<number> {
@@ -100,6 +107,7 @@ describe('rust socket contract', () => {
         CROSSWORD_PUZZLES_DIR: path.resolve('apps/server/crossword/puzzles'),
         WORDSEARCH_PUZZLES_DIR: path.resolve('apps/server/wordsearch/puzzles'),
         SUDOKU_PUZZLES_DIR: path.resolve('apps/server/sudoku/puzzles'),
+        MAZE_DIR: path.resolve('apps/server/maze'),
         HOST_SECRET: 'test-host-secret',
         STATIC_DIR: path.resolve('dist/apps/web'),
       },
@@ -234,6 +242,20 @@ describe('rust socket contract', () => {
     expect(still.activeSince).toBe(clock.activeSince);
     expect(still.elapsedMs).toBe(clock.elapsedMs);
 
+    const mazeStatePromise = waitFor<MazeState>(player, 'maze:state');
+    const maze = await emitAck(player, 'maze:subscribe', {});
+    expect(maze.ok).toBe(true);
+    const mazeState = await mazeStatePromise;
+    const blocked = await emitAck(player, 'maze:move', { direction: 'e' });
+    expect(blocked.ok).toBe(false);
+    const intro = await emitAck(player, 'maze:ackIntro', {});
+    expect(intro.ok).toBe(true);
+    const walls = mazeState.puzzle.walls[mazeState.position.row]?.[mazeState.position.col];
+    const direction = walls && !walls.e ? 'e' : walls && !walls.s ? 's' : walls && !walls.w ? 'w' : 'n';
+    await new Promise((resolve) => setTimeout(resolve, 5_200));
+    const moved = await emitAck(player, 'maze:move', { direction });
+    expect(moved.ok).toBe(true);
+
     const boardPromise = waitFor<SystemState>(admin, 'system:admin:state');
     const subscribed = await emitAck(admin, 'system:admin:subscribe', {});
     expect(subscribed.ok).toBe(true);
@@ -244,7 +266,7 @@ describe('rust socket contract', () => {
     const removal = await emitAck(admin, 'system:admin:kick', { playerId: login.playerId });
     expect(removal.ok).toBe(true);
     expect(await kicked).toEqual({ reason: SYSTEM_REMOVAL_REASON });
-  });
+  }, 20_000);
 
   it('refuses host controls until the passphrase is unlocked', async () => {
     const intruder = connect();
@@ -280,6 +302,7 @@ describe('HOST_SECRET', () => {
   it('exits when the secret is missing', async () => {
     const port = await freePort();
     const child = spawn(binaryPath(), [], {
+      cwd: os.tmpdir(),
       env: {
         ...process.env,
         HOST: '127.0.0.1',
@@ -289,6 +312,7 @@ describe('HOST_SECRET', () => {
         CROSSWORD_PUZZLES_DIR: path.resolve('apps/server/crossword/puzzles'),
         WORDSEARCH_PUZZLES_DIR: path.resolve('apps/server/wordsearch/puzzles'),
         SUDOKU_PUZZLES_DIR: path.resolve('apps/server/sudoku/puzzles'),
+        MAZE_DIR: path.resolve('apps/server/maze'),
         STATIC_DIR: path.resolve('dist/apps/web'),
       },
       stdio: 'pipe',

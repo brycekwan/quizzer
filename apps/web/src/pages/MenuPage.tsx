@@ -55,6 +55,9 @@ export function MenuPage() {
         <Button asChild size="lg" variant="outline" className="w-full">
           <Link to="/sudoku">Sudoku</Link>
         </Button>
+        <Button asChild size="lg" variant="outline" className="w-full">
+          <Link to="/maze">Maze</Link>
+        </Button>
       </div>
     </PageShell>
   );

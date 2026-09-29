@@ -1,3 +1,4 @@
+use crate::maze::{validate_maze_file, MazeDifficulty, MazeFile, MazePuzzleInfo};
 use crate::crossword::{
     derive_crossword_words, validate_crossword_file, CrosswordPuzzleFile, CrosswordPuzzleInfo,
     CrosswordWord,
@@ -61,6 +62,26 @@ pub fn resolve_sudoku_dir() -> PathBuf {
         PathBuf::from("sudoku/puzzles"),
         manifest_relative(&["apps", "server", "sudoku", "puzzles"]),
     ])
+}
+
+pub fn resolve_maze_dir() -> PathBuf {
+    if let Ok(dir) = env::var("MAZE_DIR") {
+        return PathBuf::from(dir);
+    }
+    first_existing(&[
+        PathBuf::from("apps/server/maze"),
+        PathBuf::from("maze"),
+        manifest_relative(&["apps", "server", "maze"]),
+    ])
+}
+
+pub fn maze_difficulty_dir(root: &Path, difficulty: MazeDifficulty) -> PathBuf {
+    let folder = match difficulty {
+        MazeDifficulty::Easy => "easy",
+        MazeDifficulty::Medium => "medium",
+        MazeDifficulty::Hard => "hard",
+    };
+    root.join(folder)
 }
 
 pub fn resolve_word_search_dir() -> PathBuf {
@@ -309,6 +330,58 @@ pub fn load_default_sudoku(dir: &Path) -> Result<(SudokuFile, Vec<SudokuPuzzleIn
     Ok((puzzle, puzzles))
 }
 
+pub fn list_maze_puzzles(dir: &Path) -> Vec<MazePuzzleInfo> {
+    json_files(dir)
+        .into_iter()
+        .map(|file| MazePuzzleInfo {
+            id: file.trim_end_matches(".json").to_string(),
+            label: file,
+        })
+        .collect()
+}
+
+pub fn load_maze_puzzle(
+    id: &str,
+    dir: &Path,
+    difficulty: MazeDifficulty,
+) -> Result<MazeFile, String> {
+    if !valid_pack_id(id) {
+        return Err("Invalid maze id".into());
+    }
+    let path = dir.join(format!("{id}.json"));
+    if !path.is_file() {
+        return Err(format!("Maze \"{id}\" not found"));
+    }
+    let raw = fs::read_to_string(&path).map_err(|_| format!("Could not read maze \"{id}\""))?;
+    let mut puzzle: MazeFile =
+        serde_json::from_str(&raw).map_err(|_| format!("Could not read maze \"{id}\""))?;
+    if puzzle.id.trim().is_empty() {
+        puzzle.id = id.to_string();
+    }
+    if let Some(error) = validate_maze_file(&puzzle, difficulty) {
+        return Err(error);
+    }
+    Ok(puzzle)
+}
+
+pub fn load_default_maze(
+    root: &Path,
+    difficulty: MazeDifficulty,
+    preferred_id: &str,
+) -> Result<(MazeFile, Vec<MazePuzzleInfo>), String> {
+    let dir = maze_difficulty_dir(root, difficulty);
+    let puzzles = list_maze_puzzles(&dir);
+    if puzzles.is_empty() {
+        return Err(format!("No mazes found in {}", dir.display()));
+    }
+    let preferred = puzzles
+        .iter()
+        .find(|puzzle| puzzle.id == preferred_id)
+        .unwrap_or(&puzzles[0]);
+    let puzzle = load_maze_puzzle(&preferred.id, &dir, difficulty)?;
+    Ok((puzzle, puzzles))
+}
+
 pub fn load_default_word_search(
     dir: &Path,
 ) -> Result<
@@ -393,6 +466,19 @@ mod tests {
         assert_eq!(puzzle.solution.len(), 9);
         let listed = list_sudoku_puzzles(&dir);
         assert!(listed.iter().any(|puzzle| puzzle.label == "sample.json"));
+    }
+
+    #[test]
+    fn loads_trial_mazes() {
+        let root = resolve_maze_dir();
+        let (easy, listed) = load_default_maze(&root, MazeDifficulty::Easy, "nursery").unwrap();
+        assert_eq!(easy.id, "nursery");
+        assert_eq!(easy.rows, 12);
+        assert!(listed.iter().any(|puzzle| puzzle.label == "nursery.json"));
+        let (medium, _) = load_default_maze(&root, MazeDifficulty::Medium, "kitchen").unwrap();
+        assert_eq!(medium.rows, 15);
+        let (hard, _) = load_default_maze(&root, MazeDifficulty::Hard, "bottle").unwrap();
+        assert_eq!(hard.rows, 20);
     }
 
     #[test]

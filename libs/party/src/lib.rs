@@ -2,6 +2,8 @@ pub mod clock;
 pub mod crossword;
 pub mod crossword_engine;
 pub mod load;
+pub mod maze;
+pub mod maze_engine;
 pub mod names;
 pub mod quizzer;
 pub mod scoring;

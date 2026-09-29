@@ -8,4 +8,6 @@ export * from './wordSearch';
 export * from './wordSearchLogic';
 export * from './sudoku';
 export * from './sudokuLogic';
+export * from './maze';
+export * from './mazeLogic';
 export * from './system';

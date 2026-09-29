@@ -11,6 +11,7 @@ describe('login return path', () => {
     expect(returnPath('?next=%2Fcrossword')).toBe('/crossword');
     expect(returnPath('?next=%2Fwordsearch')).toBe('/wordsearch');
     expect(returnPath('?next=%2Fsudoku')).toBe('/sudoku');
+    expect(returnPath('?next=%2Fmaze')).toBe('/maze');
     expect(returnPath('?next=%2Fquizzer')).toBe('/quizzer');
     expect(returnPath('?next=%2Fplay')).toBe('/quizzer');
   });

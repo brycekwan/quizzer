@@ -4,6 +4,7 @@ const PLAYER_PATHS = new Set([
   '/crossword',
   '/wordsearch',
   '/sudoku',
+  '/maze',
 ]);
 
 /** Where a successful login should continue. Direct visits to login go to the lobby. */

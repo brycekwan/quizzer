@@ -11,12 +11,14 @@
     "url": "git+https://github.com/brycekwan/quizzer.git"
   },
   "scripts": {
-    "dev": "nx run-many -t serve --projects=web,server-rs --parallel=2",
+    "dev": "env -u HOST_SECRET PATH=\"$HOME/.cargo/bin:$PATH\" nx run-many -t serve --projects=web,server-rs --parallel=2",
+    "dev:free": "bash scripts/free-dev-ports.sh",
     "build": "nx run-many -t build --projects=web,server-rs",
     "test": "nx run-many -t test,contract",
     "lint": "nx run-many -t lint",
     "serve:web": "nx serve web",
-    "serve:server": "nx serve server-rs",
+    "serve:server": "env -u HOST_SECRET PATH=\"$HOME/.cargo/bin:$PATH\" nx serve server-rs",
+    "convert-maze": "node scripts/convert-maze.mjs",
     "release": "semantic-release"
   },
   "dependencies": {

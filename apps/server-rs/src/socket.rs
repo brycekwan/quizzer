@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use party::load::{
-    list_question_sets, load_crossword_puzzle, load_question_sets_in_order, load_sudoku_puzzle,
-    load_word_search_puzzle, resolve_crossword_dir, resolve_questions_dir, resolve_sudoku_dir,
-    resolve_word_search_dir,
+    list_question_sets, load_crossword_puzzle, load_maze_puzzle, load_question_sets_in_order,
+    load_sudoku_puzzle, load_word_search_puzzle, maze_difficulty_dir, resolve_crossword_dir,
+    resolve_maze_dir, resolve_questions_dir, resolve_sudoku_dir, resolve_word_search_dir,
 };
+use party::maze::{MazeDifficulty, MazeDirection};
 use party::quizzer::SnapshotRole;
 use party::types::{QuestionSetMode, QUIZ_REMOVAL_REASON, SYSTEM_REMOVAL_REASON};
 use party::word_search::WordSearchCellRef;
@@ -546,6 +547,110 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
 
     socket.on(
+        "maze:subscribe",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_maze_subscribe(app, socket, ack);
+        },
+    );
+    socket.on(
+        "maze:ackIntro",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_maze_ack(app, socket, ack);
+        },
+    );
+    socket.on(
+        "maze:move",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            on_maze_move(app, socket, payload, ack);
+        },
+    );
+    socket.on(
+        "maze:restart",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_maze_restart(app, socket, ack);
+        },
+    );
+    socket.on(
+        "maze:pauseTimer",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_maze_pause(app, socket, ack, true);
+        },
+    );
+    socket.on(
+        "maze:resumeTimer",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_maze_pause(app, socket, ack, false);
+        },
+    );
+    socket.on(
+        "maze:admin:subscribe",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            flag_mut(&app, &socket, |meta| meta.maze_admin = true);
+            let _ = ack.send(&json!({ "ok": true }));
+            emit_maze_admin(&app, &socket);
+        },
+    );
+    socket.on(
+        "maze:admin:select",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let result = select_maze(&app, &payload);
+            let _ = ack.send(&result);
+            changed(&app);
+        },
+    );
+    socket.on(
+        "maze:admin:reset",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let result = reset_maze(&app, None);
+            let _ = ack.send(&result);
+            changed(&app);
+        },
+    );
+    socket.on(
+        "maze:admin:resetPlayer",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let player_id = payload
+                .get("playerId")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            if player_id.is_empty() {
+                let _ = ack.send(&fail("Choose a player"));
+                return;
+            }
+            let player_id = player_id.to_string();
+            let result = reset_maze(&app, Some(&player_id));
+            let _ = ack.send(&result);
+            changed(&app);
+        },
+    );
+
+    socket.on(
         "system:admin:subscribe",
         async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
             if !is_host(&app, &socket) {
@@ -586,6 +691,9 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         let meta = app.meta.lock().expect("meta").get(&sid).cloned();
         if let Some(meta) = meta {
             let mut party = app.party.lock().expect("party");
+            if let Some(player_id) = meta.player_id.clone() {
+                party.maze.pause_timer(&player_id);
+            }
             if meta.in_quizzer || meta.player_id.is_some() {
                 party.quiz.mark_disconnected(&sid);
             }
@@ -1176,6 +1284,162 @@ fn reset_sudoku(app: &App, only_player: Option<&str>) -> Value {
     json!({ "ok": true })
 }
 
+fn on_maze_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(player_id) = player_id_of(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    let name = {
+        let party = app.party.lock().expect("party");
+        party
+            .sessions
+            .get(&player_id)
+            .map(|session| session.name.clone())
+    };
+    let Some(name) = name else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    {
+        let mut party = app.party.lock().expect("party");
+        party.maze.ensure_player(&player_id, &name);
+    }
+    flag_mut(&app, &socket, |meta| meta.maze_player = true);
+    let _ = ack.send(&json!({ "ok": true }));
+    emit_maze_player(&app, &socket);
+    changed(&app);
+}
+
+fn maze_player_id(app: &App, socket: &SocketRef) -> Option<String> {
+    let sid = sid_of(socket);
+    let meta = app
+        .meta
+        .lock()
+        .expect("meta")
+        .get(&sid)
+        .cloned()
+        .unwrap_or_default();
+    meta.player_id.filter(|_| meta.maze_player)
+}
+
+fn on_maze_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(player_id) = maze_player_id(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    let result = {
+        let mut party = app.party.lock().expect("party");
+        match party.maze.ack_intro(&player_id) {
+            Ok(()) => json!({ "ok": true }),
+            Err(error) => fail(error),
+        }
+    };
+    let _ = ack.send(&result);
+    changed(&app);
+}
+
+fn on_maze_move(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(player_id) = maze_player_id(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    let Some(direction) = payload
+        .get("direction")
+        .and_then(Value::as_str)
+        .and_then(MazeDirection::parse)
+    else {
+        let _ = ack.send(&fail("Invalid move"));
+        return;
+    };
+    let result = {
+        let mut party = app.party.lock().expect("party");
+        match party.maze.move_player(&player_id, direction) {
+            Ok(()) => json!({ "ok": true }),
+            Err(error) => fail(error),
+        }
+    };
+    let _ = ack.send(&result);
+    changed(&app);
+}
+
+fn on_maze_restart(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(player_id) = maze_player_id(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    let result = {
+        let mut party = app.party.lock().expect("party");
+        match party.maze.restart(&player_id) {
+            Ok(()) => json!({ "ok": true }),
+            Err(error) => fail(error),
+        }
+    };
+    let _ = ack.send(&result);
+    changed(&app);
+}
+
+fn on_maze_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
+    let Some(player_id) = maze_player_id(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    {
+        let mut party = app.party.lock().expect("party");
+        if pause {
+            party.maze.pause_timer(&player_id);
+        } else {
+            party.maze.resume_timer(&player_id);
+        }
+    }
+    let _ = ack.send(&json!({ "ok": true }));
+    changed(&app);
+}
+
+fn select_maze(app: &App, payload: &Value) -> Value {
+    let Some(difficulty) = payload
+        .get("difficulty")
+        .and_then(Value::as_str)
+        .and_then(MazeDifficulty::parse)
+    else {
+        return fail("Choose a difficulty");
+    };
+    select_named(payload, "puzzleId", "Select a maze", |id| {
+        let mut party = app.party.lock().expect("party");
+        party.maze.select_puzzle(difficulty, id)
+    })
+}
+
+fn reset_maze(app: &App, only_player: Option<&str>) -> Value {
+    let mut party = app.party.lock().expect("party");
+    if only_player.is_none() {
+        for difficulty in [MazeDifficulty::Easy, MazeDifficulty::Medium, MazeDifficulty::Hard] {
+            let pending = party.maze.pending_id(difficulty).to_string();
+            let active = party.maze.active_id(difficulty).to_string();
+            if pending == active {
+                continue;
+            }
+            match load_maze_puzzle(
+                &pending,
+                &maze_difficulty_dir(&resolve_maze_dir(), difficulty),
+                difficulty,
+            ) {
+                Ok(puzzle) => {
+                    if let Err(error) = party.maze.set_puzzle(difficulty, puzzle) {
+                        return fail(error);
+                    }
+                }
+                Err(error) => return fail(error),
+            }
+        }
+        party.maze.reset();
+    } else if let Some(player_id) = only_player {
+        if let Err(error) = party.maze.reset_player(player_id) {
+            return fail(error);
+        }
+    }
+    json!({ "ok": true })
+}
+
 fn subscribed_sudoku(app: &App, only_player: Option<&str>) -> Vec<String> {
     app.meta
         .lock()
@@ -1291,6 +1555,7 @@ fn clear_player_flags(app: &App, socket: &SocketRef) {
         meta.crossword_player = false;
         meta.wordsearch_player = false;
         meta.sudoku_player = false;
+        meta.maze_player = false;
     }
 }
 
@@ -1330,6 +1595,12 @@ pub fn broadcast(app: &App) {
         }
         if meta.sudoku_admin {
             emit_sudoku_admin(&app, &socket);
+        }
+        if meta.maze_player {
+            emit_maze_player(&app, &socket);
+        }
+        if meta.maze_admin {
+            emit_maze_admin(&app, &socket);
         }
         if meta.system_admin {
             emit_system(&app, &socket);
@@ -1415,6 +1686,25 @@ fn emit_sudoku_admin(app: &App, socket: &SocketRef) {
     let snapshot = party.sudoku.admin_snapshot();
     drop(party);
     let _ = socket.emit("sudoku:admin:state", &snapshot);
+}
+
+fn emit_maze_player(app: &App, socket: &SocketRef) {
+    let Some(player_id) = player_id_of(app, socket) else {
+        return;
+    };
+    let party = app.party.lock().expect("party");
+    let Some(snapshot) = party.maze.player_snapshot(&player_id) else {
+        return;
+    };
+    drop(party);
+    let _ = socket.emit("maze:state", &snapshot);
+}
+
+fn emit_maze_admin(app: &App, socket: &SocketRef) {
+    let party = app.party.lock().expect("party");
+    let snapshot = party.maze.admin_snapshot();
+    drop(party);
+    let _ = socket.emit("maze:admin:state", &snapshot);
 }
 
 fn emit_system(app: &App, socket: &SocketRef) {

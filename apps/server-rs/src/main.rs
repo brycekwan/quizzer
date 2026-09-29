@@ -11,10 +11,12 @@ use std::time::Duration;
 
 use party::crossword_engine::CrosswordEngine;
 use party::load::{
-    load_default_crossword, load_default_question_set, load_default_sudoku,
-    load_default_word_search, resolve_crossword_dir, resolve_questions_dir, resolve_sudoku_dir,
-    resolve_word_search_dir,
+    load_default_crossword, load_default_maze, load_default_question_set, load_default_sudoku,
+    load_default_word_search, resolve_crossword_dir, resolve_maze_dir, resolve_questions_dir,
+    resolve_sudoku_dir, resolve_word_search_dir,
 };
+use party::maze::MazeDifficulty;
+use party::maze_engine::MazeEngine;
 use party::quizzer::GameEngine;
 use party::session::SessionRegistry;
 use party::sudoku_engine::SudokuEngine;
@@ -79,15 +81,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn require_host_secret() -> Result<String, Box<dyn std::error::Error>> {
+    // dotenvy keeps a variable that is already set, including a blank one.
+    // Drop a blank value so the .env file can supply it.
+    let from_environment = env::var("HOST_SECRET")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    if from_environment.is_none() {
+        env::remove_var("HOST_SECRET");
+    }
     match dotenvy::dotenv() {
-        Ok(_) => {}
+        Ok(path) => {
+            if from_environment.is_none() {
+                info!("loaded unset variables from {}", path.display());
+            }
+        }
         Err(dotenvy::Error::Io(error)) if error.kind() == ErrorKind::NotFound => {}
         Err(error) => return Err(error.into()),
     }
-    let secret = env::var("HOST_SECRET").unwrap_or_default();
-    let secret = secret.trim().to_string();
+    let secret = env::var("HOST_SECRET")
+        .unwrap_or_default()
+        .trim()
+        .to_string();
     if secret.is_empty() {
         eprintln!("HOST_SECRET is required");
+        eprintln!("Add HOST_SECRET to .env for local startup, or pass it in the environment.");
         std::process::exit(1);
     }
     Ok(secret)
@@ -127,12 +145,28 @@ fn load_party() -> Result<SystemAdmin, Box<dyn std::error::Error>> {
     let (sudoku, puzzles) = load_default_sudoku(&resolve_sudoku_dir())?;
     let sudoku = SudokuEngine::with_clock(sudoku, Some(puzzles), None, party::Clock::system())?;
 
+    let maze_root = resolve_maze_dir();
+    let (easy, easy_catalog) = load_default_maze(&maze_root, MazeDifficulty::Easy, "nursery")?;
+    let (medium, medium_catalog) =
+        load_default_maze(&maze_root, MazeDifficulty::Medium, "kitchen")?;
+    let (hard, hard_catalog) = load_default_maze(&maze_root, MazeDifficulty::Hard, "bottle")?;
+    let maze = MazeEngine::with_clock(
+        easy,
+        medium,
+        hard,
+        Some(easy_catalog),
+        Some(medium_catalog),
+        Some(hard_catalog),
+        party::Clock::system(),
+    )?;
+
     Ok(SystemAdmin::new(
         SessionRegistry::new(),
         quiz,
         crossword,
         word_search,
         sudoku,
+        maze,
     ))
 }
 

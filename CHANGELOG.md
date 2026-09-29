@@ -1,3 +1,10 @@
+# [2.5.0](https://github.com/brycekwan/quizzer/compare/v2.4.0...v2.5.0) (2026-09-29)
+
+
+### Features
+
+* **maze:** add a three-level campaign and read the local host secret from .env ([43f0297](https://github.com/brycekwan/quizzer/commit/43f02970fab9d7b31a7fff58ed1c0549cdbf1eef))
+
 # [2.4.0](https://github.com/brycekwan/quizzer/compare/v2.3.0...v2.4.0) (2026-09-28)
 
 

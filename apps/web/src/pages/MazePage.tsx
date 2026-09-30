@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import type { MazeDirection, MazePhase } from '@party/shared';
+import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { MazeGrid } from '@/components/maze/MazeGrid';
 import { MazePad } from '@/components/maze/MazePad';
@@ -263,38 +264,21 @@ export function MazePage() {
   return (
     <div className="min-h-[100dvh] bg-playfield text-ink">
       <div className="mx-auto flex w-full max-w-xl flex-col px-3 py-3">
-        <header className="flex items-start justify-between gap-3 pb-2">
-          <div className="min-w-0">
-            <p className="text-sm font-extrabold uppercase tracking-widest text-grape">Maze</p>
-            <h1 className="font-display text-2xl font-bold">{playerState.puzzle.title}</h1>
-            <p className="text-sm font-semibold text-ink/60">
-              {playerName} · {levelName(playerState.level)}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <p className="font-display text-3xl font-bold tabular-nums" aria-live="polite">
-              {elapsedLabel}
-            </p>
-            <div className="flex items-center gap-2">
-              <MazeInstructions
-                open={instructionsOpen}
-                intro={intro}
-                onOpenChange={setInstructionsOpen}
-                onOk={() => void confirmInstructions()}
-              />
-              <Button asChild variant="outline" size="sm">
-                <Link to="/">Return to Lobby</Link>
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        <div className="py-2 text-center">
-          <p className="text-xs font-extrabold uppercase tracking-widest text-ink/45">Score</p>
-          <p className="font-display text-4xl font-bold tabular-nums text-grape" aria-live="polite">
-            {playerState.score}
-          </p>
-        </div>
+        <GamePlayHeader
+          game="Maze"
+          title={playerState.puzzle.title}
+          detail={`${playerName} · ${levelName(playerState.level)}`}
+          elapsedLabel={elapsedLabel}
+          instructions={
+            <MazeInstructions
+              open={instructionsOpen}
+              intro={intro}
+              onOpenChange={setInstructionsOpen}
+              onOk={() => void confirmInstructions()}
+            />
+          }
+        />
+        <GameScore score={playerState.score} />
 
         {error ? (
           <p role="alert" className="pb-2 text-center font-bold text-coral">

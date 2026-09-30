@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import type { SudokuCellState } from '@party/shared';
+import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
 import { SudokuGrid } from '@/components/sudoku/SudokuGrid';
 import { SudokuKeyboard } from '@/components/sudoku/SudokuKeyboard';
 import { Button } from '@/components/ui/button';
@@ -298,49 +299,21 @@ export function SudokuPage() {
   return (
     <div className="min-h-[100dvh] bg-playfield text-ink">
       <div className="mx-auto flex w-full max-w-xl flex-col px-3 py-3">
-        <header className="flex items-start justify-between gap-3 pb-2">
-          <div className="min-w-0">
-            <p className="text-sm font-extrabold uppercase tracking-widest text-grape">
-              Sudoku
-            </p>
-            <h1 className="font-display text-2xl font-bold">
-              {playerState.puzzle.title}
-            </h1>
-            <p className="text-sm font-semibold text-ink/60">{playerName}</p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <p
-              className="font-display text-3xl font-bold tabular-nums"
-              aria-live="polite"
-              aria-label={`Elapsed time ${elapsedLabel}`}
-            >
-              {elapsedLabel}
-            </p>
-            <div className="flex items-center gap-2">
-              <SudokuInstructions
-                open={instructionsOpen}
-                onOpenChange={onInstructionsOpenChange}
-                intro={intro}
-                showTrigger
-              />
-              <Button asChild variant="outline" size="sm">
-                <Link to="/">Return to Lobby</Link>
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        <div className="py-2 text-center">
-          <p className="text-xs font-extrabold uppercase tracking-widest text-ink/45">
-            Score
-          </p>
-          <p
-            className="font-display text-4xl font-bold tabular-nums text-grape"
-            aria-live="polite"
-          >
-            {playerState.score}
-          </p>
-        </div>
+        <GamePlayHeader
+          game="Sudoku"
+          title={playerState.puzzle.title}
+          detail={playerName}
+          elapsedLabel={elapsedLabel}
+          instructions={
+            <SudokuInstructions
+              open={instructionsOpen}
+              onOpenChange={onInstructionsOpenChange}
+              intro={intro}
+              showTrigger
+            />
+          }
+        />
+        <GameScore score={playerState.score} />
 
         {playerState.completed ? (
           <p className="mb-2 rounded-xl border-2 border-mint/40 bg-mint/20 px-3 py-2 text-center font-display font-bold">

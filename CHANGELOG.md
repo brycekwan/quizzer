@@ -1,3 +1,10 @@
+# [2.6.0](https://github.com/brycekwan/quizzer/compare/v2.5.0...v2.6.0) (2026-09-30)
+
+
+### Features
+
+* add word survival app ([d31eb92](https://github.com/brycekwan/quizzer/commit/d31eb9204c28f5c20723a7236e637b8cbe215ea4))
+
 # [2.5.0](https://github.com/brycekwan/quizzer/compare/v2.4.0...v2.5.0) (2026-09-29)
 
 

@@ -10,13 +10,14 @@ function player(
     wordSearchScore: null,
     sudokuScore: null,
     mazeScore: null,
+    wordSurvivorScore: null,
     quizScore: null,
     ...partial,
   };
 }
 
 describe('buildSystemLeaderboard', () => {
-  it('ranks connected players by crossword, word search, sudoku, and maze, ignoring quiz', () => {
+  it('ranks connected players by crossword, word search, sudoku, maze, and word survivor, ignoring quiz', () => {
     const board = buildSystemLeaderboard([
       player({
         playerId: 'quiz-heavy',

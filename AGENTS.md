@@ -21,18 +21,21 @@ Multi-game party platform: Kahoot-style quizzer, crossword, word search, sudoku,
 | `apps/web/src/hooks/useWordSearchSocket.ts` | Word search play/admin socket |
 | `apps/web/src/hooks/useSudokuSocket.ts` | Sudoku play/admin socket |
 | `apps/web/src/hooks/useMazeSocket.ts` | Maze play/admin socket |
+| `apps/web/src/hooks/useWordSurvivorSocket.ts` | Word survivor play/admin socket |
 | `apps/web/src/components/crossword/` | Grid + clue list |
 | `apps/web/src/components/wordsearch/` | Word search grid |
 | `apps/web/src/components/sudoku/` | Sudoku grid and number keyboard |
 | `apps/web/src/components/maze/` | Maze grid, pad, and icons |
+| `apps/web/src/components/wordsurvivor/` | Word survivor board and keyboard |
 | `apps/server-rs/` | Rust binary: HTTP, static files, Socket.IO handlers (`party-server`) |
-| `libs/party/` | Session registry, quizzer, crossword, word search, sudoku, maze, system admin |
+| `libs/party/` | Session registry, quizzer, crossword, word search, sudoku, maze, word survivor, system admin |
 | `apps/server/questions/*.json` | Quizzer question packs |
 | `apps/server/crossword/puzzles/*.json` | Crossword packs (grid-first) |
 | `apps/server/wordsearch/puzzles/*.json` | Word search packs (12×12 grid + placements) |
 | `apps/server/sudoku/puzzles/*.json` | Sudoku packs (solution + givens) |
 | `apps/server/maze/{easy,medium,hard}/*.json` | Maze packs (open cells + edge walls) |
-| `libs/shared/src/` | Types, scoring, names, crossword, word search, sudoku, and maze validation |
+| `apps/server/wordsurvivor/*.json` | Word survivor lists: 5 through 9 letter words. `words.json` is the default |
+| `libs/shared/src/` | Types, scoring, names, crossword, word search, sudoku, maze, and word survivor |
 
 ## Commands
 
@@ -57,22 +60,24 @@ Prod: one Docker image serves API + built web on **8080**.
 | `/wordsearch` | Word search play |
 | `/sudoku` | Sudoku play |
 | `/maze` | Maze campaign |
+| `/wordsurvivor` | Word survivor |
 | `/host` | Host menu |
 | `/host/quizzer` | Quizzer admin (`/host/admin` redirects here) |
 | `/host/crossword` | Crossword admin + reset |
 | `/host/wordsearch` | Word search admin, leaderboard, per-player reset |
 | `/host/sudoku` | Sudoku admin, leaderboard, per-player reset |
 | `/host/maze` | Maze admin: easy, medium, and hard files, leaderboard, per-player reset |
+| `/host/wordsurvivor` | Word survivor admin: word list, topic hint, splash time, leaderboard, per-player reset |
 | `/host/system` | Connected players, combined scores, remove from the party |
 
 ## Architecture rules
 
 - **Platform session first.** `session:login` owns name uniqueness and single-connection displace. A stored player id can reclaim a session only after that socket has disconnected.
 - **Host passphrase.** `HOST_SECRET` is required at process start. Host pages send it with `host:unlock`; admin and system events are rejected until that socket unlocks. Local dev reads a gitignored `.env`. `npm run dev` clears an exported `HOST_SECRET` so that file is used, because dotenv leaves an already-set variable in place. Production passes `-e HOST_SECRET` when the container starts.
-- **Server owns time** for quizzer timers; crossword, word search, sudoku, and maze progress are server-authoritative. Those play clocks run from the first move until the puzzle is finished. The maze clock also pauses while instructions or a level splash is showing, and while the player is away from `/maze`. Quiz correctness and points stay hidden until the reveal phase.
-- **Shared logic in `@party/shared`.** Crossword answers are derived from the grid; word search placements are validated against the grid. Sudoku files carry a private solution and a starting grid. Maze files carry the open cells and the walls. Clients get a public puzzle without sudoku solutions. The maze is fully visible.
-- **One quiz room / one crossword / one word search / one sudoku / one maze campaign.** In-process singletons; no multi-room or DB.
-- Quiz reset clears quiz players (session kept). Crossword reset clears letters/completions for current players. Word search reset clears found words and play time. Sudoku reset clears the board, score, hints, and clock. Maze reset returns a player to the easy maze with 3 lives. Changing a maze file waits for reset all.
+- **Server owns time** for quizzer timers; crossword, word search, sudoku, maze, and word survivor progress are server-authoritative. Those play clocks run from the first move until the puzzle is finished. The maze clock also pauses while instructions or a level splash is showing, and while the player is away from `/maze`. The word survivor clock starts on the first letter and pauses during instructions, between words, and while the player is away from `/wordsurvivor`. Quiz correctness and points stay hidden until the reveal phase.
+- **Shared logic in `@party/shared`.** Crossword answers are derived from the grid; word search placements are validated against the grid. Sudoku files carry a private solution and a starting grid. Maze files carry the open cells and the walls. Word survivor answers stay on the server. Clients get a public puzzle without sudoku solutions. The maze is fully visible.
+- **One quiz room / one crossword / one word search / one sudoku / one maze campaign / one word survivor.** In-process singletons; no multi-room or DB.
+- Quiz reset clears quiz players (session kept). Crossword reset clears letters/completions for current players. Word search reset clears found words and play time. Sudoku reset clears the board, score, hints, and clock. Maze reset returns a player to the easy maze with 3 lives. Changing a maze file waits for reset all. Word survivor reset returns a player to the first 5-letter word of the selected list. The host submits a file and an optional topic; new runs and resets use that file, and a non-blank topic shows above the board.
 
 ## Crossword packs
 
@@ -96,6 +101,10 @@ JSON under `apps/server/maze/easy/` (12×12), `medium/` (15×15), and `hard/` (2
 node scripts/convert-maze.mjs maze_12x12.json easy 0,0 11,11 --out apps/server/maze/easy/maze-12x12.json --id maze-12x12 --title "Maze 12x12"
 ```
 
+## Word survivor
+
+Word survivor files under `apps/server/wordsurvivor/` list words under keys `"5"` through `"9"`. Each word is letters A–Z of that length, with no duplicates. A file needs at least 25 words, including at least 5 of each length from 5 through 9. The host topic is typed in admin and is blank unless they submit one. A run is 5 random words of each length, 5 letters first, then 6, and so on through 9. Any letters of the right length count as a guess. A correct word scores 100 plus 5 for each unused guess of the 5 allowed. The solved word stays green for 2 seconds, then the splash between words. The fifth miss ends the run. Clearing all 25 words wins.
+
 ## Socket events (high level)
 
 | Client → server | Purpose |
@@ -118,11 +127,16 @@ node scripts/convert-maze.mjs maze_12x12.json easy 0,0 11,11 --out apps/server/m
 | `maze:move` / `restart` | One orthogonal step, or spend a life to restart the current maze |
 | `maze:pauseTimer` / `resumeTimer` | Pause the campaign clock for instructions, splash, or leaving the page |
 | `maze:admin:subscribe` / `select` / `reset` / `resetPlayer` | Maze host (requires unlock). `select` sends `{ difficulty, puzzleId }` |
+| `wordsurvivor:subscribe` | Enter word survivor (requires session) |
+| `wordsurvivor:ackIntro` | Dismiss the opening instructions |
+| `wordsurvivor:letter` / `backspace` / `submit` | Type the current letter, erase the previous letter, or submit the word |
+| `wordsurvivor:pauseTimer` / `resumeTimer` | Pause the clock for instructions, the splash, or leaving the page |
+| `wordsurvivor:admin:subscribe` / `select` / `setSplash` / `reset` / `resetPlayer` | Word survivor host (requires unlock). `select` sends `{ fileId, topic }`. `setSplash` sends `{ seconds }` |
 | `system:admin:subscribe` / `kick` | System host: connected players and remove from the party (requires unlock) |
 
-Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `sudoku:state`, `sudoku:admin:state`, `maze:state`, `maze:admin:state`, `system:admin:state`.
+Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `sudoku:state`, `sudoku:admin:state`, `maze:state`, `maze:admin:state`, `wordsurvivor:state`, `wordsurvivor:admin:state`, `system:admin:state`.
 
-System removal emits `player:kicked` with reason `Removed from the system by admin`, clears that player's quiz, crossword, word search, sudoku, and maze progress, and sends them to login. Word search score is 100 points per word found plus a placement bonus of 1000 down to 100 for ranks 1–10 (most words, then shortest time). Sudoku awards 10 points for each correct digit and −10 for each distinct wrong note in a cell. Finishing adds 100 points plus 10 for each unused hint (maximum 3). Players see that score only. Sudoku admin ranking uses that score, then shorter time, and adds a placement bonus of 1000 down to 100 for ranks 1–10. The maze pays 200 for easy, 300 for medium, and 500 for hard, plus 50 for each heart still left when the run ends. Three lives are shared across the campaign. The maze board ranks by that score, then shorter time, with no placement bonus. The system leaderboard sums crossword, word search, sudoku, and maze scores (including crossword, word search, and sudoku placement bonuses) and shows the quiz score separately.
+System removal emits `player:kicked` with reason `Removed from the system by admin`, clears that player's quiz, crossword, word search, sudoku, maze, and word survivor progress, and sends them to login. Word search score is 100 points per word found plus a placement bonus of 1000 down to 100 for ranks 1–10 (most words, then shortest time). Sudoku awards 10 points for each correct digit and −10 for each distinct wrong note in a cell. Finishing adds 100 points plus 10 for each unused hint (maximum 3). Players see that score only. Sudoku admin ranking uses that score, then shorter time, and adds a placement bonus of 1000 down to 100 for ranks 1–10. The maze pays 200 for easy, 300 for medium, and 500 for hard, plus 50 for each heart still left when the run ends. Three lives are shared across the campaign. The maze board ranks by that score, then shorter time, with no placement bonus. Word survivor pays 100 for a correct word plus 5 for each unused guess. Its board ranks by that score, then shorter time. The system leaderboard sums crossword, word search, sudoku, maze, and word survivor scores (including crossword, word search, and sudoku placement bonuses) and shows the quiz score separately.
 
 ## Conventions
 

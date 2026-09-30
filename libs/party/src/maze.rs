@@ -299,8 +299,12 @@ pub fn validate_maze_file(puzzle: &MazeFile, difficulty: MazeDifficulty) -> Opti
     for row in 0..size {
         for col in 0..size {
             let cell = MazeCellRef { row, col };
-            for direction in [MazeDirection::N, MazeDirection::E, MazeDirection::S, MazeDirection::W]
-            {
+            for direction in [
+                MazeDirection::N,
+                MazeDirection::E,
+                MazeDirection::S,
+                MazeDirection::W,
+            ] {
                 let (dr, dc) = direction.delta();
                 let next = MazeCellRef {
                     row: row + dr,
@@ -369,7 +373,8 @@ pub fn passage_open(puzzle: &MazeFile, from: MazeCellRef, direction: MazeDirecti
     if !cell_open(puzzle, from) || !cell_open(puzzle, to) {
         return false;
     }
-    !walls_at(puzzle, from).blocked(direction) && !walls_at(puzzle, to).blocked(direction.opposite())
+    !walls_at(puzzle, from).blocked(direction)
+        && !walls_at(puzzle, to).blocked(direction.opposite())
 }
 
 fn target_reachable(puzzle: &MazeFile) -> bool {
@@ -379,7 +384,12 @@ fn target_reachable(puzzle: &MazeFile) -> bool {
         if cell == puzzle.target {
             return true;
         }
-        for direction in [MazeDirection::N, MazeDirection::E, MazeDirection::S, MazeDirection::W] {
+        for direction in [
+            MazeDirection::N,
+            MazeDirection::E,
+            MazeDirection::S,
+            MazeDirection::W,
+        ] {
             if !passage_open(puzzle, cell, direction) {
                 continue;
             }

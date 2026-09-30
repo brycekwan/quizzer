@@ -25,6 +25,8 @@ pub struct SocketMeta {
     pub sudoku_admin: bool,
     pub maze_player: bool,
     pub maze_admin: bool,
+    pub word_survivor_player: bool,
+    pub word_survivor_admin: bool,
     pub system_admin: bool,
     /// This socket presented the host passphrase.
     pub host: bool,

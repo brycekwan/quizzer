@@ -46,6 +46,9 @@ export function HostMenuPage() {
           <Link to="/host/maze">Maze</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="w-full">
+          <Link to="/host/wordsurvivor">Word Survivor</Link>
+        </Button>
+        <Button asChild size="lg" variant="outline" className="w-full">
           <Link to="/host/system">System</Link>
         </Button>
         <Button type="button" size="lg" variant="outline" className="w-full" onClick={() => setEditing(true)}>

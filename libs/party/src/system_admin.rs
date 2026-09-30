@@ -1,10 +1,11 @@
 use crate::crossword_engine::CrosswordEngine;
-use crate::quizzer::GameEngine;
 use crate::maze_engine::MazeEngine;
+use crate::quizzer::GameEngine;
 use crate::session::SessionRegistry;
 use crate::sudoku_engine::SudokuEngine;
 use crate::system::{build_system_leaderboard, SystemAdminSnapshot, SystemScoreInput};
 use crate::word_search_engine::WordSearchEngine;
+use crate::word_survivor_engine::WordSurvivorEngine;
 
 pub struct SystemAdmin {
     pub sessions: SessionRegistry,
@@ -13,6 +14,7 @@ pub struct SystemAdmin {
     pub word_search: WordSearchEngine,
     pub sudoku: SudokuEngine,
     pub maze: MazeEngine,
+    pub word_survivor: WordSurvivorEngine,
 }
 
 impl SystemAdmin {
@@ -23,6 +25,7 @@ impl SystemAdmin {
         word_search: WordSearchEngine,
         sudoku: SudokuEngine,
         maze: MazeEngine,
+        word_survivor: WordSurvivorEngine,
     ) -> Self {
         Self {
             sessions,
@@ -31,6 +34,7 @@ impl SystemAdmin {
             word_search,
             sudoku,
             maze,
+            word_survivor,
         }
     }
 
@@ -64,6 +68,13 @@ impl SystemAdmin {
             .into_iter()
             .map(|player| (player.player_id, player.score))
             .collect();
+        let word_survivor_scores: Vec<(String, i64)> = self
+            .word_survivor
+            .admin_snapshot()
+            .players
+            .into_iter()
+            .map(|player| (player.player_id, player.score))
+            .collect();
 
         let inputs = self
             .sessions
@@ -91,6 +102,10 @@ impl SystemAdmin {
                         .iter()
                         .find(|(id, _)| id == &session.id)
                         .map(|(_, score)| *score),
+                    word_survivor_score: word_survivor_scores
+                        .iter()
+                        .find(|(id, _)| id == &session.id)
+                        .map(|(_, score)| *score),
                     quiz_score: quiz_player.map(|player| player.score),
                 }
             })
@@ -105,10 +120,11 @@ impl SystemAdmin {
         self.word_search.remove_player(player_id);
         self.sudoku.remove_player(player_id);
         self.maze.remove_player(player_id);
+        self.word_survivor.remove_player(player_id);
         Ok(socket_id)
     }
 
-    /// Remove every login and wipe quiz, crossword, word search, sudoku, and maze progress.
+    /// Remove every login and wipe quiz, crossword, word search, sudoku, maze, and word survivor progress.
     pub fn reset_all(&mut self) -> Vec<String> {
         let mut socket_ids: Vec<String> = self
             .sessions
@@ -126,6 +142,7 @@ impl SystemAdmin {
         self.word_search.clear_players();
         self.sudoku.clear_players();
         self.maze.clear_players();
+        self.word_survivor.clear_players();
         socket_ids
     }
 }
@@ -141,6 +158,7 @@ mod tests {
     use crate::word_search::{
         WordSearchCellRef, WordSearchDirection, WordSearchFile, WordSearchPlacement, WordSearchWord,
     };
+    use crate::word_survivor::sample_word_lists;
 
     fn crossword() -> (CrosswordPuzzleFile, Vec<crate::crossword::CrosswordWord>) {
         let puzzle = CrosswordPuzzleFile {
@@ -230,6 +248,7 @@ mod tests {
                 step_maze(MazeDifficulty::Hard, "bottle", "Milk bottle"),
             )
             .unwrap(),
+            WordSurvivorEngine::new(sample_word_lists()),
         )
     }
 
@@ -310,6 +329,10 @@ mod tests {
         assert!(admin.word_search.player_snapshot(&ada.session.id).is_none());
         assert!(admin.sudoku.player_snapshot(&ada.session.id).is_none());
         assert!(admin.maze.player_snapshot(&ada.session.id).is_none());
+        assert!(admin
+            .word_survivor
+            .player_snapshot(&ada.session.id)
+            .is_none());
         assert_eq!(admin.snapshot().players[0].player_id, bea.session.id);
         assert_eq!(admin.word_search.admin_snapshot().players[0].name, "Bea");
     }
@@ -343,6 +366,7 @@ mod tests {
         assert!(admin.word_search.admin_snapshot().players.is_empty());
         assert!(admin.sudoku.admin_snapshot().players.is_empty());
         assert!(admin.maze.admin_snapshot().players.is_empty());
+        assert!(admin.word_survivor.admin_snapshot().players.is_empty());
         assert!(admin.snapshot().players.is_empty());
     }
 

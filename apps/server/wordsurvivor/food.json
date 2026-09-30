@@ -1,0 +1,72 @@
+{
+  "5": [
+    "BREAD",
+    "PASTA",
+    "APPLE",
+    "GRAPE",
+    "PEACH",
+    "MANGO",
+    "SUSHI",
+    "TACOS",
+    "PIZZA",
+    "STEAK",
+    "SALAD",
+    "BAGEL"
+  ],
+  "6": [
+    "WAFFLE",
+    "BUTTER",
+    "CHEESE",
+    "NUGGET",
+    "COOKIE",
+    "POTATO",
+    "CARROT",
+    "PEPPER",
+    "ORANGE",
+    "BANANA",
+    "YOGURT",
+    "DONUTS"
+  ],
+  "7": [
+    "NOODLES",
+    "BURGERS",
+    "BISCUIT",
+    "PANCAKE",
+    "SAUSAGE",
+    "CHICKEN",
+    "LOBSTER",
+    "SCALLOP",
+    "AVOCADO",
+    "BROWNIE",
+    "PUDDING",
+    "CUPCAKE"
+  ],
+  "8": [
+    "SANDWICH",
+    "MEATBALL",
+    "BARBECUE",
+    "MEATLOAF",
+    "BAGUETTE",
+    "APPLEPIE",
+    "MACARONI",
+    "PANCAKES",
+    "SAUSAGES",
+    "BISCUITS",
+    "CUPCAKES",
+    "BROWNIES"
+  ],
+  "9": [
+    "SPAGHETTI",
+    "CHOCOLATE",
+    "CROISSANT",
+    "HAMBURGER",
+    "SOURDOUGH",
+    "MEATBALLS",
+    "BLUEBERRY",
+    "RASPBERRY",
+    "PINEAPPLE",
+    "BARBECUED",
+    "CASSEROLE",
+    "DUMPLINGS"
+  ]
+}

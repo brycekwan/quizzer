@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use party::load::{
-    list_question_sets, load_crossword_puzzle, load_maze_puzzle, load_question_sets_in_order,
-    load_sudoku_puzzle, load_word_search_puzzle, maze_difficulty_dir, resolve_crossword_dir,
-    resolve_maze_dir, resolve_questions_dir, resolve_sudoku_dir, resolve_word_search_dir,
+    list_question_sets, list_word_survivor_files, load_crossword_puzzle, load_maze_puzzle,
+    load_question_sets_in_order, load_sudoku_puzzle, load_word_search_puzzle,
+    load_word_survivor_file, maze_difficulty_dir, resolve_crossword_dir, resolve_maze_dir,
+    resolve_questions_dir, resolve_sudoku_dir, resolve_word_search_dir, resolve_word_survivor_dir,
 };
 use party::maze::{MazeDifficulty, MazeDirection};
 use party::quizzer::SnapshotRole;
@@ -651,6 +652,137 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
     );
 
     socket.on(
+        "wordsurvivor:subscribe",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_word_survivor_subscribe(app, socket, ack);
+        },
+    );
+    socket.on(
+        "wordsurvivor:ackIntro",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_word_survivor_ack(app, socket, ack);
+        },
+    );
+    socket.on(
+        "wordsurvivor:letter",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            on_word_survivor_letter(app, socket, payload, ack);
+        },
+    );
+    socket.on(
+        "wordsurvivor:backspace",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_word_survivor_edit(app, socket, ack, false);
+        },
+    );
+    socket.on(
+        "wordsurvivor:submit",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_word_survivor_edit(app, socket, ack, true);
+        },
+    );
+    socket.on(
+        "wordsurvivor:pauseTimer",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_word_survivor_pause(app, socket, ack, true);
+        },
+    );
+    socket.on(
+        "wordsurvivor:resumeTimer",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            on_word_survivor_pause(app, socket, ack, false);
+        },
+    );
+    socket.on(
+        "wordsurvivor:admin:subscribe",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            flag_mut(&app, &socket, |meta| meta.word_survivor_admin = true);
+            {
+                let mut party = app.party.lock().expect("party");
+                party
+                    .word_survivor
+                    .set_catalog(list_word_survivor_files(&resolve_word_survivor_dir()));
+            }
+            let _ = ack.send(&json!({ "ok": true }));
+            emit_word_survivor_admin(&app, &socket);
+        },
+    );
+    socket.on(
+        "wordsurvivor:admin:select",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let result = select_word_survivor(&app, &payload);
+            let _ = ack.send(&result);
+            changed(&app);
+        },
+    );
+    socket.on(
+        "wordsurvivor:admin:setSplash",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let result = set_word_survivor_splash(&app, &payload);
+            let _ = ack.send(&result);
+            changed(&app);
+        },
+    );
+    socket.on(
+        "wordsurvivor:admin:reset",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let result = reset_word_survivor(&app, None);
+            let _ = ack.send(&result);
+            changed(&app);
+        },
+    );
+    socket.on(
+        "wordsurvivor:admin:resetPlayer",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let player_id = payload
+                .get("playerId")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            if player_id.is_empty() {
+                let _ = ack.send(&fail("Choose a player"));
+                return;
+            }
+            let player_id = player_id.to_string();
+            let result = reset_word_survivor(&app, Some(&player_id));
+            let _ = ack.send(&result);
+            changed(&app);
+        },
+    );
+
+    socket.on(
         "system:admin:subscribe",
         async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
             if !is_host(&app, &socket) {
@@ -693,6 +825,7 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
             let mut party = app.party.lock().expect("party");
             if let Some(player_id) = meta.player_id.clone() {
                 party.maze.pause_timer(&player_id);
+                party.word_survivor.pause_timer(&player_id);
             }
             if meta.in_quizzer || meta.player_id.is_some() {
                 party.quiz.mark_disconnected(&sid);
@@ -1395,6 +1528,202 @@ fn on_maze_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) 
     changed(&app);
 }
 
+fn on_word_survivor_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(player_id) = player_id_of(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    let name = {
+        let party = app.party.lock().expect("party");
+        party
+            .sessions
+            .get(&player_id)
+            .map(|session| session.name.clone())
+    };
+    let Some(name) = name else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    {
+        let mut party = app.party.lock().expect("party");
+        if !party.word_survivor.has_player(&player_id) {
+            refresh_word_survivor(&mut party);
+        }
+        party.word_survivor.ensure_player(&player_id, &name);
+    }
+    flag_mut(&app, &socket, |meta| meta.word_survivor_player = true);
+    let _ = ack.send(&json!({ "ok": true }));
+    emit_word_survivor_player(&app, &socket);
+    changed(&app);
+}
+
+fn word_survivor_player_id(app: &App, socket: &SocketRef) -> Option<String> {
+    let sid = sid_of(socket);
+    let meta = app
+        .meta
+        .lock()
+        .expect("meta")
+        .get(&sid)
+        .cloned()
+        .unwrap_or_default();
+    meta.player_id.filter(|_| meta.word_survivor_player)
+}
+
+fn on_word_survivor_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(player_id) = word_survivor_player_id(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    let result = {
+        let mut party = app.party.lock().expect("party");
+        match party.word_survivor.ack_intro(&player_id) {
+            Ok(()) => json!({ "ok": true }),
+            Err(error) => fail(error),
+        }
+    };
+    let _ = ack.send(&result);
+    changed(&app);
+}
+
+fn on_word_survivor_letter(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(player_id) = word_survivor_player_id(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    let letter = payload
+        .get("letter")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let result = {
+        let mut party = app.party.lock().expect("party");
+        match party.word_survivor.type_letter(&player_id, &letter) {
+            Ok(()) => json!({ "ok": true }),
+            Err(error) => fail(error),
+        }
+    };
+    let _ = ack.send(&result);
+    changed(&app);
+}
+
+fn on_word_survivor_edit(app: Arc<App>, socket: SocketRef, ack: AckSender, submit: bool) {
+    let Some(player_id) = word_survivor_player_id(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    let result = {
+        let mut party = app.party.lock().expect("party");
+        let outcome = if submit {
+            party.word_survivor.submit(&player_id)
+        } else {
+            party.word_survivor.backspace(&player_id)
+        };
+        match outcome {
+            Ok(()) => json!({ "ok": true }),
+            Err(error) => fail(error),
+        }
+    };
+    let _ = ack.send(&result);
+    changed(&app);
+}
+
+fn on_word_survivor_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
+    let Some(player_id) = word_survivor_player_id(&app, &socket) else {
+        let _ = ack.send(&fail("Log in first"));
+        return;
+    };
+    {
+        let mut party = app.party.lock().expect("party");
+        if pause {
+            party.word_survivor.pause_timer(&player_id);
+        } else {
+            party.word_survivor.resume_timer(&player_id);
+        }
+    }
+    let _ = ack.send(&json!({ "ok": true }));
+    changed(&app);
+}
+
+fn refresh_word_survivor(party: &mut party::system_admin::SystemAdmin) {
+    let dir = resolve_word_survivor_dir();
+    party
+        .word_survivor
+        .set_catalog(list_word_survivor_files(&dir));
+    let id = party.word_survivor.file_id().to_string();
+    match load_word_survivor_file(&id, &dir) {
+        Ok(lists) => party.word_survivor.replace_lists(lists),
+        Err(error) => party.word_survivor.note_load_error(error),
+    }
+}
+
+fn select_word_survivor(app: &App, payload: &Value) -> Value {
+    let file_id = payload
+        .get("fileId")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if file_id.is_empty() {
+        return fail("Select a word list");
+    }
+    let topic = payload
+        .get("topic")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let dir = resolve_word_survivor_dir();
+    let lists = match load_word_survivor_file(file_id, &dir) {
+        Ok(lists) => lists,
+        Err(error) => return fail(error),
+    };
+    let mut party = app.party.lock().expect("party");
+    if let Err(error) = party
+        .word_survivor
+        .apply_selection(file_id.to_string(), lists, &topic)
+    {
+        return fail(error);
+    }
+    party
+        .word_survivor
+        .set_catalog(list_word_survivor_files(&dir));
+    let label = party
+        .word_survivor
+        .admin_snapshot()
+        .files
+        .into_iter()
+        .find(|file| file.id == file_id)
+        .map(|file| file.label)
+        .unwrap_or_else(|| file_id.to_string());
+    json!({ "ok": true, "message": format!("{label} accepted") })
+}
+
+fn set_word_survivor_splash(app: &App, payload: &Value) -> Value {
+    let Some(seconds) = payload.get("seconds").and_then(value_i64) else {
+        return fail("Choose a splash time");
+    };
+    let mut party = app.party.lock().expect("party");
+    match party
+        .word_survivor
+        .set_splash_ms(seconds.saturating_mul(1000))
+    {
+        Ok(()) => json!({ "ok": true }),
+        Err(error) => fail(error),
+    }
+}
+
+fn reset_word_survivor(app: &App, only_player: Option<&str>) -> Value {
+    let mut party = app.party.lock().expect("party");
+    refresh_word_survivor(&mut party);
+    if only_player.is_none() {
+        party.word_survivor.reset();
+    } else if let Some(player_id) = only_player {
+        if let Err(error) = party.word_survivor.reset_player(player_id) {
+            return fail(error);
+        }
+    }
+    json!({ "ok": true })
+}
+
 fn select_maze(app: &App, payload: &Value) -> Value {
     let Some(difficulty) = payload
         .get("difficulty")
@@ -1412,7 +1741,11 @@ fn select_maze(app: &App, payload: &Value) -> Value {
 fn reset_maze(app: &App, only_player: Option<&str>) -> Value {
     let mut party = app.party.lock().expect("party");
     if only_player.is_none() {
-        for difficulty in [MazeDifficulty::Easy, MazeDifficulty::Medium, MazeDifficulty::Hard] {
+        for difficulty in [
+            MazeDifficulty::Easy,
+            MazeDifficulty::Medium,
+            MazeDifficulty::Hard,
+        ] {
             let pending = party.maze.pending_id(difficulty).to_string();
             let active = party.maze.active_id(difficulty).to_string();
             if pending == active {
@@ -1556,6 +1889,7 @@ fn clear_player_flags(app: &App, socket: &SocketRef) {
         meta.wordsearch_player = false;
         meta.sudoku_player = false;
         meta.maze_player = false;
+        meta.word_survivor_player = false;
     }
 }
 
@@ -1601,6 +1935,12 @@ pub fn broadcast(app: &App) {
         }
         if meta.maze_admin {
             emit_maze_admin(&app, &socket);
+        }
+        if meta.word_survivor_player {
+            emit_word_survivor_player(&app, &socket);
+        }
+        if meta.word_survivor_admin {
+            emit_word_survivor_admin(&app, &socket);
         }
         if meta.system_admin {
             emit_system(&app, &socket);
@@ -1705,6 +2045,25 @@ fn emit_maze_admin(app: &App, socket: &SocketRef) {
     let snapshot = party.maze.admin_snapshot();
     drop(party);
     let _ = socket.emit("maze:admin:state", &snapshot);
+}
+
+fn emit_word_survivor_player(app: &App, socket: &SocketRef) {
+    let Some(player_id) = player_id_of(app, socket) else {
+        return;
+    };
+    let party = app.party.lock().expect("party");
+    let Some(snapshot) = party.word_survivor.player_snapshot(&player_id) else {
+        return;
+    };
+    drop(party);
+    let _ = socket.emit("wordsurvivor:state", &snapshot);
+}
+
+fn emit_word_survivor_admin(app: &App, socket: &SocketRef) {
+    let party = app.party.lock().expect("party");
+    let snapshot = party.word_survivor.admin_snapshot();
+    drop(party);
+    let _ = socket.emit("wordsurvivor:admin:state", &snapshot);
 }
 
 fn emit_system(app: &App, socket: &SocketRef) {

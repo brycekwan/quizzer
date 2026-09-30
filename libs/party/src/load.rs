@@ -1,8 +1,8 @@
-use crate::maze::{validate_maze_file, MazeDifficulty, MazeFile, MazePuzzleInfo};
 use crate::crossword::{
     derive_crossword_words, validate_crossword_file, CrosswordPuzzleFile, CrosswordPuzzleInfo,
     CrosswordWord,
 };
+use crate::maze::{validate_maze_file, MazeDifficulty, MazeFile, MazePuzzleInfo};
 use crate::sudoku::{validate_sudoku_file, SudokuFile, SudokuPuzzleInfo};
 use crate::types::{Question, QuestionSetInfo, QuestionsFile};
 use crate::validation::validate_questions_file;
@@ -10,6 +10,7 @@ use crate::word_search::{
     derive_word_search_words, validate_word_search_file, WordSearchFile, WordSearchPuzzleInfo,
     WordSearchWord,
 };
+use crate::word_survivor::{WordLists, WordSurvivorFile, WordSurvivorFileInfo};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -82,6 +83,60 @@ pub fn maze_difficulty_dir(root: &Path, difficulty: MazeDifficulty) -> PathBuf {
         MazeDifficulty::Hard => "hard",
     };
     root.join(folder)
+}
+
+pub fn resolve_word_survivor_dir() -> PathBuf {
+    if let Ok(dir) = env::var("WORDSURVIVOR_DIR") {
+        return PathBuf::from(dir);
+    }
+    first_existing(&[
+        PathBuf::from("apps/server/wordsurvivor"),
+        PathBuf::from("wordsurvivor"),
+        manifest_relative(&["apps", "server", "wordsurvivor"]),
+    ])
+}
+
+pub fn list_word_survivor_files(dir: &Path) -> Vec<WordSurvivorFileInfo> {
+    json_files(dir)
+        .into_iter()
+        .map(|file| {
+            let id = file.trim_end_matches(".json").to_string();
+            WordSurvivorFileInfo {
+                label: label_from_question_set_id(&id),
+                id,
+            }
+        })
+        .collect()
+}
+
+pub fn load_word_survivor_file(id: &str, dir: &Path) -> Result<WordLists, String> {
+    if !valid_pack_id(id) {
+        return Err("Invalid word list".into());
+    }
+    let path = dir.join(format!("{id}.json"));
+    if !path.is_file() {
+        return Err(format!("Word list \"{id}\" not found"));
+    }
+    let raw =
+        fs::read_to_string(&path).map_err(|_| format!("Could not read word list \"{id}\""))?;
+    let file: WordSurvivorFile =
+        serde_json::from_str(&raw).map_err(|_| format!("Could not read word list \"{id}\""))?;
+    WordLists::from_file(file)
+}
+
+pub fn load_default_word_survivor(
+    dir: &Path,
+) -> Result<(WordLists, String, Vec<WordSurvivorFileInfo>), String> {
+    let files = list_word_survivor_files(dir);
+    if files.is_empty() {
+        return Err(format!("No word survivor lists found in {}", dir.display()));
+    }
+    let preferred = files
+        .iter()
+        .find(|file| file.id == "words")
+        .unwrap_or(&files[0]);
+    let lists = load_word_survivor_file(&preferred.id, dir)?;
+    Ok((lists, preferred.id.clone(), files))
 }
 
 pub fn resolve_word_search_dir() -> PathBuf {
@@ -489,5 +544,19 @@ mod tests {
         assert_eq!(words.len(), 10);
         let listed = list_word_search_puzzles(&dir);
         assert!(listed.iter().any(|puzzle| puzzle.label == "canada.json"));
+    }
+
+    #[test]
+    fn loads_word_survivor_lists() {
+        let dir = resolve_word_survivor_dir();
+        let (lists, file_id, files) = load_default_word_survivor(&dir).unwrap();
+        assert_eq!(file_id, "words");
+        assert!(lists.counts().iter().all(|count| count.count >= 5));
+        for id in ["words", "babies", "canada", "food"] {
+            assert!(files.iter().any(|file| file.id == id), "{id} missing");
+            let loaded = load_word_survivor_file(id, &dir).unwrap();
+            assert!(loaded.counts().iter().all(|count| count.count >= 5));
+        }
+        assert!(load_word_survivor_file("missing", &dir).is_err());
     }
 }

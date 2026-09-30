@@ -10,4 +10,5 @@ export * from './sudoku';
 export * from './sudokuLogic';
 export * from './maze';
 export * from './mazeLogic';
+export * from './wordSurvivor';
 export * from './system';

@@ -11,6 +11,7 @@ pub struct SystemPlayerEntry {
     pub word_search_score: Option<i64>,
     pub sudoku_score: Option<i64>,
     pub maze_score: Option<i64>,
+    pub word_survivor_score: Option<i64>,
     pub quiz_score: Option<i64>,
 }
 
@@ -29,6 +30,7 @@ pub struct SystemScoreInput {
     pub word_search_score: Option<i64>,
     pub sudoku_score: Option<i64>,
     pub maze_score: Option<i64>,
+    pub word_survivor_score: Option<i64>,
     pub quiz_score: Option<i64>,
 }
 
@@ -37,6 +39,7 @@ fn accumulated_of(player: &SystemScoreInput) -> i64 {
         + player.word_search_score.unwrap_or(0)
         + player.sudoku_score.unwrap_or(0)
         + player.maze_score.unwrap_or(0)
+        + player.word_survivor_score.unwrap_or(0)
 }
 
 pub fn build_system_leaderboard(players: &[SystemScoreInput]) -> SystemAdminSnapshot {
@@ -61,6 +64,7 @@ pub fn build_system_leaderboard(players: &[SystemScoreInput]) -> SystemAdminSnap
                 word_search_score: player.word_search_score,
                 sudoku_score: player.sudoku_score,
                 maze_score: player.maze_score,
+                word_survivor_score: player.word_survivor_score,
                 quiz_score: player.quiz_score,
             })
             .collect(),
@@ -80,6 +84,7 @@ mod tests {
             word_search_score: None,
             sudoku_score: None,
             maze_score: None,
+            word_survivor_score: None,
             quiz_score: None,
         }
     }

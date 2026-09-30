@@ -2,10 +2,10 @@ use indexmap::IndexMap;
 
 use crate::clock::Clock;
 use crate::maze::{
-    cell_open, in_bounds, maze_campaign_score, to_public_maze, validate_maze_file,
-    walls_at, MazeAdminEntry, MazeAdminSnapshot, MazeCellRef, MazeDifficulty, MazeDirection,
-    MazeFile, MazeLevelChoice, MazePhase, MazePlayerSnapshot, MazePuzzleInfo, MazePublicPuzzle,
-    MAZE_LIVES, MAZE_SPLASH_MS,
+    cell_open, in_bounds, maze_campaign_score, to_public_maze, validate_maze_file, walls_at,
+    MazeAdminEntry, MazeAdminSnapshot, MazeCellRef, MazeDifficulty, MazeDirection, MazeFile,
+    MazeLevelChoice, MazePhase, MazePlayerSnapshot, MazePublicPuzzle, MazePuzzleInfo, MAZE_LIVES,
+    MAZE_SPLASH_MS,
 };
 
 struct LevelSlot {
@@ -146,11 +146,7 @@ impl MazeEngine {
         Ok(())
     }
 
-    pub fn move_player(
-        &mut self,
-        player_id: &str,
-        direction: MazeDirection,
-    ) -> Result<(), String> {
+    pub fn move_player(&mut self, player_id: &str, direction: MazeDirection) -> Result<(), String> {
         let now = self.now();
         self.sync_player(player_id, now);
         let puzzle = self.current_puzzle(player_id)?.clone();
@@ -442,7 +438,9 @@ impl MazeEngine {
     }
 
     fn sort_elapsed(player: &MazeAdminEntry, now: i64) -> i64 {
-        if player.phase == MazePhase::Intro && player.active_since.is_none() && player.elapsed_ms == 0
+        if player.phase == MazePhase::Intro
+            && player.active_since.is_none()
+            && player.elapsed_ms == 0
         {
             return i64::MAX;
         }

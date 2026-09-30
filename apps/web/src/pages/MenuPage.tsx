@@ -58,6 +58,9 @@ export function MenuPage() {
         <Button asChild size="lg" variant="outline" className="w-full">
           <Link to="/maze">Maze</Link>
         </Button>
+        <Button asChild size="lg" variant="outline" className="w-full">
+          <Link to="/wordsurvivor">Word Survivor</Link>
+        </Button>
       </div>
     </PageShell>
   );

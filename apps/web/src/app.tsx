@@ -15,6 +15,8 @@ import { SudokuPage } from './pages/SudokuPage';
 import { SudokuAdminPage } from './pages/SudokuAdminPage';
 import { MazePage } from './pages/MazePage';
 import { MazeAdminPage } from './pages/MazeAdminPage';
+import { WordSurvivorPage } from './pages/WordSurvivorPage';
+import { WordSurvivorAdminPage } from './pages/WordSurvivorAdminPage';
 import { SystemAdminPage } from './pages/SystemAdminPage';
 
 function RequirePlayer({ children }: { children: ReactNode }) {
@@ -79,12 +81,21 @@ export function App() {
           </RequirePlayer>
         }
       />
+      <Route
+        path="/wordsurvivor"
+        element={
+          <RequirePlayer>
+            <WordSurvivorPage />
+          </RequirePlayer>
+        }
+      />
       <Route path="/host" element={<HostMenuPage />} />
       <Route path="/host/quizzer" element={<AdminPage />} />
       <Route path="/host/crossword" element={<CrosswordAdminPage />} />
       <Route path="/host/wordsearch" element={<WordSearchAdminPage />} />
       <Route path="/host/sudoku" element={<SudokuAdminPage />} />
       <Route path="/host/maze" element={<MazeAdminPage />} />
+      <Route path="/host/wordsurvivor" element={<WordSurvivorAdminPage />} />
       <Route path="/host/system" element={<SystemAdminPage />} />
       <Route path="/host/admin" element={<Navigate to="/host/quizzer" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

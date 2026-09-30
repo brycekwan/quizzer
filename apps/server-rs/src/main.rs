@@ -12,8 +12,8 @@ use std::time::Duration;
 use party::crossword_engine::CrosswordEngine;
 use party::load::{
     load_default_crossword, load_default_maze, load_default_question_set, load_default_sudoku,
-    load_default_word_search, resolve_crossword_dir, resolve_maze_dir, resolve_questions_dir,
-    resolve_sudoku_dir, resolve_word_search_dir,
+    load_default_word_search, load_default_word_survivor, resolve_crossword_dir, resolve_maze_dir,
+    resolve_questions_dir, resolve_sudoku_dir, resolve_word_search_dir, resolve_word_survivor_dir,
 };
 use party::maze::MazeDifficulty;
 use party::maze_engine::MazeEngine;
@@ -23,6 +23,7 @@ use party::sudoku_engine::SudokuEngine;
 use party::system_admin::SystemAdmin;
 use party::types::QuestionSetMode;
 use party::word_search_engine::WordSearchEngine;
+use party::word_survivor_engine::WordSurvivorEngine;
 use socketioxide::SocketIo;
 use tokio::net::TcpListener;
 use tracing::info;
@@ -160,6 +161,10 @@ fn load_party() -> Result<SystemAdmin, Box<dyn std::error::Error>> {
         party::Clock::system(),
     )?;
 
+    let (lists, file_id, catalog) = load_default_word_survivor(&resolve_word_survivor_dir())?;
+    let mut word_survivor = WordSurvivorEngine::new(lists);
+    word_survivor.use_file(file_id, catalog);
+
     Ok(SystemAdmin::new(
         SessionRegistry::new(),
         quiz,
@@ -167,6 +172,7 @@ fn load_party() -> Result<SystemAdmin, Box<dyn std::error::Error>> {
         word_search,
         sudoku,
         maze,
+        word_survivor,
     ))
 }
 

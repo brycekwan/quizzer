@@ -8,7 +8,7 @@ export interface SystemPlayerEntry {
   rank: number;
   playerId: string;
   name: string;
-  /** Crossword, word search, sudoku, and maze scores. Quiz points are excluded. */
+  /** Crossword, word search, sudoku, maze, and word survivor scores. Quiz points are excluded. */
   accumulatedScore: number;
   /** Null when the player has not entered the crossword. */
   crosswordScore: number | null;
@@ -18,6 +18,8 @@ export interface SystemPlayerEntry {
   sudokuScore: number | null;
   /** Null when the player has not entered the maze. */
   mazeScore: number | null;
+  /** Null when the player has not entered word survivor. */
+  wordSurvivorScore: number | null;
   /** Null when the player has not joined the quiz. */
   quizScore: number | null;
 }
@@ -34,6 +36,7 @@ export interface SystemScoreInput {
   wordSearchScore: number | null;
   sudokuScore: number | null;
   mazeScore: number | null;
+  wordSurvivorScore: number | null;
   quizScore: number | null;
 }
 
@@ -42,11 +45,12 @@ function accumulatedOf(player: SystemScoreInput): number {
     (player.crosswordScore ?? 0) +
     (player.wordSearchScore ?? 0) +
     (player.sudokuScore ?? 0) +
-    (player.mazeScore ?? 0)
+    (player.mazeScore ?? 0) +
+    (player.wordSurvivorScore ?? 0)
   );
 }
 
-/** Connected players, ranked by crossword, word search, sudoku, and maze scores. */
+/** Connected players, ranked by crossword, word search, sudoku, maze, and word survivor scores. */
 export function buildSystemLeaderboard(
   players: SystemScoreInput[]
 ): SystemAdminSnapshot {
@@ -70,6 +74,7 @@ export function buildSystemLeaderboard(
       wordSearchScore: player.wordSearchScore,
       sudokuScore: player.sudokuScore,
       mazeScore: player.mazeScore,
+      wordSurvivorScore: player.wordSurvivorScore,
       quizScore: player.quizScore,
     })),
   };

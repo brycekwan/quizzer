@@ -5,6 +5,7 @@ const PLAYER_PATHS = new Set([
   '/wordsearch',
   '/sudoku',
   '/maze',
+  '/wordsurvivor',
 ]);
 
 /** Where a successful login should continue. Direct visits to login go to the lobby. */

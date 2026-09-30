@@ -16,6 +16,8 @@ pub mod types;
 pub mod validation;
 pub mod word_search;
 pub mod word_search_engine;
+pub mod word_survivor;
+pub mod word_survivor_engine;
 
 pub use clock::Clock;
 pub use types::*;

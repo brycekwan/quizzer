@@ -28,6 +28,7 @@ COPY apps/server/crossword/puzzles /app/crossword/puzzles
 COPY apps/server/wordsearch/puzzles /app/wordsearch/puzzles
 COPY apps/server/sudoku/puzzles /app/sudoku/puzzles
 COPY apps/server/maze /app/maze
+COPY apps/server/wordsurvivor /app/wordsurvivor
 ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV STATIC_DIR=/app/public
@@ -36,5 +37,6 @@ ENV CROSSWORD_PUZZLES_DIR=/app/crossword/puzzles
 ENV WORDSEARCH_PUZZLES_DIR=/app/wordsearch/puzzles
 ENV SUDOKU_PUZZLES_DIR=/app/sudoku/puzzles
 ENV MAZE_DIR=/app/maze
+ENV WORDSURVIVOR_DIR=/app/wordsurvivor
 EXPOSE 8080
 ENTRYPOINT ["/app/party-server"]

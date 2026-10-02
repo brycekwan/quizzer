@@ -1,3 +1,10 @@
+# [2.8.0](https://github.com/brycekwan/quizzer/compare/v2.7.0...v2.8.0) (2026-10-02)
+
+
+### Features
+
+* add baby crossword ([525f45e](https://github.com/brycekwan/quizzer/commit/525f45ee3efb721b6ca85270ac70da6e75517bdf))
+
 # [2.7.0](https://github.com/brycekwan/quizzer/compare/v2.6.0...v2.7.0) (2026-10-02)
 
 

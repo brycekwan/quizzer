@@ -1,3 +1,11 @@
+# [2.7.0](https://github.com/brycekwan/quizzer/compare/v2.6.0...v2.7.0) (2026-10-02)
+
+
+### Features
+
+* add party leaderboard and refine maze and sudoku UX ([8ae03b6](https://github.com/brycekwan/quizzer/commit/8ae03b6de158322ab0ef6c8f9e4370b6db8c6fd2))
+* standardize the header ([7e57574](https://github.com/brycekwan/quizzer/commit/7e575741d9667592fb9a53875d456378afaedf81))
+
 # [2.6.0](https://github.com/brycekwan/quizzer/compare/v2.5.0...v2.6.0) (2026-09-30)
 
 

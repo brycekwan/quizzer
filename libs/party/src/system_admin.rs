@@ -1,9 +1,15 @@
 use crate::crossword_engine::CrosswordEngine;
+use crate::leaderboard::{
+    clock_has_started, display_clock, live_clock_ms, rank_game_rows, rank_overall, LeaderboardRow,
+    OverallCandidate, PartyLeaderboardSnapshot, PlayClock,
+};
 use crate::maze_engine::MazeEngine;
 use crate::quizzer::GameEngine;
 use crate::session::SessionRegistry;
 use crate::sudoku_engine::SudokuEngine;
-use crate::system::{build_system_leaderboard, SystemAdminSnapshot, SystemScoreInput};
+use crate::system::{
+    build_system_leaderboard, PartyTheme, SystemAdminSnapshot, SystemScoreInput,
+};
 use crate::word_search_engine::WordSearchEngine;
 use crate::word_survivor_engine::WordSurvivorEngine;
 
@@ -15,6 +21,7 @@ pub struct SystemAdmin {
     pub sudoku: SudokuEngine,
     pub maze: MazeEngine,
     pub word_survivor: WordSurvivorEngine,
+    pub theme: PartyTheme,
 }
 
 impl SystemAdmin {
@@ -35,7 +42,14 @@ impl SystemAdmin {
             sudoku,
             maze,
             word_survivor,
+            theme: PartyTheme::Standard,
         }
+    }
+
+    pub fn set_theme(&mut self, theme: &str) -> Result<PartyTheme, String> {
+        let theme = PartyTheme::parse(theme)?;
+        self.theme = theme;
+        Ok(theme)
     }
 
     pub fn snapshot(&self) -> SystemAdminSnapshot {
@@ -110,7 +124,188 @@ impl SystemAdmin {
                 }
             })
             .collect::<Vec<_>>();
-        build_system_leaderboard(&inputs)
+        let mut snapshot = build_system_leaderboard(&inputs);
+        snapshot.theme = self.theme;
+        snapshot
+    }
+
+    pub fn leaderboard(&self) -> PartyLeaderboardSnapshot {
+        let crossword = self.crossword.admin_snapshot();
+        let crossword_now = self.crossword.clock().now();
+        let word_search = self.word_search.admin_snapshot();
+        let word_search_now = self.word_search.clock().now();
+        let sudoku = self.sudoku.admin_snapshot();
+        let sudoku_now = self.sudoku.clock().now();
+        let maze = self.maze.admin_snapshot();
+        let maze_now = self.maze.clock().now();
+        let word_survivor = self.word_survivor.admin_snapshot();
+        let word_survivor_now = self.word_survivor.clock().now();
+
+        let crossword_rows = rank_game_rows(
+            crossword
+                .players
+                .iter()
+                .map(|player| {
+                    (
+                        player.player_id.clone(),
+                        player.name.clone(),
+                        player.score,
+                        display_clock(
+                            player.elapsed_ms,
+                            player.active_since,
+                            player.completed_at,
+                            crossword_now,
+                            false,
+                        ),
+                    )
+                })
+                .collect(),
+        );
+        let word_search_rows = rank_game_rows(
+            word_search
+                .players
+                .iter()
+                .map(|player| {
+                    (
+                        player.player_id.clone(),
+                        player.name.clone(),
+                        player.score,
+                        display_clock(
+                            player.elapsed_ms,
+                            player.active_since,
+                            player.completed_at,
+                            word_search_now,
+                            false,
+                        ),
+                    )
+                })
+                .collect(),
+        );
+        let sudoku_rows = rank_game_rows(
+            sudoku
+                .players
+                .iter()
+                .map(|player| {
+                    (
+                        player.player_id.clone(),
+                        player.name.clone(),
+                        player.score,
+                        display_clock(
+                            player.elapsed_ms,
+                            player.active_since,
+                            player.completed_at,
+                            sudoku_now,
+                            false,
+                        ),
+                    )
+                })
+                .collect(),
+        );
+        let maze_rows = rank_game_rows(
+            maze.players
+                .iter()
+                .map(|player| {
+                    (
+                        player.player_id.clone(),
+                        player.name.clone(),
+                        player.score,
+                        display_clock(
+                            player.elapsed_ms,
+                            player.active_since,
+                            player.completed_at,
+                            maze_now,
+                            true,
+                        ),
+                    )
+                })
+                .collect(),
+        );
+        let word_survivor_rows = rank_game_rows(
+            word_survivor
+                .players
+                .iter()
+                .map(|player| {
+                    (
+                        player.player_id.clone(),
+                        player.name.clone(),
+                        player.score,
+                        display_clock(
+                            player.elapsed_ms,
+                            player.active_since,
+                            player.completed_at,
+                            word_survivor_now,
+                            true,
+                        ),
+                    )
+                })
+                .collect(),
+        );
+        let quiz_rows = self
+            .quiz
+            .leaderboard()
+            .into_iter()
+            .map(|entry| LeaderboardRow {
+                rank: entry.rank,
+                player_id: entry.id,
+                name: entry.name,
+                score: entry.score,
+                quiz_score: None,
+                clocks: vec![],
+            })
+            .collect();
+
+        let mut candidates = Vec::new();
+        for session in self.sessions.list() {
+            if !session.connected {
+                continue;
+            }
+            let mut score = 0i64;
+            let mut clocks: Vec<PlayClock> = Vec::new();
+            let mut play_ms = 0i64;
+            let mut started = false;
+            for (rows, now) in [
+                (&crossword_rows, crossword_now),
+                (&word_search_rows, word_search_now),
+                (&sudoku_rows, sudoku_now),
+                (&maze_rows, maze_now),
+                (&word_survivor_rows, word_survivor_now),
+            ] {
+                let Some(row) = rows.iter().find(|row| row.player_id == session.id) else {
+                    continue;
+                };
+                score = score.saturating_add(row.score);
+                for clock in &row.clocks {
+                    if !clock_has_started(clock.elapsed_ms, clock.active_since, None) {
+                        continue;
+                    }
+                    started = true;
+                    play_ms = play_ms.saturating_add(live_clock_ms(clock, now));
+                    clocks.push(clock.clone());
+                }
+            }
+            let quiz_score = self
+                .quiz
+                .get_player(&session.id)
+                .map(|player| player.score);
+            candidates.push(OverallCandidate {
+                player_id: session.id,
+                name: session.name,
+                score,
+                quiz_score,
+                clocks,
+                play_ms: if started { play_ms } else { i64::MAX },
+            });
+        }
+
+        PartyLeaderboardSnapshot {
+            overall: rank_overall(candidates),
+            crossword: crossword_rows,
+            word_search: word_search_rows,
+            sudoku: sudoku_rows,
+            maze: maze_rows,
+            word_survivor: word_survivor_rows,
+            quiz: quiz_rows,
+        }
     }
 
     pub fn remove_player(&mut self, player_id: &str) -> Result<Option<String>, String> {
@@ -290,13 +485,22 @@ mod tests {
             .map(|player| player.name.as_str())
             .collect();
         assert_eq!(names, ["Ada", "Bea"]);
-        assert_eq!(board.players[0].accumulated_score, 1200);
-        assert_eq!(board.players[0].crossword_score, Some(1200));
+        assert_eq!(board.players[0].accumulated_score, 200);
+        assert_eq!(board.players[0].crossword_score, Some(200));
         assert!(board.players[0].word_search_score.is_none());
         assert!(board.players[0].quiz_score.unwrap_or(0) > 0);
-        assert_eq!(board.players[1].accumulated_score, 1100);
-        assert_eq!(board.players[1].word_search_score, Some(1100));
+        assert_eq!(board.players[1].accumulated_score, 100);
+        assert_eq!(board.players[1].word_search_score, Some(100));
         assert!(board.players[1].quiz_score.is_none());
+        let party = admin.leaderboard();
+        assert_eq!(party.overall[0].name, "Ada");
+        assert_eq!(party.overall[0].score, 200);
+        assert!(party.overall[0].quiz_score.unwrap_or(0) > 0);
+        assert_eq!(party.overall[1].score, 100);
+        assert_eq!(party.crossword[0].score, 200);
+        assert_eq!(party.word_search[0].score, 100);
+        assert!(party.quiz.iter().any(|row| row.score > 0));
+        assert!(party.quiz[0].clocks.is_empty());
     }
 
     #[test]
@@ -368,6 +572,16 @@ mod tests {
         assert!(admin.maze.admin_snapshot().players.is_empty());
         assert!(admin.word_survivor.admin_snapshot().players.is_empty());
         assert!(admin.snapshot().players.is_empty());
+    }
+
+    #[test]
+    fn remembers_the_selected_theme() {
+        let mut admin = admin();
+        assert_eq!(admin.snapshot().theme, PartyTheme::Standard);
+        admin.set_theme("baby").unwrap();
+        assert_eq!(admin.snapshot().theme, PartyTheme::Baby);
+        assert!(admin.set_theme("neon").is_err());
+        assert_eq!(admin.theme, PartyTheme::Baby);
     }
 
     #[test]

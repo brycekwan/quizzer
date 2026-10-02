@@ -29,11 +29,14 @@ export interface SudokuPublicPuzzle {
 
 export interface SudokuCellState {
   given: boolean;
-  /** Large digit for a given, a correct entry, or a hint. */
+  /** Large digit for a given, a correct entry, a hint, or the current wrong guess. */
   value: number | null;
   solved: boolean;
   hinted: boolean;
+  /** The large digit is a wrong guess. Erase clears it. */
+  wrong: boolean;
   drafts: number[];
+  /** Digits already entered wrong in this cell. They stay blocked after erase. */
   wrongDrafts: number[];
 }
 
@@ -59,7 +62,7 @@ export interface SudokuPuzzleInfo {
 export interface SudokuAdminEntry {
   playerId: string;
   name: string;
-  /** Player score plus the placement bonus for the current order. */
+  /** Player score for the current order. */
   score: number;
   elapsedMs: number;
   activeSince: number | null;
@@ -102,6 +105,6 @@ export function sudokuRankBonus(rank: number): number {
   return SUDOKU_RANK_BONUS_FIRST - (rank - 1) * SUDOKU_RANK_BONUS_STEP;
 }
 
-export function sudokuAdminScore(playerScore: number, rank: number): number {
-  return playerScore + sudokuRankBonus(rank);
+export function sudokuAdminScore(playerScore: number, _rank: number): number {
+  return playerScore;
 }

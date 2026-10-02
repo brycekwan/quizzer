@@ -28,6 +28,7 @@ pub struct SocketMeta {
     pub word_survivor_player: bool,
     pub word_survivor_admin: bool,
     pub system_admin: bool,
+    pub leaderboard: bool,
     /// This socket presented the host passphrase.
     pub host: bool,
 }

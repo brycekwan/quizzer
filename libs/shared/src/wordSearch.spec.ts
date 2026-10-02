@@ -19,10 +19,10 @@ describe('word search scoring', () => {
     expect(wordSearchRankBonus(0)).toBe(0);
   });
 
-  it('combines word points and rank bonus', () => {
-    expect(wordSearchScore(10, 1)).toBe(2000);
-    expect(wordSearchScore(10, 10)).toBe(1100);
+  it('scores the words a player has found', () => {
+    expect(wordSearchScore(10, 1)).toBe(1000);
+    expect(wordSearchScore(10, 10)).toBe(1000);
     expect(wordSearchScore(10, 11)).toBe(1000);
-    expect(wordSearchScore(2, 3)).toBe(200 + 800);
+    expect(wordSearchScore(2, 3)).toBe(200);
   });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import type { WordSearchCellRef } from '@party/shared';
+import { wordSearchWordPoints, type WordSearchCellRef } from '@party/shared';
+import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
 import { WordSearchGrid } from '@/components/wordsearch/WordSearchGrid';
 import { Button } from '@/components/ui/button';
 import {
@@ -195,40 +196,23 @@ export function WordSearchPage() {
   return (
     <div className="min-h-[100dvh] bg-playfield text-ink">
       <div className="mx-auto flex w-full max-w-xl flex-col md:max-w-5xl md:px-4 md:py-3">
-        <header className="flex items-start justify-between gap-3 px-3 pb-2 pt-3 md:px-0">
-          <div className="min-w-0">
-            <p className="text-sm font-extrabold uppercase tracking-widest text-grape">
-              Word search
-            </p>
-            <h1 className="font-display text-2xl font-bold">
-              {playerState.puzzle.title}
-            </h1>
-            <p className="text-sm font-semibold text-ink/60">
-              {playerName} · {playerState.found.length}/{playerState.totalWords}{' '}
-              words
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <p
-              className="font-display text-3xl font-bold tabular-nums"
-              aria-live="polite"
-              aria-label={`Elapsed time ${elapsedLabel}`}
-            >
-              {elapsedLabel}
-            </p>
-            <div className="flex items-center gap-2">
+        <div className="px-3 pt-3 md:px-0">
+          <GamePlayHeader
+            game="Word search"
+            title={playerState.puzzle.title}
+            detail={`${playerName} · ${playerState.found.length}/${playerState.totalWords} words`}
+            elapsedLabel={elapsedLabel}
+            instructions={
               <WordSearchInstructions
                 open={instructionsOpen}
                 onOpenChange={onInstructionsOpenChange}
                 intro={intro}
                 showTrigger
               />
-              <Button asChild variant="outline" size="sm">
-                <Link to="/">Return to Lobby</Link>
-              </Button>
-            </div>
-          </div>
-        </header>
+            }
+          />
+          <GameScore score={wordSearchWordPoints(playerState.found.length)} />
+        </div>
 
         {playerState.completed ? (
           <p className="mx-3 mb-2 rounded-xl border-2 border-mint/40 bg-mint/20 px-3 py-2 text-center font-display font-bold md:mx-0">

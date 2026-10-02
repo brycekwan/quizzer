@@ -8,7 +8,7 @@ import { useGameSocket, useSyncedCountdown } from '@/hooks/useGameSocket';
 import { useHostSecret } from '@/hooks/useHostSecret';
 import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
 import { AnswerGrid } from '@/components/AnswerGrid';
-import { Leaderboard } from '@/components/Leaderboard';
+import { PlayerActionList } from '@/components/PlayerActionList';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -478,21 +478,21 @@ export function AdminPage() {
         </section>
 
         <section className="space-y-6">
-          <div className="rounded-[2rem] border-4 border-white/60 bg-white/75 p-5 shadow-pop backdrop-blur">
-            <Leaderboard
-              entries={state.leaderboard}
-              title="Live scores"
-              paused={state.status === 'paused'}
-              onKick={(id) => {
-                const player = state.leaderboard.find((entry) => entry.id === id);
-                setConfirm({
-                  kind: 'kick',
-                  playerId: id,
-                  name: player?.name ?? 'this player',
-                });
-              }}
-            />
-          </div>
+          <PlayerActionList
+            empty="No players have joined the quiz."
+            actionLabel="Kick"
+            actionVariant="coral"
+            players={[...state.leaderboard]
+              .sort((left, right) => left.name.localeCompare(right.name))
+              .map((player) => ({ id: player.id, name: player.name }))}
+            onAction={(player) =>
+              setConfirm({
+                kind: 'kick',
+                playerId: player.id,
+                name: player.name,
+              })
+            }
+          />
 
           {state.currentQuestion &&
           (state.status === 'active' || state.status === 'paused') ? (

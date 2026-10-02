@@ -26,7 +26,7 @@ describe('sudoku scoring', () => {
     expect(sudokuRankBonus(2)).toBe(900);
     expect(sudokuRankBonus(10)).toBe(100);
     expect(sudokuRankBonus(11)).toBe(0);
-    expect(sudokuAdminScore(40, 1)).toBe(1040);
+    expect(sudokuAdminScore(40, 1)).toBe(40);
     expect(sudokuAdminScore(-10, 11)).toBe(-10);
   });
 });

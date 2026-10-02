@@ -81,7 +81,7 @@ export interface CrosswordAdminEntry {
   name: string;
   correctWordCount: number;
   totalWords: number;
-  /** Word points + placement bonus for the current leaderboard order. */
+  /** Word points for the current order. */
   score: number;
   elapsedMs: number;
   activeSince: number | null;
@@ -125,9 +125,6 @@ export function crosswordRankBonus(rank: number): number {
   return CROSSWORD_RANK_BONUS_FIRST - (rank - 1) * CROSSWORD_RANK_BONUS_STEP;
 }
 
-export function crosswordScore(
-  correctWordCount: number,
-  rank: number
-): number {
-  return crosswordWordPoints(correctWordCount) + crosswordRankBonus(rank);
+export function crosswordScore(correctWordCount: number, _rank: number): number {
+  return crosswordWordPoints(correctWordCount);
 }

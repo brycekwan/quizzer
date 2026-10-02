@@ -19,8 +19,8 @@ describe('crossword scoring', () => {
     expect(crosswordRankBonus(0)).toBe(0);
   });
 
-  it('combines word points and rank bonus', () => {
-    expect(crosswordScore(2, 1)).toBe(200 + 1000);
-    expect(crosswordScore(0, 3)).toBe(800);
+  it('scores the words a player has finished', () => {
+    expect(crosswordScore(2, 1)).toBe(200);
+    expect(crosswordScore(0, 3)).toBe(0);
   });
 });

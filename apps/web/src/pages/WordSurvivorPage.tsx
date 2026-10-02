@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import type { WordSurvivorPhase } from '@party/shared';
+import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
 import { SurvivorBoard } from '@/components/wordsurvivor/Board';
 import { SurvivorKeyboard } from '@/components/wordsurvivor/Keyboard';
 import { WinnerConfetti } from '@/components/WinnerConfetti';
@@ -277,48 +278,22 @@ export function WordSurvivorPage() {
   return (
     <div className="min-h-[100dvh] bg-playfield text-ink">
       <div className="mx-auto flex w-full max-w-xl flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
-        <header className="flex flex-col gap-3 pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-extrabold uppercase tracking-widest text-grape">
-                Word Survivor
-              </p>
-              <h1 className="font-display text-2xl font-bold">
-                Word {playerState.wordNumber} of {playerState.wordCount}
-              </h1>
-              <p className="text-sm font-semibold text-ink/60">
-                {playerName} · {playerState.length} letters
-              </p>
-            </div>
-            <p className="font-display text-3xl font-bold tabular-nums" aria-live="polite">
-              {elapsedLabel}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <GamePlayHeader
+          game="Word Survivor"
+          title={`Word ${playerState.wordNumber} of ${playerState.wordCount}`}
+          detail={`${playerName} · ${playerState.length} letters`}
+          topic={playerState.topic}
+          elapsedLabel={elapsedLabel}
+          instructions={
             <Instructions
               open={modalOpen}
               intro={intro}
               onOpenChange={setInstructionsOpen}
               onOk={() => void confirmInstructions()}
             />
-            <Button asChild variant="outline" size="sm">
-              <Link to="/">Return to Lobby</Link>
-            </Button>
-          </div>
-        </header>
-
-        {playerState.topic.trim() ? (
-          <p className="mb-3 text-center text-sm font-extrabold uppercase tracking-widest text-grape break-words">
-            {playerState.topic.trim()}
-          </p>
-        ) : null}
-
-        <div className="py-2 text-center">
-          <p className="text-xs font-extrabold uppercase tracking-widest text-ink/45">Score</p>
-          <p className="font-display text-4xl font-bold tabular-nums text-grape" aria-live="polite">
-            {playerState.score}
-          </p>
-        </div>
+          }
+        />
+        <GameScore score={playerState.score} />
 
         {error ? (
           <p role="alert" className="pb-2 text-center font-bold text-coral">

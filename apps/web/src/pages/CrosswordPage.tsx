@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import type { CrosswordCluePublic, CrosswordDirection } from '@party/shared';
+import {
+  crosswordWordPoints,
+  type CrosswordCluePublic,
+  type CrosswordDirection,
+} from '@party/shared';
+import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
 import { useCrosswordSocket } from '@/hooks/useCrosswordSocket';
 import { CrosswordGrid } from '@/components/crossword/CrosswordGrid';
 import {
@@ -621,41 +626,21 @@ export function CrosswordPage() {
 
   const content = (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-extrabold uppercase tracking-widest text-grape">
-            Crossword
-          </p>
-          <h1 className="font-display text-2xl font-bold sm:text-4xl">
-            {playerState.puzzle.title}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
+      <GamePlayHeader
+        game="Crossword"
+        title={playerState.puzzle.title}
+        detail={`Playing as ${playerName} · ${playerState.correctWordIds.length}/${playerState.totalWords} words`}
+        elapsedLabel={elapsedLabel}
+        instructions={
           <CrosswordInstructions
             open={instructionsOpen}
             onOpenChange={onInstructionsOpenChange}
             intro={intro}
             showTrigger
           />
-          <Button asChild variant="outline" size="sm">
-            <Link to="/">Return to Lobby</Link>
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-semibold text-ink/60">
-          Playing as {playerName} · {playerState.correctWordIds.length}/
-          {playerState.totalWords} words
-        </p>
-        <p
-          className="shrink-0 text-sm font-semibold tabular-nums text-ink/60"
-          aria-live="polite"
-          aria-label={`Elapsed time ${elapsedLabel}`}
-        >
-          {elapsedLabel}
-        </p>
-      </div>
+        }
+      />
+      <GameScore score={crosswordWordPoints(playerState.correctWordIds.length)} />
 
       {playerState.completed ? (
         <div className="rounded-xl border-2 border-mint/40 bg-mint/20 px-3 py-2 text-center shadow-pop-sm">

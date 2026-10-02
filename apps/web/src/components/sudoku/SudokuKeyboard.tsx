@@ -24,16 +24,15 @@ export function SudokuKeyboard({
           <button
             key={value}
             type="button"
-            aria-pressed={draftMode ? pressed : undefined}
+            aria-pressed={draftMode && !wrong ? pressed : undefined}
             aria-label={keyLabel(value, draftMode, noted, wrong)}
-            disabled={disabled}
+            disabled={disabled || wrong}
             onClick={() => onDigit(value)}
             className={cn(
-              'h-12 rounded-xl border-2 border-ink/15 bg-white font-display text-xl font-bold text-ink shadow-pop-sm',
-              pressed && 'translate-y-0.5 bg-ink/15 shadow-none',
+              'h-12 rounded-xl border-2 border-ink/15 bg-white font-display text-xl font-bold text-ink shadow-pop-sm disabled:opacity-100',
+              pressed && !wrong && 'translate-y-0.5 bg-ink/15 shadow-none',
               !draftMode && noted && !wrong && 'bg-ink/10 ring-2 ring-grape',
-              !draftMode && wrong && 'bg-[#ffc9c9]',
-              draftMode && wrong && pressed && 'ring-2 ring-coral'
+              wrong && 'bg-[#ffc9c9] text-ink'
             )}
           >
             {value}
@@ -50,11 +49,14 @@ function keyLabel(
   noted: boolean,
   wrong: boolean
 ): string {
+  if (wrong) {
+    return `${value}, incorrect`;
+  }
   if (!noted) {
     return String(value);
   }
   if (draftMode) {
-    return `${value}, in notes${wrong ? ', incorrect' : ''}`;
+    return `${value}, in notes`;
   }
-  return `${value}, noted${wrong ? ', incorrect' : ''}`;
+  return `${value}, noted`;
 }

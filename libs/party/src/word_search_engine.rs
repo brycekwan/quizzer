@@ -554,7 +554,7 @@ mod tests {
         assert_eq!(admin.players[1].elapsed_ms, 60_000);
         assert_eq!(admin.players[2].found_count, 1);
         let scores: Vec<_> = admin.players.iter().map(|player| player.score).collect();
-        assert_eq!(scores, [1200, 1100, 900]);
+        assert_eq!(scores, [200, 200, 100]);
     }
 
     #[test]

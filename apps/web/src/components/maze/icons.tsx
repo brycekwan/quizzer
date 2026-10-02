@@ -1,29 +1,26 @@
+/** Chunky crawling baby. Built from a few fat shapes so it still reads inside a maze cell. */
 export function CrawlingBaby({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-      <ellipse cx="32" cy="60" rx="18" ry="2.4" fill="#1f2933" opacity="0.12" />
-      <ellipse cx="21" cy="11" rx="5.5" ry="3.6" fill="#f3b899" />
-      <ellipse cx="43" cy="11" rx="5.5" ry="3.6" fill="#f3b899" />
-      <ellipse cx="22" cy="17" rx="4" ry="2.2" fill="#e8a0a0" opacity="0.7" />
-      <ellipse cx="42" cy="17" rx="4" ry="2.2" fill="#e8a0a0" opacity="0.7" />
-      <path d="M18 16c-1 6 2 9 6 8" fill="none" stroke="#7b2cbf" strokeWidth="4.5" strokeLinecap="round" />
-      <path d="M46 16c1 6-2 9-6 8" fill="none" stroke="#7b2cbf" strokeWidth="4.5" strokeLinecap="round" />
-      <ellipse cx="32" cy="28" rx="12" ry="8" fill="#7b2cbf" />
-      <path d="M22 26c2 4 18 4 20 0" fill="#9b4de0" />
-      <circle cx="32" cy="38" r="16" fill="#f6c7a8" />
-      <path d="M18 32c1-12 10-18 14-18s13 6 14 18c-4-3-24-3-28 0z" fill="#6b3a2a" />
-      <ellipse cx="22" cy="39" rx="4.6" ry="5.4" fill="#1f2933" />
-      <ellipse cx="42" cy="39" rx="4.6" ry="5.4" fill="#1f2933" />
-      <ellipse cx="23.3" cy="37.4" rx="1.7" ry="1.9" fill="#fff" />
-      <ellipse cx="43.3" cy="37.4" rx="1.7" ry="1.9" fill="#fff" />
-      <ellipse cx="32" cy="44" rx="1.3" ry="0.9" fill="#e7b199" />
-      <path d="M26 47c2.2 2.4 9.8 2.4 12 0" fill="none" stroke="#c46b64" strokeWidth="2.2" strokeLinecap="round" />
-      <ellipse cx="20" cy="45.5" rx="2.6" ry="1.5" fill="#f4a4a4" />
-      <ellipse cx="44" cy="45.5" rx="2.6" ry="1.5" fill="#f4a4a4" />
-      <ellipse cx="12" cy="54" rx="7" ry="5" fill="#f6c7a8" />
-      <ellipse cx="52" cy="54" rx="7" ry="5" fill="#f6c7a8" />
-      <ellipse cx="11" cy="53" rx="3.2" ry="2" fill="#fff" opacity="0.35" />
-      <ellipse cx="51" cy="53" rx="3.2" ry="2" fill="#fff" opacity="0.35" />
+    <svg viewBox="0 0 36 36" className={className} aria-hidden="true">
+      <ellipse
+        cx="21"
+        cy="20"
+        rx="11"
+        ry="7.5"
+        fill="#fff7ed"
+        stroke="currentColor"
+        strokeWidth="2.5"
+      />
+      <circle cx="12" cy="16" r="8" fill="#f6c7a8" stroke="currentColor" strokeWidth="2.5" />
+      <path
+        d="M8 9c1.4-4 5.2-3.4 4.4.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.75"
+        strokeLinecap="round"
+      />
+      <circle cx="15.5" cy="28.5" r="3.1" fill="#f6c7a8" stroke="currentColor" strokeWidth="2.25" />
+      <circle cx="24.5" cy="28.5" r="3.1" fill="#f6c7a8" stroke="currentColor" strokeWidth="2.25" />
     </svg>
   );
 }

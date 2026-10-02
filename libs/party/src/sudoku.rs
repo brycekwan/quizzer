@@ -32,10 +32,14 @@ pub struct SudokuPublicPuzzle {
 #[serde(rename_all = "camelCase")]
 pub struct SudokuCellState {
     pub given: bool,
+    /// Large digit: a given, a correct entry, a hint, or the current wrong guess.
     pub value: Option<u8>,
     pub solved: bool,
     pub hinted: bool,
+    /// The large digit is a wrong guess. Erase clears it.
+    pub wrong: bool,
     pub drafts: Vec<u8>,
+    /// Digits already entered wrong in this cell. They stay blocked after erase.
     pub wrong_drafts: Vec<u8>,
 }
 
@@ -98,8 +102,8 @@ pub fn sudoku_rank_bonus(rank: i64) -> i64 {
     SUDOKU_RANK_BONUS_FIRST - (rank - 1) * SUDOKU_RANK_BONUS_STEP
 }
 
-pub fn sudoku_admin_score(player_score: i64, rank: i64) -> i64 {
-    player_score + sudoku_rank_bonus(rank)
+pub fn sudoku_admin_score(player_score: i64, _rank: i64) -> i64 {
+    player_score
 }
 
 pub fn to_public_sudoku(puzzle: &SudokuFile) -> SudokuPublicPuzzle {
@@ -294,7 +298,7 @@ mod tests {
         assert_eq!(sudoku_rank_bonus(1), 1000);
         assert_eq!(sudoku_rank_bonus(10), 100);
         assert_eq!(sudoku_rank_bonus(11), 0);
-        assert_eq!(sudoku_admin_score(40, 1), 1040);
+        assert_eq!(sudoku_admin_score(40, 1), 40);
     }
 
     #[test]

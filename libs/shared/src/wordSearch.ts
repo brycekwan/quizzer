@@ -86,7 +86,7 @@ export interface WordSearchAdminEntry {
   name: string;
   foundCount: number;
   totalWords: number;
-  /** Word points + placement bonus for the current leaderboard order. */
+  /** Word points for the current order. */
   score: number;
   elapsedMs: number;
   activeSince: number | null;
@@ -130,6 +130,6 @@ export function wordSearchRankBonus(rank: number): number {
   );
 }
 
-export function wordSearchScore(foundCount: number, rank: number): number {
-  return wordSearchWordPoints(foundCount) + wordSearchRankBonus(rank);
+export function wordSearchScore(foundCount: number, _rank: number): number {
+  return wordSearchWordPoints(foundCount);
 }

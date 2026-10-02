@@ -19,6 +19,8 @@ enum SolvedBy {
 struct Notes {
     drafts: BTreeSet<u8>,
     wrong: BTreeSet<u8>,
+    /// Wrong guess currently filling the cell. Cleared by erase.
+    entry: Option<u8>,
 }
 
 struct PlayerProgress {
@@ -225,9 +227,7 @@ impl SudokuEngine {
             player.incorrect_count += 1;
             player.notes[row][col].drafts.insert(value);
             player.notes[row][col].wrong.insert(value);
-        } else {
-            player.notes[row][col].drafts.insert(value);
-            player.notes[row][col].wrong.insert(value);
+            player.notes[row][col].entry = Some(value);
         }
         self.maybe_complete(player_id, now);
         Ok(correct)
@@ -244,6 +244,9 @@ impl SudokuEngine {
         let value = digit(value)?;
         self.note_entry(player_id);
         let player = self.players.get_mut(player_id).expect("player");
+        if player.penalties.contains(&(row, col, value)) {
+            return Ok(());
+        }
         if player.notes[row][col].drafts.contains(&value) {
             player.notes[row][col].drafts.remove(&value);
             player.notes[row][col].wrong.remove(&value);
@@ -264,11 +267,11 @@ impl SudokuEngine {
         if player.solved[row][col].is_some() {
             return Ok(());
         }
-        let wrong: Vec<u8> = player.notes[row][col].wrong.iter().copied().collect();
-        for value in wrong {
-            player.notes[row][col].wrong.remove(&value);
-            player.notes[row][col].drafts.remove(&value);
-        }
+        let Some(value) = player.notes[row][col].entry.take() else {
+            return Ok(());
+        };
+        player.notes[row][col].wrong.remove(&value);
+        player.notes[row][col].drafts.remove(&value);
         Ok(())
     }
 
@@ -395,7 +398,7 @@ impl SudokuEngine {
     }
 
     pub fn player_snapshot(&self, player_id: &str) -> Option<SudokuPlayerSnapshot> {
-        let (score, hints_used, completed, elapsed_ms, active_since, completed_at, solved, notes) = {
+        let (score, hints_used, completed, elapsed_ms, active_since, completed_at, solved, notes, penalties) = {
             let player = self.players.get(player_id)?;
             (
                 player_points(player),
@@ -406,11 +409,12 @@ impl SudokuEngine {
                 player.completed_at,
                 player.solved,
                 player.notes.clone(),
+                player.penalties.clone(),
             )
         };
         Some(SudokuPlayerSnapshot {
             puzzle: self.public_puzzle.clone(),
-            cells: board_cells(&self.solution, &self.givens, &solved, &notes),
+            cells: board_cells(&self.solution, &self.givens, &solved, &notes, &penalties),
             score,
             hints_used,
             hints_max: SUDOKU_HINT_MAX,
@@ -530,16 +534,29 @@ fn board_cells(
     givens: &[[Option<u8>; SUDOKU_SIZE]; SUDOKU_SIZE],
     solved: &[[Option<SolvedBy>; SUDOKU_SIZE]; SUDOKU_SIZE],
     notes: &[[Notes; SUDOKU_SIZE]; SUDOKU_SIZE],
+    penalties: &HashSet<(usize, usize, u8)>,
 ) -> Vec<Vec<SudokuCellState>> {
     let mut cells = Vec::with_capacity(SUDOKU_SIZE);
     for row in 0..SUDOKU_SIZE {
         let mut line = Vec::with_capacity(SUDOKU_SIZE);
         for col in 0..SUDOKU_SIZE {
-            line.push(cell_state(solution, givens, solved, notes, row, col));
+            line.push(cell_state(
+                solution, givens, solved, notes, penalties, row, col,
+            ));
         }
         cells.push(line);
     }
     cells
+}
+
+fn blocked_digits(penalties: &HashSet<(usize, usize, u8)>, row: usize, col: usize) -> Vec<u8> {
+    let mut digits: Vec<u8> = penalties
+        .iter()
+        .filter(|(penalized_row, penalized_col, _)| *penalized_row == row && *penalized_col == col)
+        .map(|(_, _, value)| *value)
+        .collect();
+    digits.sort_unstable();
+    digits
 }
 
 fn cell_state(
@@ -547,17 +564,20 @@ fn cell_state(
     givens: &[[Option<u8>; SUDOKU_SIZE]; SUDOKU_SIZE],
     solved: &[[Option<SolvedBy>; SUDOKU_SIZE]; SUDOKU_SIZE],
     notes: &[[Notes; SUDOKU_SIZE]; SUDOKU_SIZE],
+    penalties: &HashSet<(usize, usize, u8)>,
     row: usize,
     col: usize,
 ) -> SudokuCellState {
+    let wrong_drafts = blocked_digits(penalties, row, col);
     if let Some(value) = givens[row][col] {
         return SudokuCellState {
             given: true,
             value: Some(value),
             solved: false,
             hinted: false,
+            wrong: false,
             drafts: Vec::new(),
-            wrong_drafts: Vec::new(),
+            wrong_drafts,
         };
     }
     match solved[row][col] {
@@ -566,16 +586,18 @@ fn cell_state(
             value: Some(solution[row][col]),
             solved: true,
             hinted: kind == SolvedBy::Hint,
+            wrong: false,
             drafts: Vec::new(),
-            wrong_drafts: Vec::new(),
+            wrong_drafts,
         },
         None => SudokuCellState {
             given: false,
-            value: None,
+            value: notes[row][col].entry,
             solved: false,
             hinted: false,
+            wrong: notes[row][col].entry.is_some(),
             drafts: notes[row][col].drafts.iter().copied().collect(),
-            wrong_drafts: notes[row][col].wrong.iter().copied().collect(),
+            wrong_drafts,
         },
     }
 }
@@ -645,30 +667,46 @@ mod tests {
         engine.toggle_draft("p1", 0, 2, 2).unwrap();
         assert!(!engine.commit("p1", 0, 2, 1).unwrap());
         let marked = cell(&engine, "p1", 0, 2);
-        assert_eq!(marked.value, None);
+        assert!(marked.wrong);
+        assert_eq!(marked.value, Some(1));
         assert_eq!(marked.drafts, vec![1, 2]);
         assert_eq!(marked.wrong_drafts, vec![1]);
         assert_eq!(engine.player_snapshot("p1").unwrap().score, -10);
         assert!(!engine.commit("p1", 0, 2, 1).unwrap());
         assert_eq!(engine.player_snapshot("p1").unwrap().score, -10);
+        assert_eq!(cell(&engine, "p1", 0, 2).value, Some(1));
     }
 
     #[test]
-    fn erase_and_draft_toggle_remove_a_red_note_without_a_refund() {
+    fn erase_clears_the_wrong_digit_and_its_note_without_a_refund() {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("p1", "Buddy");
         engine.toggle_draft("p1", 0, 2, 2).unwrap();
         engine.commit("p1", 0, 2, 1).unwrap();
         engine.toggle_draft("p1", 0, 2, 1).unwrap();
-        let cleared = cell(&engine, "p1", 0, 2);
-        assert_eq!(cleared.drafts, vec![2]);
-        assert!(cleared.wrong_drafts.is_empty());
+        let still = cell(&engine, "p1", 0, 2);
+        assert_eq!(still.value, Some(1));
+        assert_eq!(still.drafts, vec![1, 2]);
         assert_eq!(engine.player_snapshot("p1").unwrap().score, -10);
+        engine.erase("p1", 0, 2).unwrap();
+        let cleared = cell(&engine, "p1", 0, 2);
+        assert!(!cleared.wrong);
+        assert_eq!(cleared.value, None);
+        assert_eq!(cleared.drafts, vec![2]);
+        assert_eq!(cleared.wrong_drafts, vec![1]);
         engine.commit("p1", 0, 2, 9).unwrap();
         engine.erase("p1", 0, 2).unwrap();
         let left = cell(&engine, "p1", 0, 2);
         assert_eq!(left.drafts, vec![2]);
-        assert!(left.wrong_drafts.is_empty());
+        assert_eq!(left.wrong_drafts, vec![1, 9]);
+        assert_eq!(engine.player_snapshot("p1").unwrap().score, -20);
+        assert!(!engine.commit("p1", 0, 2, 1).unwrap());
+        engine.toggle_draft("p1", 0, 2, 1).unwrap();
+        engine.toggle_draft("p1", 0, 2, 9).unwrap();
+        let blocked = cell(&engine, "p1", 0, 2);
+        assert_eq!(blocked.value, None);
+        assert_eq!(blocked.drafts, vec![2]);
+        assert_eq!(blocked.wrong_drafts, vec![1, 9]);
         assert_eq!(engine.player_snapshot("p1").unwrap().score, -20);
     }
 
@@ -745,7 +783,7 @@ mod tests {
     }
 
     #[test]
-    fn ranks_by_score_then_shorter_time_and_hides_the_bonus_from_the_player() {
+    fn ranks_by_score_then_shorter_time() {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("a", "Ada");
         engine.ensure_player("b", "Bea");
@@ -772,7 +810,7 @@ mod tests {
                 .iter()
                 .map(|player| player.score)
                 .collect::<Vec<_>>(),
-            [1010, 910, 790]
+            [10, 10, -10]
         );
         assert_eq!(engine.player_snapshot("a").unwrap().score, 10);
         assert_eq!(engine.player_snapshot("c").unwrap().score, -10);

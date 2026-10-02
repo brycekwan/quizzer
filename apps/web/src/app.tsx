@@ -18,6 +18,9 @@ import { MazeAdminPage } from './pages/MazeAdminPage';
 import { WordSurvivorPage } from './pages/WordSurvivorPage';
 import { WordSurvivorAdminPage } from './pages/WordSurvivorAdminPage';
 import { SystemAdminPage } from './pages/SystemAdminPage';
+import { HostLeaderboardPage } from './pages/HostLeaderboardPage';
+import { PlayerLeaderboardPage } from './pages/PlayerLeaderboardPage';
+import { PartyThemeProvider } from './components/PartyThemeProvider';
 
 function RequirePlayer({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -30,6 +33,7 @@ function RequirePlayer({ children }: { children: ReactNode }) {
 
 export function App() {
   return (
+    <PartyThemeProvider>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
@@ -89,7 +93,16 @@ export function App() {
           </RequirePlayer>
         }
       />
+      <Route
+        path="/leaderboard"
+        element={
+          <RequirePlayer>
+            <PlayerLeaderboardPage />
+          </RequirePlayer>
+        }
+      />
       <Route path="/host" element={<HostMenuPage />} />
+      <Route path="/host/leaderboard" element={<HostLeaderboardPage />} />
       <Route path="/host/quizzer" element={<AdminPage />} />
       <Route path="/host/crossword" element={<CrosswordAdminPage />} />
       <Route path="/host/wordsearch" element={<WordSearchAdminPage />} />
@@ -100,6 +113,7 @@ export function App() {
       <Route path="/host/admin" element={<Navigate to="/host/quizzer" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </PartyThemeProvider>
   );
 }
 

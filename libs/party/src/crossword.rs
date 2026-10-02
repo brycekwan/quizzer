@@ -131,8 +131,8 @@ pub fn crossword_rank_bonus(rank: i64) -> i64 {
     CROSSWORD_RANK_BONUS_FIRST - (rank - 1) * CROSSWORD_RANK_BONUS_STEP
 }
 
-pub fn crossword_score(correct_word_count: i64, rank: i64) -> i64 {
-    crossword_word_points(correct_word_count) + crossword_rank_bonus(rank)
+pub fn crossword_score(correct_word_count: i64, _rank: i64) -> i64 {
+    crossword_word_points(correct_word_count)
 }
 
 fn walk_answer(
@@ -447,8 +447,8 @@ mod tests {
         assert_eq!(crossword_rank_bonus(10), 100);
         assert_eq!(crossword_rank_bonus(11), 0);
         assert_eq!(crossword_rank_bonus(0), 0);
-        assert_eq!(crossword_score(2, 1), 1200);
-        assert_eq!(crossword_score(0, 3), 800);
+        assert_eq!(crossword_score(2, 1), 200);
+        assert_eq!(crossword_score(0, 3), 0);
     }
 
     #[test]

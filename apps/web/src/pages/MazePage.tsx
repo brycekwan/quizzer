@@ -401,8 +401,8 @@ function MazeInstructions({
             and all the way to a bottle of milk. Can you finish the quest?
           </p>
           <p>
-            Move one square at a time with the arrows under the maze, or the keyboard arrows on a
-            desktop. On a phone, touch the baby and drag, then let go to commit that step.
+            Move one square at a time with the controller at the bottom of the screen. On a
+            desktop, the keyboard arrows work too.
           </p>
           <p>
             You cannot go back or retrace a square you already crawled. If you get stuck, Restart

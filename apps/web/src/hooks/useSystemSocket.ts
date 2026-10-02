@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { SystemAdminSnapshot } from '@party/shared';
+import type { PartyTheme, SystemAdminSnapshot } from '@party/shared';
 import { unlockHost } from '@/lib/hostSecret';
 
 export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 0) {
@@ -67,6 +67,10 @@ export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 
       resetAll: () =>
         new Promise<{ ok: boolean; error?: string }>((resolve) => {
           socketRef.current?.emit('system:admin:reset', {}, resolve);
+        }),
+      setTheme: (theme: PartyTheme) =>
+        new Promise<{ ok: boolean; error?: string; theme?: PartyTheme }>((resolve) => {
+          socketRef.current?.emit('system:admin:setTheme', { theme }, resolve);
         }),
     }),
     []

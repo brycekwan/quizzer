@@ -24,8 +24,17 @@ export interface SystemPlayerEntry {
   quizScore: number | null;
 }
 
+export const PARTY_THEMES = ['standard', 'dark', 'baby'] as const;
+
+export type PartyTheme = (typeof PARTY_THEMES)[number];
+
+export function isPartyTheme(value: unknown): value is PartyTheme {
+  return typeof value === 'string' && (PARTY_THEMES as readonly string[]).includes(value);
+}
+
 export interface SystemAdminSnapshot {
   players: SystemPlayerEntry[];
+  theme: PartyTheme;
 }
 
 export interface SystemScoreInput {
@@ -65,6 +74,7 @@ export function buildSystemLeaderboard(
     });
 
   return {
+    theme: 'standard',
     players: ranked.map((player, index) => ({
       rank: index + 1,
       playerId: player.playerId,

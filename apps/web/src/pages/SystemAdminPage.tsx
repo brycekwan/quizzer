@@ -1,17 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { PlayerActionList } from '@/components/PlayerActionList';
 import { Button } from '@/components/ui/button';
 import { useSystemSocket } from '@/hooks/useSystemSocket';
 import { useHostSecret } from '@/hooks/useHostSecret';
 import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
-
-function ScoreValue({ value }: { value: number | null }) {
-  if (value == null) {
-    return <span className="text-ink/40">—</span>;
-  }
-  return <span className="tabular-nums">{value}</span>;
-}
+import { PARTY_THEMES, type PartyTheme } from '@party/shared';
+import { Label } from '@/components/ui/label';
 
 type PendingAction =
   | { kind: 'reset' }
@@ -19,7 +15,7 @@ type PendingAction =
 
 export function SystemAdminPage() {
   const host = useHostSecret();
-  const { connected, adminState, error, setError, kick, resetAll, hostReady } =
+  const { connected, adminState, error, setError, kick, resetAll, setTheme, hostReady } =
     useSystemSocket(host.secret, host.attempt);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [working, setWorking] = useState(false);
@@ -79,7 +75,29 @@ export function SystemAdminPage() {
               {adminState.players.length === 1 ? 'player' : 'players'} connected
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[10rem]">
+              <Label htmlFor="party-theme">Theme</Label>
+              <select
+                id="party-theme"
+                value={adminState.theme}
+                className="mt-1 flex h-10 w-full rounded-2xl border-4 border-ink/15 bg-white px-3 text-sm font-bold text-ink shadow-pop-sm outline-none focus-visible:ring-4 focus-visible:ring-sun/70"
+                onChange={(event) => {
+                  const next = event.target.value as PartyTheme;
+                  void setTheme(next).then((result) => {
+                    if (!result?.ok) {
+                      setError(result?.error ?? 'Could not change the theme');
+                    }
+                  });
+                }}
+              >
+                {PARTY_THEMES.map((theme) => (
+                  <option key={theme} value={theme}>
+                    {theme === 'standard' ? 'Standard' : theme === 'dark' ? 'Dark' : 'Baby'}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Button asChild variant="outline" size="sm">
               <Link to="/host">Back to host menu</Link>
             </Button>
@@ -99,71 +117,21 @@ export function SystemAdminPage() {
           </p>
         ) : null}
 
-        <section className="overflow-hidden rounded-[2rem] border-4 border-white/60 bg-white/75 shadow-pop backdrop-blur">
-          <div className="border-b-4 border-ink/10 px-5 py-3">
-            <h2 className="font-display text-2xl font-bold">Leaderboard</h2>
-            <p className="text-sm font-semibold text-ink/60">
-              Ranked by crossword, word search, sudoku, maze, and word survivor points combined.
-              Quiz points are shown separately and do not change rank.
-            </p>
-          </div>
-          {adminState.players.length === 0 ? (
-            <p className="px-5 py-8 text-center font-semibold text-ink/50">
-              No players are connected.
-            </p>
-          ) : (
-            <ul className="divide-y-2 divide-ink/10">
-              {adminState.players.map((player) => (
-                <li
-                  key={player.playerId}
-                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
-                >
-                  <div className="min-w-0">
-                    <p className="font-display text-xl font-bold">
-                      <span className="mr-2 text-ink/40">{player.rank}.</span>
-                      {player.name}
-                    </p>
-                    <p className="text-sm font-semibold text-ink/55">
-                      Crossword <ScoreValue value={player.crosswordScore} /> ·
-                      Word search <ScoreValue value={player.wordSearchScore} />
-                      {' · '}
-                      Sudoku <ScoreValue value={player.sudokuScore} />
-                      {' · '}
-                      Maze <ScoreValue value={player.mazeScore} />
-                      {' · '}
-                      Word Survivor <ScoreValue value={player.wordSurvivorScore} />
-                      {' · '}
-                      Quiz <ScoreValue value={player.quizScore} />
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="font-display text-2xl font-bold text-grape">
-                        {player.accumulatedScore}
-                      </p>
-                      <p className="text-xs font-extrabold uppercase tracking-wide text-ink/45">
-                        points
-                      </p>
-                    </div>
-                    <Button
-                      variant="coral"
-                      size="sm"
-                      onClick={() =>
-                        setPending({
-                          kind: 'kick',
-                          playerId: player.playerId,
-                          name: player.name,
-                        })
-                      }
-                    >
-                      Kick
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <PlayerActionList
+          empty="No players are connected."
+          actionLabel="Kick"
+          actionVariant="coral"
+          players={[...adminState.players]
+            .sort((left, right) => left.name.localeCompare(right.name))
+            .map((player) => ({ id: player.playerId, name: player.name }))}
+          onAction={(player) =>
+            setPending({
+              kind: 'kick',
+              playerId: player.id,
+              name: player.name,
+            })
+          }
+        />
       </div>
 
       <ConfirmDialog

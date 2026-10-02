@@ -5,11 +5,14 @@ import {
   clearQuizRemovalMessage,
   readQuizRemovalMessage,
 } from '@/lib/quizRemoval';
+import { BabyLobbyBackdrop } from '@/components/baby/BabyLobbyBackdrop';
+import { usePartyTheme } from '@/components/PartyThemeProvider';
 import { Button } from '@/components/ui/button';
 import { PageShell } from '@/components/PageShell';
 
 export function MenuPage() {
   const { playerId, playerName } = useSession();
+  const theme = usePartyTheme();
   const [quizRemovalMessage, setQuizRemovalMessage] = useState<string | null>(
     null
   );
@@ -27,7 +30,7 @@ export function MenuPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell backdrop={theme === 'baby' ? <BabyLobbyBackdrop /> : null}>
       <p className="mb-2 text-sm font-extrabold uppercase tracking-widest text-grape">
         Party
       </p>
@@ -60,6 +63,9 @@ export function MenuPage() {
         </Button>
         <Button asChild size="lg" variant="outline" className="w-full">
           <Link to="/wordsurvivor">Word Survivor</Link>
+        </Button>
+        <Button asChild size="lg" variant="outline" className="w-full">
+          <Link to="/leaderboard">Leaderboard</Link>
         </Button>
       </div>
     </PageShell>

@@ -113,8 +113,8 @@ function SudokuInstructions({
             <li>
               Select a square, then enter a number. A correct number turns
               green, then fades to the locked shade, and is worth 10 points. A
-              wrong number stays as a small red
-              note and costs 10 points. Other notes in that square stay.
+              wrong number fills the square in red and costs 10 points. That
+              number cannot be entered in the square again.
             </li>
             <li>
               The timer starts on your first entry. It stays stopped while these
@@ -124,9 +124,13 @@ function SudokuInstructions({
             <li>
               Notes lets you pencil in candidates. Keys for numbers already in
               the square start pressed, and pressing one adds or removes that
-              note. Notes are not scored.
+              note. A number already entered wrong in that square cannot be
+              added as a note. Notes are not scored.
             </li>
-            <li>Erase clears the incorrect notes in the selected square.</li>
+            <li>
+              Erase removes the red number from the selected square, and removes
+              it from the notes there too.
+            </li>
             <li>
               Hint reveals one number and is not worth points. You can use it
               up to 3 times. Each unused hint is worth 10 points when you finish.
@@ -198,6 +202,9 @@ export function SudokuPage() {
 
   const enterDigit = (value: number) => {
     if (!selected || instructionsOpenRef.current || locked) {
+      return;
+    }
+    if (selectedCell?.wrongDrafts.includes(value)) {
       return;
     }
     const action = draftMode
@@ -294,7 +301,7 @@ export function SudokuPage() {
   }
 
   const hintsLeft = Math.max(0, playerState.hintsMax - playerState.hintsUsed);
-  const canErase = (selectedCell?.wrongDrafts.length ?? 0) > 0;
+  const canErase = selectedCell?.wrong === true;
 
   return (
     <div className="min-h-[100dvh] bg-playfield text-ink">

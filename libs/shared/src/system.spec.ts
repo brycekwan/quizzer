@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSystemLeaderboard, type SystemScoreInput } from './system';
+import { buildSystemLeaderboard, isPartyTheme, type SystemScoreInput } from './system';
 
 function player(
   partial: Partial<SystemScoreInput> & Pick<SystemScoreInput, 'playerId' | 'name'>
@@ -65,7 +65,10 @@ describe('buildSystemLeaderboard', () => {
       player({ playerId: 'b', name: 'Bea', crosswordScore: 100 }),
       player({ playerId: 'a', name: 'Ada', wordSearchScore: 100 }),
     ]);
+    expect(board.theme).toBe('standard');
     expect(board.players.map((entry) => entry.name)).toEqual(['Ada', 'Bea']);
+    expect(isPartyTheme('baby')).toBe(true);
+    expect(isPartyTheme('neon')).toBe(false);
     expect(board.players.map((entry) => entry.rank)).toEqual([1, 2]);
   });
 });

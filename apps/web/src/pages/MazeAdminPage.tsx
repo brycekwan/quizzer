@@ -1,41 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MazeDifficulty, MazeLevelChoice } from '@party/shared';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
+import { PlayerActionList } from '@/components/PlayerActionList';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useHostSecret } from '@/hooks/useHostSecret';
 import { useMazeSocket } from '@/hooks/useMazeSocket';
-import { computeElapsedMs, formatElapsedMs } from '@/lib/crosswordClient';
-
-function ElapsedCell({
-  elapsedMs,
-  activeSince,
-}: {
-  elapsedMs: number;
-  activeSince: number | null;
-}) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (activeSince == null) {
-      return;
-    }
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [activeSince]);
-
-  if (elapsedMs === 0 && activeSince == null) {
-    return <span className="text-ink/40">—</span>;
-  }
-
-  return (
-    <span className="tabular-nums">
-      {formatElapsedMs(computeElapsedMs(elapsedMs, activeSince, now))}
-    </span>
-  );
-}
 
 function levelName(level: MazeDifficulty) {
   if (level === 'easy') {
@@ -146,62 +118,21 @@ export function MazeAdminPage() {
           </p>
         </section>
 
-        <section className="overflow-hidden rounded-[2rem] border-4 border-white/60 bg-white/75 shadow-pop backdrop-blur">
-          <div className="border-b-4 border-ink/10 px-5 py-3">
-            <h2 className="font-display text-2xl font-bold">Leaderboard</h2>
-            <p className="text-sm font-semibold text-ink/60">
-              Highest score, then shortest time. 200 for easy, 300 for medium, 500 for hard, plus
-              50 for each heart left at the end.
-            </p>
-          </div>
-          {adminState.players.length === 0 ? (
-            <p className="px-5 py-8 text-center font-semibold text-ink/50">
-              No players have played the maze yet.
-            </p>
-          ) : (
-            <ul className="divide-y-2 divide-ink/10">
-              {adminState.players.map((player, index) => (
-                <li
-                  key={player.playerId}
-                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
-                >
-                  <div className="min-w-0">
-                    <p className="font-display text-xl font-bold">
-                      <span className="mr-2 text-ink/40">{index + 1}.</span>
-                      {player.name}
-                    </p>
-                    <p className="text-sm font-semibold text-ink/55">
-                      {levelName(player.level)} · {player.lives}{' '}
-                      {player.lives === 1 ? 'life' : 'lives'} ·{' '}
-                      <ElapsedCell elapsedMs={player.elapsedMs} activeSince={player.activeSince} />
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="font-display text-2xl font-bold text-grape">{player.score}</p>
-                      <p className="text-xs font-extrabold uppercase tracking-wide text-ink/45">
-                        points
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setConfirm({
-                          kind: 'player',
-                          playerId: player.playerId,
-                          name: player.name,
-                        })
-                      }
-                    >
-                      Reset
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <PlayerActionList
+          empty="No players have played the maze yet."
+          actionLabel="Reset"
+          players={adminState.players.map((player) => ({
+            id: player.playerId,
+            name: player.name,
+          }))}
+          onAction={(player) =>
+            setConfirm({
+              kind: 'player',
+              playerId: player.id,
+              name: player.name,
+            })
+          }
+        />
       </div>
       <ConfirmDialog
         open={confirm != null}

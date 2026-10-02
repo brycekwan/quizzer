@@ -32,6 +32,7 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         meta.entry(sid.clone()).or_default();
     }
     emit_game(&app, &socket);
+    emit_theme(&app, &socket);
 
     socket.on(
         "host:unlock",
@@ -795,6 +796,14 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         },
     );
     socket.on(
+        "leaderboard:subscribe",
+        async |socket: SocketRef, ack: AckSender, State(app): State<Arc<App>>| {
+            flag_mut(&app, &socket, |meta| meta.leaderboard = true);
+            let _ = ack.send(&json!({ "ok": true }));
+            emit_leaderboard(&app, &socket);
+        },
+    );
+    socket.on(
         "system:admin:kick",
         async |socket: SocketRef,
                Data(payload): Data<Value>,
@@ -815,6 +824,34 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
                 return;
             }
             on_system_reset(app, ack);
+        },
+    );
+    socket.on(
+        "system:admin:setTheme",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let theme = payload
+                .get("theme")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let result = {
+                let mut party = app.party.lock().expect("party");
+                match party.set_theme(theme) {
+                    Ok(theme) => json!({ "ok": true, "theme": theme }),
+                    Err(error) => fail(error),
+                }
+            };
+            let _ = ack.send(&result);
+            if result.get("ok").and_then(Value::as_bool) == Some(true) {
+                emit_theme_all(&app);
+                changed(&app);
+            }
         },
     );
 
@@ -1945,6 +1982,9 @@ pub fn broadcast(app: &App) {
         if meta.system_admin {
             emit_system(&app, &socket);
         }
+        if meta.leaderboard {
+            emit_leaderboard(&app, &socket);
+        }
     }
 }
 
@@ -2064,6 +2104,29 @@ fn emit_word_survivor_admin(app: &App, socket: &SocketRef) {
     let snapshot = party.word_survivor.admin_snapshot();
     drop(party);
     let _ = socket.emit("wordsurvivor:admin:state", &snapshot);
+}
+
+fn emit_theme(app: &App, socket: &SocketRef) {
+    let party = app.party.lock().expect("party");
+    let theme = party.theme;
+    drop(party);
+    let _ = socket.emit("party:theme", &json!({ "theme": theme }));
+}
+
+fn emit_theme_all(app: &App) {
+    let Some(io) = app.io.get() else {
+        return;
+    };
+    for socket in io.sockets() {
+        emit_theme(app, &socket);
+    }
+}
+
+fn emit_leaderboard(app: &App, socket: &SocketRef) {
+    let party = app.party.lock().expect("party");
+    let snapshot = party.leaderboard();
+    drop(party);
+    let _ = socket.emit("leaderboard:state", &snapshot);
 }
 
 fn emit_system(app: &App, socket: &SocketRef) {

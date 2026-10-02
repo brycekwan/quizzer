@@ -15,10 +15,31 @@ pub struct SystemPlayerEntry {
     pub quiz_score: Option<i64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PartyTheme {
+    #[default]
+    Standard,
+    Dark,
+    Baby,
+}
+
+impl PartyTheme {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value.trim() {
+            "standard" => Ok(Self::Standard),
+            "dark" => Ok(Self::Dark),
+            "baby" => Ok(Self::Baby),
+            _ => Err("Choose standard, dark, or baby".into()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemAdminSnapshot {
     pub players: Vec<SystemPlayerEntry>,
+    pub theme: PartyTheme,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +73,7 @@ pub fn build_system_leaderboard(players: &[SystemScoreInput]) -> SystemAdminSnap
     });
 
     SystemAdminSnapshot {
+        theme: PartyTheme::Standard,
         players: ranked
             .into_iter()
             .enumerate()
@@ -148,5 +170,13 @@ mod tests {
         assert_eq!(names, ["Ada", "Bea"]);
         let ranks: Vec<_> = board.players.iter().map(|entry| entry.rank).collect();
         assert_eq!(ranks, [1, 2]);
+    }
+
+    #[test]
+    fn parses_party_themes() {
+        assert_eq!(PartyTheme::parse("standard").unwrap(), PartyTheme::Standard);
+        assert_eq!(PartyTheme::parse(" dark ").unwrap(), PartyTheme::Dark);
+        assert_eq!(PartyTheme::parse("baby").unwrap(), PartyTheme::Baby);
+        assert!(PartyTheme::parse("neon").is_err());
     }
 }

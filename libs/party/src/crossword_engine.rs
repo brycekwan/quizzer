@@ -523,7 +523,7 @@ mod tests {
         assert_eq!(admin.players[0].elapsed_ms, 30_000);
         assert_eq!(admin.players[1].elapsed_ms, 60_000);
         let scores: Vec<_> = admin.players.iter().map(|player| player.score).collect();
-        assert_eq!(scores, [1200, 1100, 900]);
+        assert_eq!(scores, [200, 200, 100]);
     }
 
     #[test]
@@ -580,7 +580,7 @@ mod tests {
         let mut engine = engine_at(NOON_2026_MS);
         engine.ensure_player("a", "Ada");
         fill_all(&mut engine, "a");
-        assert_eq!(engine.admin_snapshot().players[0].score, 1200);
+        assert_eq!(engine.admin_snapshot().players[0].score, 200);
         engine.ensure_player("b", "Bea");
         let admin = engine.admin_snapshot();
         let names: Vec<_> = admin
@@ -589,8 +589,8 @@ mod tests {
             .map(|player| player.name.as_str())
             .collect();
         assert_eq!(names, ["Ada", "Bea"]);
-        assert_eq!(admin.players[0].score, 1200);
-        assert_eq!(admin.players[1].score, 900);
+        assert_eq!(admin.players[0].score, 200);
+        assert_eq!(admin.players[1].score, 0);
     }
 
     #[test]
@@ -623,6 +623,6 @@ mod tests {
         assert_eq!(snap.letters[0][0].as_deref(), Some(""));
         assert!(snap.correct_word_ids.is_empty());
         assert_eq!(engine.admin_snapshot().players.len(), 1);
-        assert_eq!(engine.admin_snapshot().players[0].score, 1000);
+        assert_eq!(engine.admin_snapshot().players[0].score, 0);
     }
 }

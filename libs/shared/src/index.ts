@@ -12,3 +12,4 @@ export * from './maze';
 export * from './mazeLogic';
 export * from './wordSurvivor';
 export * from './system';
+export * from './partyLeaderboard';

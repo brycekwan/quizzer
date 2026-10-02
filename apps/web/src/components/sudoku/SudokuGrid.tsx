@@ -32,17 +32,19 @@ export function SudokuGrid({
             Math.floor(selected.col / 3) === Math.floor(colIndex / 3);
           const justCorrect = flashing.has(`${rowIndex}-${colIndex}`);
           const locked = cell.solved || cell.given;
-          const shade = justCorrect
-            ? 'bg-[#d8f3dc] duration-300'
-            : isSelected
-              ? 'bg-black/25'
-              : sameRow || sameCol
-                ? 'bg-black/[0.16]'
-                : sameBox
-                  ? 'bg-black/10'
-                  : locked
-                    ? 'bg-[#efe6d6] duration-700'
-                    : 'bg-white';
+          const shade = cell.wrong
+            ? 'bg-[#ffc9c9]'
+            : justCorrect
+              ? 'bg-[#d8f3dc] duration-300'
+              : isSelected
+                ? 'bg-black/25'
+                : sameRow || sameCol
+                  ? 'bg-black/[0.16]'
+                  : sameBox
+                    ? 'bg-black/10'
+                    : locked
+                      ? 'bg-[#efe6d6] duration-700'
+                      : 'bg-white';
           return (
             <button
               key={`${rowIndex}-${colIndex}`}
@@ -67,15 +69,14 @@ export function SudokuGrid({
                 <span className="grid h-full w-full grid-cols-3 grid-rows-3 p-0.5">
                   {Array.from({ length: 9 }, (_, index) => {
                     const digit = index + 1;
-                    const noted = cell.drafts.includes(digit);
-                    const wrong = cell.wrongDrafts.includes(digit);
+                    const noted =
+                      cell.drafts.includes(digit) && !cell.wrongDrafts.includes(digit);
                     return (
                       <span
                         key={digit}
                         className={cn(
                           'flex items-center justify-center text-[0.55rem] font-bold leading-none text-transparent sm:text-[0.7rem]',
-                          noted && 'text-ink/75',
-                          wrong && 'rounded-[2px] bg-[#ffc9c9] text-ink'
+                          noted && 'text-ink/75'
                         )}
                       >
                         {digit}
@@ -156,6 +157,9 @@ function cellLabel(row: number, col: number, cell: SudokuCellState): string {
   }
   if (cell.solved && cell.value != null) {
     return `${place}, ${cell.hinted ? 'hint' : 'correct'} ${cell.value}`;
+  }
+  if (cell.wrong && cell.value != null) {
+    return `${place}, incorrect ${cell.value}`;
   }
   if (cell.drafts.length > 0) {
     return `${place}, notes ${cell.drafts.join(' ')}`;

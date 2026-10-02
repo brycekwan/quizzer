@@ -64,11 +64,13 @@ Prod: one Docker image serves API + built web on **8080**.
 | `/host` | Host menu |
 | `/host/quizzer` | Quizzer admin (`/host/admin` redirects here) |
 | `/host/crossword` | Crossword admin + reset |
-| `/host/wordsearch` | Word search admin, leaderboard, per-player reset |
-| `/host/sudoku` | Sudoku admin, leaderboard, per-player reset |
-| `/host/maze` | Maze admin: easy, medium, and hard files, leaderboard, per-player reset |
-| `/host/wordsurvivor` | Word survivor admin: word list, topic hint, splash time, leaderboard, per-player reset |
-| `/host/system` | Connected players, combined scores, remove from the party |
+| `/leaderboard` | Player leaderboard: top 10 per game, with the player's own rank |
+| `/host/leaderboard` | Host leaderboard: overall and per-game scores with play time |
+| `/host/wordsearch` | Word search admin and per-player reset |
+| `/host/sudoku` | Sudoku admin and per-player reset |
+| `/host/maze` | Maze admin: easy, medium, and hard files, and per-player reset |
+| `/host/wordsurvivor` | Word survivor admin: word list, topic hint, splash time, and per-player reset |
+| `/host/system` | Theme, connected players, remove from the party, reset all |
 
 ## Architecture rules
 
@@ -133,10 +135,11 @@ Word survivor files under `apps/server/wordsurvivor/` list words under keys `"5"
 | `wordsurvivor:pauseTimer` / `resumeTimer` | Pause the clock for instructions, the splash, or leaving the page |
 | `wordsurvivor:admin:subscribe` / `select` / `setSplash` / `reset` / `resetPlayer` | Word survivor host (requires unlock). `select` sends `{ fileId, topic }`. `setSplash` sends `{ seconds }` |
 | `system:admin:subscribe` / `kick` | System host: connected players and remove from the party (requires unlock) |
+| `leaderboard:subscribe` | Overall and per-game leaderboard (no host unlock; players and host both subscribe) |
 
-Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `sudoku:state`, `sudoku:admin:state`, `maze:state`, `maze:admin:state`, `wordsurvivor:state`, `wordsurvivor:admin:state`, `system:admin:state`.
+Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `sudoku:state`, `sudoku:admin:state`, `maze:state`, `maze:admin:state`, `wordsurvivor:state`, `wordsurvivor:admin:state`, `system:admin:state`, `leaderboard:state`.
 
-System removal emits `player:kicked` with reason `Removed from the system by admin`, clears that player's quiz, crossword, word search, sudoku, maze, and word survivor progress, and sends them to login. Word search score is 100 points per word found plus a placement bonus of 1000 down to 100 for ranks 1–10 (most words, then shortest time). Sudoku awards 10 points for each correct digit and −10 for each distinct wrong note in a cell. Finishing adds 100 points plus 10 for each unused hint (maximum 3). Players see that score only. Sudoku admin ranking uses that score, then shorter time, and adds a placement bonus of 1000 down to 100 for ranks 1–10. The maze pays 200 for easy, 300 for medium, and 500 for hard, plus 50 for each heart still left when the run ends. Three lives are shared across the campaign. The maze board ranks by that score, then shorter time, with no placement bonus. Word survivor pays 100 for a correct word plus 5 for each unused guess. Its board ranks by that score, then shorter time. The system leaderboard sums crossword, word search, sudoku, maze, and word survivor scores (including crossword, word search, and sudoku placement bonuses) and shows the quiz score separately.
+System removal emits `player:kicked` with reason `Removed from the system by admin`, clears that player's quiz, crossword, word search, sudoku, maze, and word survivor progress, and sends them to login. Crossword and word search each award 100 points per word, ranked by words then shorter time. Sudoku awards 10 points for each correct digit and −10 for each distinct wrong note in a cell. Finishing adds 100 points plus 10 for each unused hint (maximum 3). Sudoku ranking uses that score, then shorter time. The maze pays 200 for easy, 300 for medium, and 500 for hard, plus 50 for each heart still left when the run ends. Three lives are shared across the campaign. The maze board ranks by that score, then shorter time. Word survivor pays 100 for a correct word plus 5 for each unused guess. Its board ranks by that score, then shorter time. The party leaderboard sums crossword, word search, sudoku, maze, and word survivor scores and shows the quiz score separately. Equal overall scores break by shorter total play time.
 
 ## Conventions
 

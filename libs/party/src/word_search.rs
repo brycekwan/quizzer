@@ -157,8 +157,8 @@ pub fn word_search_rank_bonus(rank: i64) -> i64 {
     WORD_SEARCH_RANK_BONUS_FIRST - (rank - 1) * WORD_SEARCH_RANK_BONUS_STEP
 }
 
-pub fn word_search_score(found_count: i64, rank: i64) -> i64 {
-    word_search_word_points(found_count) + word_search_rank_bonus(rank)
+pub fn word_search_score(found_count: i64, _rank: i64) -> i64 {
+    word_search_word_points(found_count)
 }
 
 pub fn cells_for_placement(
@@ -362,10 +362,10 @@ mod tests {
         assert_eq!(word_search_rank_bonus(10), 100);
         assert_eq!(word_search_rank_bonus(11), 0);
         assert_eq!(word_search_rank_bonus(0), 0);
-        assert_eq!(word_search_score(10, 1), 2000);
-        assert_eq!(word_search_score(10, 10), 1100);
+        assert_eq!(word_search_score(10, 1), 1000);
+        assert_eq!(word_search_score(10, 10), 1000);
         assert_eq!(word_search_score(10, 11), 1000);
-        assert_eq!(word_search_score(2, 3), 1000);
+        assert_eq!(word_search_score(2, 3), 200);
     }
 
     #[test]

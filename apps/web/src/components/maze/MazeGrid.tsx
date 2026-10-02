@@ -106,7 +106,7 @@ export function MazeGrid({
               ) : null}
               {here ? (
                 <span className="absolute inset-0 flex items-center justify-center text-grape">
-                  <CrawlingBaby className="h-[80%] w-[80%]" />
+                  <CrawlingBaby className="h-[92%] w-[92%]" />
                 </span>
               ) : null}
             </div>

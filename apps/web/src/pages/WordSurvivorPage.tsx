@@ -281,7 +281,6 @@ export function WordSurvivorPage() {
         <GamePlayHeader
           game="Word Survivor"
           title={`Word ${playerState.wordNumber} of ${playerState.wordCount}`}
-          detail={`${playerName} · ${playerState.length} letters`}
           topic={playerState.topic}
           elapsedLabel={elapsedLabel}
           instructions={
@@ -382,7 +381,7 @@ function Instructions({
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+        <Button type="button" variant="outline" size="xs" className="border-2 shadow-none">
           Instructions
         </Button>
       </DialogTrigger>

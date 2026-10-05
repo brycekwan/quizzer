@@ -862,6 +862,9 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         if let Some(meta) = meta {
             let mut party = app.party.lock().expect("party");
             if let Some(player_id) = meta.player_id.clone() {
+                party.crossword.pause_timer(&player_id);
+                party.word_search.pause_timer(&player_id);
+                party.sudoku.pause_timer(&player_id);
                 party.maze.pause_timer(&player_id);
                 party.word_survivor.pause_timer(&player_id);
             }

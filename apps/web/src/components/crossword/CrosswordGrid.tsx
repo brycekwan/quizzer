@@ -22,7 +22,7 @@ export function CrosswordGrid({
 
   return (
     <div
-      className="mx-auto grid w-full max-w-[18rem] gap-0.5 sm:max-w-md"
+      className="mx-auto grid w-full max-w-lg gap-0.5"
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       role="grid"
       aria-label="Crossword grid"
@@ -55,14 +55,14 @@ export function CrosswordGrid({
               aria-selected={isSelected}
               onClick={() => onSelect(row, col)}
               className={cn(
-                'relative aspect-square select-none rounded-sm border-2 border-ink/20 bg-white font-display text-base font-bold uppercase text-ink shadow-sm transition-colors touch-manipulation sm:text-xl',
+                'relative aspect-square select-none rounded-sm border-2 border-ink/20 bg-white font-display text-[clamp(0.65rem,3.2vw,1.25rem)] font-bold uppercase text-ink shadow-sm transition-colors touch-manipulation',
                 isHighlighted && !isSelected && 'bg-sky/30',
                 isSelected && 'border-grape bg-sun/40 ring-2 ring-grape/40',
                 isCorrect && 'bg-mint/35 border-mint'
               )}
             >
               {number != null ? (
-                <span className="absolute left-0.5 top-0 text-[0.5rem] font-extrabold leading-none text-ink/55 sm:text-[0.65rem]">
+                <span className="absolute left-0.5 top-0 text-[clamp(0.4rem,1.8vw,0.65rem)] font-extrabold leading-none text-ink/55">
                   {number}
                 </span>
               ) : null}

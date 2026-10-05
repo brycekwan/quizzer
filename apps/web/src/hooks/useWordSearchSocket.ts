@@ -154,6 +154,9 @@ export function useWordSearchSocket(
 
     return () => {
       active = false;
+      if (role === 'player') {
+        socket.emit('wordsearch:pauseTimer', {});
+      }
       socket.disconnect();
       socketRef.current = null;
     };

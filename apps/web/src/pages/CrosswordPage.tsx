@@ -34,6 +34,7 @@ import {
   nextUnsolvedClue,
   wordsAtCell,
 } from '@/lib/crosswordClient';
+import { usePlayInstructions } from '@/lib/usePlayInstructions';
 
 const DOUBLE_CLICK_MS = 400;
 
@@ -131,7 +132,7 @@ function CrosswordInstructions({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {showTrigger ? (
         <DialogTrigger asChild>
-          <Button type="button" variant="outline" size="sm">
+          <Button type="button" variant="outline" size="xs" className="border-2 shadow-none">
             Instructions
           </Button>
         </DialogTrigger>
@@ -174,6 +175,8 @@ export function CrosswordPage() {
     kicked,
     setLetter,
     clearLetter,
+    pauseTimer,
+    resumeTimer,
   } = useCrosswordSocket('player');
 
   const isMobile = useIsMobileViewport();
@@ -217,22 +220,17 @@ export function CrosswordPage() {
     }
   }
 
-  const [instructionsOpen, setInstructionsOpen] = useState(true);
-  const [intro, setIntro] = useState(true);
-  const instructionsOpenRef = useRef(true);
+  const {
+    open: instructionsOpen,
+    intro,
+    instructionsOpenRef,
+    onOpenChange: onInstructionsOpenChange,
+  } = usePlayInstructions(playerState, pauseTimer, resumeTimer);
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
-    false
+    instructionsOpen
   );
-
-  const onInstructionsOpenChange = (open: boolean) => {
-    setInstructionsOpen(open);
-    instructionsOpenRef.current = open;
-    if (!open) {
-      setIntro(false);
-    }
-  };
 
   const showKeyboard = isMobile && selected != null && !instructionsOpen;
 
@@ -620,12 +618,6 @@ export function CrosswordPage() {
         <Button asChild size="lg" variant="outline" className="mt-8">
           <Link to="/">Return to Lobby</Link>
         </Button>
-        <CrosswordInstructions
-          open={instructionsOpen}
-          onOpenChange={onInstructionsOpenChange}
-          intro={intro}
-          showTrigger={false}
-        />
       </div>
     );
   }
@@ -658,7 +650,6 @@ export function CrosswordPage() {
       <GamePlayHeader
         game="Crossword"
         title={playerState.puzzle.title}
-        detail={`Playing as ${playerName} · ${playerState.correctWordIds.length}/${playerState.totalWords} words`}
         elapsedLabel={elapsedLabel}
         instructions={
           <CrosswordInstructions
@@ -695,7 +686,7 @@ export function CrosswordPage() {
         </>
       ) : (
         <div className="flex items-start gap-6">
-          <div className="w-full max-w-md shrink-0">{grid}</div>
+          <div className="w-full max-w-lg shrink-0">{grid}</div>
           <div className="min-w-0 flex-1">{clues}</div>
         </div>
       )}
@@ -707,7 +698,7 @@ export function CrosswordPage() {
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-playfield text-ink">
         <WinnerConfetti active={playerState.completed} />
         <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-4 sm:py-3">
             {content}
           </div>
           {showKeyboard ? (

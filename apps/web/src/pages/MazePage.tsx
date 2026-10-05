@@ -104,7 +104,7 @@ export function MazePage() {
     resumeTimer,
     subscription,
   } = useMazeSocket('player');
-  const [instructionsOpen, setInstructionsOpen] = useState(true);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -150,7 +150,9 @@ export function MazePage() {
   const timerHeld =
     playerState == null || finished(playerState.phase)
       ? null
-      : instructionsOpen || Boolean(splashBlocking) || playerState.phase === 'intro';
+      : instructionsOpen ||
+        Boolean(splashBlocking) ||
+        playerState.phase === 'intro';
   useEffect(() => {
     if (timerHeld == null || subscription === 0) {
       return;
@@ -161,7 +163,11 @@ export function MazePage() {
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
-    !playerState || instructionsOpen || Boolean(splashBlocking) || playerState.phase !== 'playing',
+    !playerState ||
+      instructionsOpen ||
+      playerState.phase === 'intro' ||
+      Boolean(splashBlocking) ||
+      playerState.phase !== 'playing',
     playerState != null && finished(playerState.phase)
   );
 
@@ -246,9 +252,10 @@ export function MazePage() {
   }
 
   const intro = playerState.phase === 'intro';
-  const splashVisible = Boolean(splashBlocking) && !instructionsOpen;
+  const modalOpen = instructionsOpen || intro;
+  const splashVisible = Boolean(splashBlocking) && !modalOpen;
   const controlsDisabled =
-    instructionsOpen || splashVisible || (playerState.phase !== 'playing' && playerState.phase !== 'splash');
+    modalOpen || splashVisible || (playerState.phase !== 'playing' && playerState.phase !== 'splash');
 
   const confirmInstructions = async () => {
     if (playerState.phase === 'intro') {
@@ -268,11 +275,10 @@ export function MazePage() {
         <GamePlayHeader
           game="Maze"
           title={playerState.puzzle.title}
-          detail={`${playerName} · ${levelName(playerState.level)}`}
           elapsedLabel={elapsedLabel}
           instructions={
             <MazeInstructions
-              open={instructionsOpen}
+              open={modalOpen}
               intro={intro}
               onOpenChange={setInstructionsOpen}
               onOk={() => void confirmInstructions()}
@@ -376,7 +382,7 @@ function MazeInstructions({
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+        <Button type="button" variant="outline" size="xs" className="border-2 shadow-none">
           Instructions
         </Button>
       </DialogTrigger>

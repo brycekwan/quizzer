@@ -226,6 +226,9 @@ export function useSudokuSocket(
 
     return () => {
       active = false;
+      if (role === 'player') {
+        socket.emit('sudoku:pauseTimer', {});
+      }
       socket.disconnect();
       socketRef.current = null;
     };

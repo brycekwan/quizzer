@@ -149,6 +149,9 @@ export function useCrosswordSocket(
 
     return () => {
       active = false;
+      if (role === 'player') {
+        socket.emit('crossword:pauseTimer', {});
+      }
       socket.disconnect();
       socketRef.current = null;
     };

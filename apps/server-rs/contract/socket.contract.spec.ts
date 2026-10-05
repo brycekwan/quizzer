@@ -282,6 +282,29 @@ describe('rust socket contract', () => {
     const paused = await emitAck(intruder, 'sudoku:pauseTimer', {});
     expect(paused).toEqual({ ok: true });
   });
+
+  it('rejects gameplay floods over the per-socket rate limit', async () => {
+    const player = connect();
+    await waitFor(player, 'game:state');
+    const login = await emitAck(player, 'session:login', { name: 'Flooder' });
+    expect(login.ok).toBe(true);
+    const crossword = await emitAck(player, 'crossword:subscribe', {});
+    expect(crossword.ok).toBe(true);
+
+    let limited: Ack | undefined;
+    for (let i = 0; i < 80; i++) {
+      const result = await emitAck(player, 'crossword:setLetter', {
+        row: 0,
+        col: 0,
+        letter: 'A',
+      });
+      if (!result.ok && result.error === 'Too many requests') {
+        limited = result;
+        break;
+      }
+    }
+    expect(limited).toEqual({ ok: false, error: 'Too many requests' });
+  });
 });
 
 async function waitForHealth(url: string) {

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use party::load::{
     list_question_sets, list_word_survivor_files, load_crossword_puzzle, load_maze_puzzle,
@@ -14,7 +15,7 @@ use serde_json::{json, Value};
 use socketioxide::extract::{AckSender, Data, SocketRef, State};
 use socketioxide::SocketIo;
 
-use crate::state::{App, Dirty, Role, SocketMeta};
+use crate::state::{App, Dirty, RateDecision, Role, SocketMeta};
 
 pub fn register(io: &SocketIo) {
     io.ns(
@@ -979,6 +980,9 @@ fn on_player_join(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSend
 }
 
 fn on_player_answer(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let player_id = {
         let meta = app.meta.lock().expect("meta");
@@ -1061,6 +1065,9 @@ fn on_crossword_letter(
     ack: AckSender,
     clear: bool,
 ) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = player_id_of(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1115,6 +1122,9 @@ fn on_wordsearch_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
 }
 
 fn on_wordsearch_selection(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1168,6 +1178,9 @@ fn on_sudoku_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
 }
 
 fn on_sudoku_commit(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1196,6 +1209,9 @@ fn on_sudoku_commit(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSe
 }
 
 fn on_sudoku_draft(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1224,6 +1240,9 @@ fn on_sudoku_draft(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSen
 }
 
 fn on_sudoku_erase(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1252,6 +1271,9 @@ fn on_sudoku_erase(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSen
 }
 
 fn on_sudoku_hint(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1489,6 +1511,9 @@ fn maze_player_id(app: &App, socket: &SocketRef) -> Option<String> {
 }
 
 fn on_maze_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = maze_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1505,6 +1530,9 @@ fn on_maze_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
 }
 
 fn on_maze_move(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = maze_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1529,6 +1557,9 @@ fn on_maze_move(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender
 }
 
 fn on_maze_restart(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = maze_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1545,6 +1576,9 @@ fn on_maze_restart(app: Arc<App>, socket: SocketRef, ack: AckSender) {
 }
 
 fn on_maze_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = maze_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1602,6 +1636,9 @@ fn word_survivor_player_id(app: &App, socket: &SocketRef) -> Option<String> {
 }
 
 fn on_word_survivor_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = word_survivor_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1618,6 +1655,9 @@ fn on_word_survivor_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
 }
 
 fn on_word_survivor_letter(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = word_survivor_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1639,6 +1679,9 @@ fn on_word_survivor_letter(app: Arc<App>, socket: SocketRef, payload: Value, ack
 }
 
 fn on_word_survivor_edit(app: Arc<App>, socket: SocketRef, ack: AckSender, submit: bool) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = word_survivor_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1660,6 +1703,9 @@ fn on_word_survivor_edit(app: Arc<App>, socket: SocketRef, ack: AckSender, submi
 }
 
 fn on_word_survivor_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = word_survivor_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -2306,6 +2352,30 @@ fn find_socket(app: &App, socket_id: &str) -> Option<SocketRef> {
 
 fn sid_of(socket: &SocketRef) -> String {
     socket.id.to_string()
+}
+
+const RATE_LIMIT_MESSAGE: &str = "Too many requests";
+
+/// Admit one gameplay input, or ack-reject / disconnect a flooding socket.
+/// Returns the ack sender when the input may proceed.
+fn admit_input(app: &App, socket: &SocketRef, ack: AckSender) -> Option<AckSender> {
+    let sid = sid_of(socket);
+    let decision = {
+        let mut meta = app.meta.lock().expect("meta");
+        meta.entry(sid).or_default().input_rate.check(Instant::now())
+    };
+    match decision {
+        RateDecision::Allow => Some(ack),
+        RateDecision::Reject => {
+            let _ = ack.send(&fail(RATE_LIMIT_MESSAGE));
+            None
+        }
+        RateDecision::Disconnect => {
+            let _ = ack.send(&fail(RATE_LIMIT_MESSAGE));
+            let _ = socket.clone().disconnect();
+            None
+        }
+    }
 }
 
 fn fail(error: impl Into<String>) -> Value {

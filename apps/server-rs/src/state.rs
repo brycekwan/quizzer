@@ -1,10 +1,62 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use party::maze::MazeDifficulty;
 use party::system_admin::SystemAdmin;
 use socketioxide::SocketIo;
 use tokio::sync::Notify;
+
+/// Human-paced gameplay inputs per socket within one window.
+pub const INPUT_RATE_LIMIT: u32 = 60;
+pub(crate) const INPUT_RATE_WINDOW: Duration = Duration::from_secs(1);
+/// Consecutive rejects before the socket is dropped for flooding.
+pub(crate) const INPUT_RATE_DISCONNECT_AFTER: u32 = 120;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RateDecision {
+    Allow,
+    Reject,
+    Disconnect,
+}
+
+/// Sliding 1s counter of inbound gameplay events for one socket.
+#[derive(Clone, Debug)]
+pub struct InputRate {
+    window_started: Instant,
+    count: u32,
+    rejected_in_row: u32,
+}
+
+impl Default for InputRate {
+    fn default() -> Self {
+        Self {
+            window_started: Instant::now(),
+            count: 0,
+            rejected_in_row: 0,
+        }
+    }
+}
+
+impl InputRate {
+    pub fn check(&mut self, now: Instant) -> RateDecision {
+        if now.duration_since(self.window_started) >= INPUT_RATE_WINDOW {
+            self.window_started = now;
+            self.count = 0;
+        }
+        if self.count < INPUT_RATE_LIMIT {
+            self.count += 1;
+            self.rejected_in_row = 0;
+            return RateDecision::Allow;
+        }
+        self.rejected_in_row = self.rejected_in_row.saturating_add(1);
+        if self.rejected_in_row >= INPUT_RATE_DISCONNECT_AFTER {
+            RateDecision::Disconnect
+        } else {
+            RateDecision::Reject
+        }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub enum Role {
@@ -34,6 +86,8 @@ pub struct SocketMeta {
     pub host: bool,
     /// The maze this socket was last sent, so later updates can leave it out.
     pub maze_puzzle: Option<(MazeDifficulty, String)>,
+    /// Gameplay packet rate for this connection.
+    pub input_rate: InputRate,
 }
 
 impl SocketMeta {
@@ -171,5 +225,40 @@ mod tests {
         });
         assert!(dirty.maze && dirty.system && !dirty.quiz);
         assert!(dirty.any());
+    }
+
+    #[test]
+    fn input_rate_allows_up_to_the_limit_then_rejects() {
+        let mut rate = InputRate::default();
+        let now = Instant::now();
+        for _ in 0..INPUT_RATE_LIMIT {
+            assert_eq!(rate.check(now), RateDecision::Allow);
+        }
+        assert_eq!(rate.check(now), RateDecision::Reject);
+    }
+
+    #[test]
+    fn input_rate_resets_after_the_window() {
+        let mut rate = InputRate::default();
+        let now = Instant::now();
+        for _ in 0..INPUT_RATE_LIMIT {
+            assert_eq!(rate.check(now), RateDecision::Allow);
+        }
+        assert_eq!(rate.check(now), RateDecision::Reject);
+        let next = now + INPUT_RATE_WINDOW;
+        assert_eq!(rate.check(next), RateDecision::Allow);
+    }
+
+    #[test]
+    fn input_rate_disconnects_after_sustained_rejects() {
+        let mut rate = InputRate::default();
+        let now = Instant::now();
+        for _ in 0..INPUT_RATE_LIMIT {
+            assert_eq!(rate.check(now), RateDecision::Allow);
+        }
+        for _ in 0..(INPUT_RATE_DISCONNECT_AFTER - 1) {
+            assert_eq!(rate.check(now), RateDecision::Reject);
+        }
+        assert_eq!(rate.check(now), RateDecision::Disconnect);
     }
 }

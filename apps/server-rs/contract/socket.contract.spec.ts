@@ -253,8 +253,12 @@ describe('rust socket contract', () => {
     const walls = mazeState.puzzle.walls[mazeState.position.row]?.[mazeState.position.col];
     const direction = walls && !walls.e ? 'e' : walls && !walls.s ? 's' : walls && !walls.w ? 'w' : 'n';
     await new Promise((resolve) => setTimeout(resolve, 5_200));
+    const slimPromise = waitFor<Partial<MazeState>>(player, 'maze:state');
     const moved = await emitAck(player, 'maze:move', { direction });
     expect(moved.ok).toBe(true);
+    const slim = await slimPromise;
+    expect(slim.puzzle).toBeUndefined();
+    expect(slim.position).not.toEqual(mazeState.position);
 
     const boardPromise = waitFor<SystemState>(admin, 'system:admin:state');
     const subscribed = await emitAck(admin, 'system:admin:subscribe', {});
@@ -277,6 +281,29 @@ describe('rust socket contract', () => {
     expect(reset).toEqual({ ok: false, error: 'Host passphrase required' });
     const paused = await emitAck(intruder, 'sudoku:pauseTimer', {});
     expect(paused).toEqual({ ok: true });
+  });
+
+  it('rejects gameplay floods over the per-socket rate limit', async () => {
+    const player = connect();
+    await waitFor(player, 'game:state');
+    const login = await emitAck(player, 'session:login', { name: 'Flooder' });
+    expect(login.ok).toBe(true);
+    const crossword = await emitAck(player, 'crossword:subscribe', {});
+    expect(crossword.ok).toBe(true);
+
+    let limited: Ack | undefined;
+    for (let i = 0; i < 80; i++) {
+      const result = await emitAck(player, 'crossword:setLetter', {
+        row: 0,
+        col: 0,
+        letter: 'A',
+      });
+      if (!result.ok && result.error === 'Too many requests') {
+        limited = result;
+        break;
+      }
+    }
+    expect(limited).toEqual({ ok: false, error: 'Too many requests' });
   });
 });
 

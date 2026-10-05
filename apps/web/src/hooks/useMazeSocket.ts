@@ -1,6 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { MazeAdminSnapshot, MazeDifficulty, MazePlayerSnapshot } from '@party/shared';
+import {
+  predictMazeMove,
+  type MazeAdminSnapshot,
+  type MazeDifficulty,
+  type MazeDirection,
+  type MazePlayerSnapshot,
+  type MazePublicPuzzle,
+  type MazeStateUpdate,
+} from '@party/shared';
+import {
+  DROPPED,
+  createOptimisticQueue,
+  emitInput,
+  type InputAck,
+  type OptimisticQueue,
+} from '@/lib/optimisticInput';
 import {
   clearStoredSession,
   readStoredSession,
@@ -10,7 +25,9 @@ import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
 
-type Ack = { ok: boolean; error?: string };
+type Ack = InputAck;
+
+type MazeInput = { kind: 'move'; direction: MazeDirection } | { kind: 'restart' };
 
 export function useMazeSocket(
   role: 'player' | 'admin' = 'player',
@@ -27,10 +44,26 @@ export function useMazeSocket(
   const [error, setError] = useState<string | null>(null);
   const [kicked, setKicked] = useState(false);
   const [hostReady, setHostReady] = useState(role !== 'admin');
+  /** Counts successful subscribes, so the page can resume the clock after a reconnect. */
+  const [subscription, setSubscription] = useState(0);
   const playerIdRef = useRef(playerId);
   playerIdRef.current = playerId;
   const playerNameRef = useRef(playerName);
   playerNameRef.current = playerName;
+  const puzzleRef = useRef<MazePublicPuzzle | null>(null);
+  const queueRef = useRef<OptimisticQueue<MazePlayerSnapshot, MazeInput> | null>(null);
+  if (!queueRef.current) {
+    const queue = createOptimisticQueue<MazePlayerSnapshot, MazeInput>({
+      apply: (state, input) =>
+        input.kind === 'move' ? (predictMazeMove(state, input.direction) ?? state) : state,
+      send: (input, done) =>
+        input.kind === 'move'
+          ? emitInput(socketRef.current, 'maze:move', { direction: input.direction }, done)
+          : emitInput(socketRef.current, 'maze:restart', {}, done),
+      onChange: () => setPlayerState(queue.view()),
+    });
+    queueRef.current = queue;
+  }
 
   useEffect(() => {
     const socket = io({
@@ -39,6 +72,9 @@ export function useMazeSocket(
     });
     socketRef.current = socket;
     let active = true;
+    const queue = queueRef.current;
+    puzzleRef.current = null;
+    queue?.reset();
 
     const clearSession = () => {
       clearStoredSession();
@@ -110,14 +146,25 @@ export function useMazeSocket(
           socket.emit('maze:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
             if (result?.ok === false) {
               setError(result.error ?? 'Could not join the maze');
+              return;
             }
+            setSubscription((count) => count + 1);
           });
         });
       }
     });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('maze:state', (snapshot: MazePlayerSnapshot) => {
-      setPlayerState(snapshot);
+    socket.on('disconnect', () => {
+      setConnected(false);
+      puzzleRef.current = null;
+      queue?.reset();
+    });
+    socket.on('maze:state', (update: MazeStateUpdate) => {
+      const puzzle = update.puzzle ?? puzzleRef.current;
+      if (!puzzle) {
+        return;
+      }
+      puzzleRef.current = puzzle;
+      queue?.receive({ ...update, puzzle });
     });
     socket.on('maze:admin:state', (snapshot: MazeAdminSnapshot) => {
       setAdminState(snapshot);
@@ -154,10 +201,18 @@ export function useMazeSocket(
       new Promise<Ack>((resolve) => {
         socketRef.current?.emit(event, payload, resolve);
       });
+    const queue = queueRef.current;
     return {
       ackIntro: () => emit('maze:ackIntro', {}),
-      move: (direction: 'n' | 'e' | 's' | 'w') => emit('maze:move', { direction }),
-      restart: () => emit('maze:restart', {}),
+      move: (direction: MazeDirection): Promise<Ack> => {
+        const current = queue?.view();
+        if (!queue || !current || !predictMazeMove(current, direction)) {
+          return Promise.resolve(DROPPED);
+        }
+        return queue.push({ kind: 'move', direction });
+      },
+      restart: (): Promise<Ack> =>
+        queue ? queue.push({ kind: 'restart' }) : Promise.resolve(DROPPED),
       pauseTimer: () => emit('maze:pauseTimer', {}),
       resumeTimer: () => emit('maze:resumeTimer', {}),
       reset: () => emit('maze:admin:reset', {}),
@@ -177,6 +232,7 @@ export function useMazeSocket(
     kicked,
     setError,
     hostReady,
+    subscription,
     ...api,
   };
 }

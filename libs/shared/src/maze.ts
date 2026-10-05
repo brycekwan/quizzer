@@ -62,6 +62,11 @@ export interface MazePlayerSnapshot {
   completedAt: number | null;
 }
 
+/** `maze:state` leaves out `puzzle` once this socket has been sent that maze. */
+export type MazeStateUpdate = Omit<MazePlayerSnapshot, 'puzzle'> & {
+  puzzle?: MazePublicPuzzle;
+};
+
 export interface MazePuzzleInfo {
   id: string;
   label: string;

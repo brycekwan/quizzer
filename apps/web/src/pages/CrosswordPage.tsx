@@ -34,6 +34,7 @@ import {
   nextUnsolvedClue,
   wordsAtCell,
 } from '@/lib/crosswordClient';
+import { usePlayInstructions } from '@/lib/usePlayInstructions';
 
 const DOUBLE_CLICK_MS = 400;
 
@@ -131,7 +132,7 @@ function CrosswordInstructions({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {showTrigger ? (
         <DialogTrigger asChild>
-          <Button type="button" variant="outline" size="sm">
+          <Button type="button" variant="outline" size="xs" className="border-2 shadow-none">
             Instructions
           </Button>
         </DialogTrigger>
@@ -174,6 +175,8 @@ export function CrosswordPage() {
     kicked,
     setLetter,
     clearLetter,
+    pauseTimer,
+    resumeTimer,
   } = useCrosswordSocket('player');
 
   const isMobile = useIsMobileViewport();
@@ -193,6 +196,7 @@ export function CrosswordPage() {
     letters: (string | null)[][];
     correctWordIds: string[];
   } | null>(null);
+  const [, setGridVersion] = useState(0);
   const keyQueueRef = useRef(Promise.resolve());
   const seenLettersRef = useRef<(string | null)[][] | null>(null);
   const puzzleIdRef = useRef<string | null>(null);
@@ -216,22 +220,17 @@ export function CrosswordPage() {
     }
   }
 
-  const [instructionsOpen, setInstructionsOpen] = useState(true);
-  const [intro, setIntro] = useState(true);
-  const instructionsOpenRef = useRef(true);
+  const {
+    open: instructionsOpen,
+    intro,
+    instructionsOpenRef,
+    onOpenChange: onInstructionsOpenChange,
+  } = usePlayInstructions(playerState, pauseTimer, resumeTimer);
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
-    false
+    instructionsOpen
   );
-
-  const onInstructionsOpenChange = (open: boolean) => {
-    setInstructionsOpen(open);
-    instructionsOpenRef.current = open;
-    if (!open) {
-      setIntro(false);
-    }
-  };
 
   const showKeyboard = isMobile && selected != null && !instructionsOpen;
 
@@ -448,15 +447,8 @@ export function CrosswordPage() {
     const { row, col } = current;
     const dir = directionRef.current;
     if (key === 'Backspace' || key === 'Delete') {
-      const cleared = await clearLetter(row, col);
-      if (cleared.ok && cleared.correctWordIds && gridRef.current) {
-        gridRef.current = {
-          letters: gridRef.current.letters.map((letterRow, r) =>
-            letterRow.map((letter, c) => (r === row && c === col ? '' : letter))
-          ),
-          correctWordIds: cleared.correctWordIds,
-        };
-      }
+      writeCell(row, col, '');
+      void clearLetter(row, col).then((result) => settleCell(row, col, '', result));
       if (key === 'Backspace') {
         moveInDirection(row, col, dir, -1);
       }
@@ -496,27 +488,29 @@ export function CrosswordPage() {
       return;
     }
     collapseClues();
-    const baseline =
-      gridRef.current ??
-      ({
-        letters: playerState.letters,
-        correctWordIds: playerState.correctWordIds,
-      } as const);
-    const previousCorrect = new Set(baseline.correctWordIds);
-    const result = await setLetter(row, col, key);
-    if (!result.ok || !result.correctWordIds) {
-      return;
-    }
-    const letters = baseline.letters.map((letterRow, r) =>
-      letterRow.map((letter, c) =>
-        r === row && c === col ? key.toUpperCase() : letter
-      )
+    const letter = key.toUpperCase();
+    const previousCorrect = new Set(
+      gridRef.current?.correctWordIds ?? playerState.correctWordIds
     );
-    gridRef.current = { letters, correctWordIds: result.correctWordIds };
+    const letters = writeCell(row, col, letter);
+    const answered = setLetter(row, col, key).then((result) => {
+      settleCell(row, col, letter, result);
+      return result;
+    });
 
     const covering = wordsAtCell(words, row, col);
     const word = covering.find((entry) => entry.direction === dir) ?? covering[0];
     if (!word) {
+      return;
+    }
+    const nextCell = nextEmptyCellInWord(word, letters, { row, col });
+    if (nextCell) {
+      focusCell(nextCell);
+      return;
+    }
+    // A full word may be solved, and only the server knows, so the cursor waits for it here.
+    const result = await answered;
+    if (!result.ok || !result.correctWordIds) {
       return;
     }
     const justSolved =
@@ -524,13 +518,46 @@ export function CrosswordPage() {
     if (justSolved) {
       const nextClue = nextUnsolvedClue(words, word.id, result.correctWordIds);
       if (nextClue) {
-        focusCell(firstEmptyCellInWord(nextClue, letters), nextClue.direction);
+        focusCell(
+          firstEmptyCellInWord(nextClue, gridRef.current?.letters ?? letters),
+          nextClue.direction
+        );
+      }
+    }
+  };
+
+  const writeCell = (row: number, col: number, letter: string) => {
+    const base = gridRef.current ?? {
+      letters: playerState?.letters ?? [],
+      correctWordIds: playerState?.correctWordIds ?? [],
+    };
+    const letters = base.letters.map((letterRow, r) =>
+      letterRow.map((value, c) => (r === row && c === col ? letter : value))
+    );
+    gridRef.current = { letters, correctWordIds: base.correctWordIds };
+    setGridVersion((version) => version + 1);
+    return letters;
+  };
+
+  const settleCell = (
+    row: number,
+    col: number,
+    letter: string,
+    result: { ok: boolean; correctWordIds?: string[] }
+  ) => {
+    const grid = gridRef.current;
+    if (!grid) {
+      return;
+    }
+    if (result.ok) {
+      if (result.correctWordIds) {
+        gridRef.current = { ...grid, correctWordIds: result.correctWordIds };
       }
       return;
     }
-    const nextCell = nextEmptyCellInWord(word, letters, { row, col });
-    if (nextCell) {
-      focusCell(nextCell);
+    // Refused: show what the server holds, unless the square was typed over since.
+    if (grid.letters[row]?.[col] === letter) {
+      writeCell(row, col, seenLettersRef.current?.[row]?.[col] ?? '');
     }
   };
 
@@ -591,12 +618,6 @@ export function CrosswordPage() {
         <Button asChild size="lg" variant="outline" className="mt-8">
           <Link to="/">Return to Lobby</Link>
         </Button>
-        <CrosswordInstructions
-          open={instructionsOpen}
-          onOpenChange={onInstructionsOpenChange}
-          intro={intro}
-          showTrigger={false}
-        />
       </div>
     );
   }
@@ -605,7 +626,7 @@ export function CrosswordPage() {
     <CrosswordGrid
       open={playerState.puzzle.open}
       cellNumbers={playerState.puzzle.cellNumbers}
-      letters={playerState.letters}
+      letters={gridRef.current?.letters ?? playerState.letters}
       selected={selected}
       highlighted={highlighted}
       correctCells={correctCells}
@@ -629,7 +650,6 @@ export function CrosswordPage() {
       <GamePlayHeader
         game="Crossword"
         title={playerState.puzzle.title}
-        detail={`Playing as ${playerName} · ${playerState.correctWordIds.length}/${playerState.totalWords} words`}
         elapsedLabel={elapsedLabel}
         instructions={
           <CrosswordInstructions
@@ -666,7 +686,7 @@ export function CrosswordPage() {
         </>
       ) : (
         <div className="flex items-start gap-6">
-          <div className="w-full max-w-md shrink-0">{grid}</div>
+          <div className="w-full max-w-lg shrink-0">{grid}</div>
           <div className="min-w-0 flex-1">{clues}</div>
         </div>
       )}
@@ -678,7 +698,7 @@ export function CrosswordPage() {
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-playfield text-ink">
         <WinnerConfetti active={playerState.completed} />
         <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-4 sm:py-3">
             {content}
           </div>
           {showKeyboard ? (

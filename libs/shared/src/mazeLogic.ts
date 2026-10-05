@@ -4,6 +4,7 @@ import {
   type MazeDifficulty,
   type MazeDirection,
   type MazeFile,
+  type MazePlayerSnapshot,
   type MazePublicPuzzle,
   type MazeWalls,
 } from './maze';
@@ -164,6 +165,39 @@ function label(difficulty: MazeDifficulty): string {
     case 'hard':
       return 'Hard';
   }
+}
+
+/**
+ * The board after one step, using the same rules the server applies, or null
+ * when the server would refuse it. Reaching the target holds further steps
+ * until the server moves the player on.
+ */
+export function predictMazeMove(
+  state: MazePlayerSnapshot,
+  direction: MazeDirection,
+  now: number = Date.now()
+): MazePlayerSnapshot | null {
+  const splashOver =
+    state.phase === 'splash' && state.splashUntil != null && state.splashUntil <= now;
+  if (state.phase !== 'playing' && !splashOver) {
+    return null;
+  }
+  const { puzzle, position } = state;
+  if (sameCell(position, puzzle.target) || !passageOpen(puzzle, position, direction)) {
+    return null;
+  }
+  const step = delta(direction);
+  const next = { row: position.row + step.row, col: position.col + step.col };
+  if (state.visited.some((cell) => sameCell(cell, next))) {
+    return null;
+  }
+  return {
+    ...state,
+    phase: 'playing',
+    splashUntil: null,
+    position: next,
+    visited: [...state.visited, next],
+  };
 }
 
 export function toPublicMaze(

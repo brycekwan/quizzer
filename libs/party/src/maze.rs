@@ -180,7 +180,9 @@ pub struct MazePublicPuzzle {
 #[serde(rename_all = "camelCase")]
 pub struct MazePlayerSnapshot {
     pub level: MazeDifficulty,
-    pub puzzle: MazePublicPuzzle,
+    /// Left out when the client already holds this maze.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub puzzle: Option<MazePublicPuzzle>,
     pub position: MazeCellRef,
     pub visited: Vec<MazeCellRef>,
     pub lives: i64,

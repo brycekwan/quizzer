@@ -102,15 +102,15 @@ export function MazePage() {
     restart,
     pauseTimer,
     resumeTimer,
+    subscription,
   } = useMazeSocket('player');
-  const [instructionsOpen, setInstructionsOpen] = useState(true);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const instructionsOpenRef = useRef(instructionsOpen);
   instructionsOpenRef.current = instructionsOpen;
   const seen = useRef<{ phase: MazePhase; level: string } | null>(null);
-  const moving = useRef(false);
 
   useEffect(() => {
     if (!playerState) {
@@ -132,21 +132,6 @@ export function MazePage() {
     return () => window.clearTimeout(id);
   }, [showSplash, playerState?.splashUntil]);
 
-  useEffect(() => {
-    if (!playerState || finished(playerState.phase)) {
-      return;
-    }
-    const splashBlocking =
-      playerState.phase === 'splash' &&
-      (showSplash || (playerState.splashUntil != null && playerState.splashUntil > Date.now()));
-    const hold = instructionsOpen || splashBlocking || playerState.phase === 'intro';
-    if (hold) {
-      void pauseTimer();
-      return;
-    }
-    void resumeTimer();
-  }, [instructionsOpen, pauseTimer, playerState, resumeTimer, showSplash]);
-
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
     if (playerState?.phase !== 'splash') {
@@ -159,15 +144,35 @@ export function MazePage() {
   const splashBlocking =
     playerState?.phase === 'splash' &&
     (showSplash || (playerState.splashUntil != null && playerState.splashUntil > tick));
+
+  // Keyed on the hold itself: each pause or resume answers with new state,
+  // so depending on `playerState` would send them in a loop.
+  const timerHeld =
+    playerState == null || finished(playerState.phase)
+      ? null
+      : instructionsOpen ||
+        Boolean(splashBlocking) ||
+        playerState.phase === 'intro';
+  useEffect(() => {
+    if (timerHeld == null || subscription === 0) {
+      return;
+    }
+    void (timerHeld ? pauseTimer() : resumeTimer());
+  }, [timerHeld, subscription, pauseTimer, resumeTimer]);
+
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
-    !playerState || instructionsOpen || Boolean(splashBlocking) || playerState.phase !== 'playing',
+    !playerState ||
+      instructionsOpen ||
+      playerState.phase === 'intro' ||
+      Boolean(splashBlocking) ||
+      playerState.phase !== 'playing',
     playerState != null && finished(playerState.phase)
   );
 
   const sendMove = async (direction: MazeDirection) => {
-    if (moving.current || !playerState) {
+    if (!playerState) {
       return;
     }
     if (playerState.phase !== 'playing' && playerState.phase !== 'splash') {
@@ -176,12 +181,14 @@ export function MazePage() {
     if (instructionsOpenRef.current || showSplash || splashBlocking) {
       return;
     }
-    moving.current = true;
     const result = await move(direction);
-    moving.current = false;
     if (!result?.ok) {
       const message = result?.error ?? '';
-      if (message === 'That way is blocked' || message === 'You cannot go back') {
+      if (
+        result?.dropped ||
+        message === 'That way is blocked' ||
+        message === 'You cannot go back'
+      ) {
         return;
       }
       setError(message || 'Could not move');
@@ -245,9 +252,10 @@ export function MazePage() {
   }
 
   const intro = playerState.phase === 'intro';
-  const splashVisible = Boolean(splashBlocking) && !instructionsOpen;
+  const modalOpen = instructionsOpen || intro;
+  const splashVisible = Boolean(splashBlocking) && !modalOpen;
   const controlsDisabled =
-    instructionsOpen || splashVisible || (playerState.phase !== 'playing' && playerState.phase !== 'splash');
+    modalOpen || splashVisible || (playerState.phase !== 'playing' && playerState.phase !== 'splash');
 
   const confirmInstructions = async () => {
     if (playerState.phase === 'intro') {
@@ -267,11 +275,10 @@ export function MazePage() {
         <GamePlayHeader
           game="Maze"
           title={playerState.puzzle.title}
-          detail={`${playerName} · ${levelName(playerState.level)}`}
           elapsedLabel={elapsedLabel}
           instructions={
             <MazeInstructions
-              open={instructionsOpen}
+              open={modalOpen}
               intro={intro}
               onOpenChange={setInstructionsOpen}
               onOk={() => void confirmInstructions()}
@@ -338,7 +345,7 @@ export function MazePage() {
             const result = await restart();
             setConfirming(false);
             setConfirmRestart(false);
-            if (!result.ok) {
+            if (!result.ok && !result.dropped) {
               setError(result.error ?? 'Could not restart');
             }
           })();
@@ -375,7 +382,7 @@ function MazeInstructions({
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+        <Button type="button" variant="outline" size="xs" className="border-2 shadow-none">
           Instructions
         </Button>
       </DialogTrigger>

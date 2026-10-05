@@ -12,6 +12,9 @@ import {
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
+import { createSerialSender, emitInput, type InputAck } from '@/lib/optimisticInput';
+
+type LetterAck = InputAck & { correctWordIds?: string[] };
 
 export function useCrosswordSocket(
   role: 'player' | 'admin' = 'player',
@@ -146,37 +149,25 @@ export function useCrosswordSocket(
 
     return () => {
       active = false;
+      if (role === 'player') {
+        socket.emit('crossword:pauseTimer', {});
+      }
       socket.disconnect();
       socketRef.current = null;
     };
   }, [role, hostSecret, hostAttempt]);
 
-  const api = useMemo(
-    () => ({
+  const api = useMemo(() => {
+    const send = createSerialSender();
+    return {
       setLetter: (row: number, col: number, letter: string) =>
-        new Promise<{
-          ok: boolean;
-          error?: string;
-          correctWordIds?: string[];
-        }>((resolve) => {
-          socketRef.current?.emit(
-            'crossword:setLetter',
-            { row, col, letter },
-            resolve
-          );
-        }),
+        send<LetterAck>((done) =>
+          emitInput(socketRef.current, 'crossword:setLetter', { row, col, letter }, done)
+        ),
       clearLetter: (row: number, col: number) =>
-        new Promise<{
-          ok: boolean;
-          error?: string;
-          correctWordIds?: string[];
-        }>((resolve) => {
-          socketRef.current?.emit(
-            'crossword:clearLetter',
-            { row, col },
-            resolve
-          );
-        }),
+        send<LetterAck>((done) =>
+          emitInput(socketRef.current, 'crossword:clearLetter', { row, col }, done)
+        ),
       pauseTimer: () =>
         new Promise<{ ok: boolean; error?: string }>((resolve) => {
           socketRef.current?.emit('crossword:pauseTimer', {}, resolve);
@@ -205,9 +196,8 @@ export function useCrosswordSocket(
             resolve
           );
         }),
-    }),
-    []
-  );
+    };
+  }, []);
 
   return {
     connected,

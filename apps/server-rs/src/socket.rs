@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use party::load::{
     list_question_sets, list_word_survivor_files, load_crossword_puzzle, load_maze_puzzle,
@@ -14,7 +15,7 @@ use serde_json::{json, Value};
 use socketioxide::extract::{AckSender, Data, SocketRef, State};
 use socketioxide::SocketIo;
 
-use crate::state::{App, Role, SocketMeta};
+use crate::state::{App, Dirty, RateDecision, Role, SocketMeta};
 
 pub fn register(io: &SocketIo) {
     io.ns(
@@ -861,6 +862,9 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         if let Some(meta) = meta {
             let mut party = app.party.lock().expect("party");
             if let Some(player_id) = meta.player_id.clone() {
+                party.crossword.pause_timer(&player_id);
+                party.word_search.pause_timer(&player_id);
+                party.sudoku.pause_timer(&player_id);
                 party.maze.pause_timer(&player_id);
                 party.word_survivor.pause_timer(&player_id);
             }
@@ -871,7 +875,7 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
         }
         app.meta.lock().expect("meta").remove(&sid);
         drop(socket);
-        changed(&app);
+        mark(&app, Dirty::ALL);
     });
 }
 
@@ -905,7 +909,7 @@ fn on_session_login(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSe
             let _ = ack.send(&fail(error));
         }
     }
-    changed(&app);
+    mark(&app, Dirty::ALL);
 }
 
 fn on_player_join(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
@@ -975,10 +979,13 @@ fn on_player_join(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSend
             let _ = ack.send(&fail(error));
         }
     }
-    changed(&app);
+    mark(&app, Dirty::ALL);
 }
 
 fn on_player_answer(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let player_id = {
         let meta = app.meta.lock().expect("meta");
@@ -1000,7 +1007,7 @@ fn on_player_answer(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSe
         }
     };
     let _ = ack.send(&result);
-    changed(&app);
+    played(&app, &socket, Game::Quiz);
 }
 
 fn on_quiz_kick(app: Arc<App>, payload: Value, ack: AckSender) {
@@ -1051,8 +1058,7 @@ fn on_crossword_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     }
     flag_mut(&app, &socket, |meta| meta.crossword_player = true);
     let _ = ack.send(&json!({ "ok": true }));
-    emit_crossword_player(&app, &socket);
-    changed(&app);
+    played(&app, &socket, Game::Crossword);
 }
 
 fn on_crossword_letter(
@@ -1062,6 +1068,9 @@ fn on_crossword_letter(
     ack: AckSender,
     clear: bool,
 ) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = player_id_of(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1087,7 +1096,7 @@ fn on_crossword_letter(
         Ok(ids) => json!({ "ok": true, "correctWordIds": ids }),
         Err(error) => fail(error),
     });
-    changed(&app);
+    played(&app, &socket, Game::Crossword);
 }
 
 fn on_wordsearch_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
@@ -1112,11 +1121,13 @@ fn on_wordsearch_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     }
     flag_mut(&app, &socket, |meta| meta.wordsearch_player = true);
     let _ = ack.send(&json!({ "ok": true }));
-    emit_wordsearch_player(&app, &socket);
-    changed(&app);
+    played(&app, &socket, Game::WordSearch);
 }
 
 fn on_wordsearch_selection(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1141,7 +1152,7 @@ fn on_wordsearch_selection(app: Arc<App>, socket: SocketRef, payload: Value, ack
         Ok(matched) => json!({ "ok": true, "matched": matched }),
         Err(error) => fail(error),
     });
-    changed(&app);
+    played(&app, &socket, Game::WordSearch);
 }
 
 fn on_sudoku_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
@@ -1166,11 +1177,13 @@ fn on_sudoku_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     }
     flag_mut(&app, &socket, |meta| meta.sudoku_player = true);
     let _ = ack.send(&json!({ "ok": true }));
-    emit_sudoku_player(&app, &socket);
-    changed(&app);
+    played(&app, &socket, Game::Sudoku);
 }
 
 fn on_sudoku_commit(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1195,10 +1208,13 @@ fn on_sudoku_commit(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSe
         Ok(correct) => json!({ "ok": true, "correct": correct }),
         Err(error) => fail(error),
     });
-    changed(&app);
+    played(&app, &socket, Game::Sudoku);
 }
 
 fn on_sudoku_draft(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1223,10 +1239,13 @@ fn on_sudoku_draft(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSen
         Ok(()) => json!({ "ok": true }),
         Err(error) => fail(error),
     });
-    changed(&app);
+    played(&app, &socket, Game::Sudoku);
 }
 
 fn on_sudoku_erase(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1251,10 +1270,13 @@ fn on_sudoku_erase(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSen
         Ok(()) => json!({ "ok": true }),
         Err(error) => fail(error),
     });
-    changed(&app);
+    played(&app, &socket, Game::Sudoku);
 }
 
 fn on_sudoku_hint(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let sid = sid_of(&socket);
     let meta = app
         .meta
@@ -1280,7 +1302,7 @@ fn on_sudoku_hint(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSend
         Ok(()) => json!({ "ok": true }),
         Err(error) => fail(error),
     });
-    changed(&app);
+    played(&app, &socket, Game::Sudoku);
 }
 
 fn on_system_kick(app: Arc<App>, payload: Value, ack: AckSender) {
@@ -1476,8 +1498,7 @@ fn on_maze_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
     }
     flag_mut(&app, &socket, |meta| meta.maze_player = true);
     let _ = ack.send(&json!({ "ok": true }));
-    emit_maze_player(&app, &socket);
-    changed(&app);
+    played(&app, &socket, Game::Maze);
 }
 
 fn maze_player_id(app: &App, socket: &SocketRef) -> Option<String> {
@@ -1493,6 +1514,9 @@ fn maze_player_id(app: &App, socket: &SocketRef) -> Option<String> {
 }
 
 fn on_maze_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = maze_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1505,10 +1529,13 @@ fn on_maze_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
         }
     };
     let _ = ack.send(&result);
-    changed(&app);
+    played(&app, &socket, Game::Maze);
 }
 
 fn on_maze_move(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = maze_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1529,10 +1556,13 @@ fn on_maze_move(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender
         }
     };
     let _ = ack.send(&result);
-    changed(&app);
+    played(&app, &socket, Game::Maze);
 }
 
 fn on_maze_restart(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = maze_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1545,10 +1575,13 @@ fn on_maze_restart(app: Arc<App>, socket: SocketRef, ack: AckSender) {
         }
     };
     let _ = ack.send(&result);
-    changed(&app);
+    played(&app, &socket, Game::Maze);
 }
 
 fn on_maze_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = maze_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1562,7 +1595,7 @@ fn on_maze_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) 
         }
     }
     let _ = ack.send(&json!({ "ok": true }));
-    changed(&app);
+    played(&app, &socket, Game::Maze);
 }
 
 fn on_word_survivor_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
@@ -1590,8 +1623,7 @@ fn on_word_survivor_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) 
     }
     flag_mut(&app, &socket, |meta| meta.word_survivor_player = true);
     let _ = ack.send(&json!({ "ok": true }));
-    emit_word_survivor_player(&app, &socket);
-    changed(&app);
+    played(&app, &socket, Game::WordSurvivor);
 }
 
 fn word_survivor_player_id(app: &App, socket: &SocketRef) -> Option<String> {
@@ -1607,6 +1639,9 @@ fn word_survivor_player_id(app: &App, socket: &SocketRef) -> Option<String> {
 }
 
 fn on_word_survivor_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = word_survivor_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1619,10 +1654,13 @@ fn on_word_survivor_ack(app: Arc<App>, socket: SocketRef, ack: AckSender) {
         }
     };
     let _ = ack.send(&result);
-    changed(&app);
+    played(&app, &socket, Game::WordSurvivor);
 }
 
 fn on_word_survivor_letter(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = word_survivor_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1640,10 +1678,13 @@ fn on_word_survivor_letter(app: Arc<App>, socket: SocketRef, payload: Value, ack
         }
     };
     let _ = ack.send(&result);
-    changed(&app);
+    played(&app, &socket, Game::WordSurvivor);
 }
 
 fn on_word_survivor_edit(app: Arc<App>, socket: SocketRef, ack: AckSender, submit: bool) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = word_survivor_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1661,10 +1702,13 @@ fn on_word_survivor_edit(app: Arc<App>, socket: SocketRef, ack: AckSender, submi
         }
     };
     let _ = ack.send(&result);
-    changed(&app);
+    played(&app, &socket, Game::WordSurvivor);
 }
 
 fn on_word_survivor_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, pause: bool) {
+    let Some(ack) = admit_input(&app, &socket, ack) else {
+        return;
+    };
     let Some(player_id) = word_survivor_player_id(&app, &socket) else {
         let _ = ack.send(&fail("Log in first"));
         return;
@@ -1678,7 +1722,7 @@ fn on_word_survivor_pause(app: Arc<App>, socket: SocketRef, ack: AckSender, paus
         }
     }
     let _ = ack.send(&json!({ "ok": true }));
-    changed(&app);
+    played(&app, &socket, Game::WordSurvivor);
 }
 
 fn refresh_word_survivor(party: &mut party::system_admin::SystemAdmin) {
@@ -1930,62 +1974,174 @@ fn clear_player_flags(app: &App, socket: &SocketRef) {
     }
 }
 
+#[derive(Clone, Copy)]
+enum Game {
+    Quiz,
+    Crossword,
+    WordSearch,
+    Sudoku,
+    Maze,
+    WordSurvivor,
+}
+
+/// Host actions and resets: every view goes out now.
 fn changed(app: &App) {
     broadcast(app);
     app.notify.notify_one();
 }
 
+/// One player's input. Their own board goes out now; host, system, and
+/// leaderboard views wait for the next flush.
+fn played(app: &App, socket: &SocketRef, game: Game) {
+    let mut dirty = Dirty {
+        system: true,
+        leaderboard: true,
+        ..Dirty::default()
+    };
+    match game {
+        Game::Quiz => {
+            emit_game(app, socket);
+            dirty.quiz = true;
+        }
+        Game::Crossword => {
+            emit_crossword_player(app, socket);
+            dirty.crossword = true;
+        }
+        Game::WordSearch => {
+            emit_wordsearch_player(app, socket);
+            dirty.word_search = true;
+        }
+        Game::Sudoku => {
+            emit_sudoku_player(app, socket);
+            dirty.sudoku = true;
+        }
+        Game::Maze => {
+            emit_maze_player(app, socket);
+            dirty.maze = true;
+        }
+        Game::WordSurvivor => {
+            emit_word_survivor_player(app, socket);
+            dirty.word_survivor = true;
+        }
+    }
+    mark(app, dirty);
+}
+
+pub fn mark(app: &App, dirty: Dirty) {
+    app.dirty.lock().expect("dirty").merge(dirty);
+    if dirty.quiz {
+        app.notify.notify_one();
+    }
+}
+
+/// Send the views queued by `mark`.
+pub fn flush(app: &App) {
+    let dirty = std::mem::take(&mut *app.dirty.lock().expect("dirty"));
+    if dirty.any() {
+        send_views(app, dirty);
+    }
+}
+
 pub fn broadcast(app: &App) {
+    *app.dirty.lock().expect("dirty") = Dirty::default();
     let Some(io) = app.io.get() else {
         return;
     };
-    let sockets = io.sockets();
-    for socket in sockets {
-        let meta = app
-            .meta
-            .lock()
-            .expect("meta")
-            .get(&socket.id.to_string())
-            .cloned()
-            .unwrap_or_default();
-        emit_game_for(&app, &socket, &meta);
+    let metas = app.meta.lock().expect("meta").clone();
+    for socket in io.sockets() {
+        let Some(meta) = metas.get(&sid_of(&socket)) else {
+            continue;
+        };
         if meta.crossword_player {
-            emit_crossword_player(&app, &socket);
-        }
-        if meta.crossword_admin {
-            emit_crossword_admin(&app, &socket);
+            emit_crossword_player(app, &socket);
         }
         if meta.wordsearch_player {
-            emit_wordsearch_player(&app, &socket);
-        }
-        if meta.wordsearch_admin {
-            emit_wordsearch_admin(&app, &socket);
+            emit_wordsearch_player(app, &socket);
         }
         if meta.sudoku_player {
-            emit_sudoku_player(&app, &socket);
-        }
-        if meta.sudoku_admin {
-            emit_sudoku_admin(&app, &socket);
+            emit_sudoku_player(app, &socket);
         }
         if meta.maze_player {
-            emit_maze_player(&app, &socket);
-        }
-        if meta.maze_admin {
-            emit_maze_admin(&app, &socket);
+            emit_maze_player(app, &socket);
         }
         if meta.word_survivor_player {
-            emit_word_survivor_player(&app, &socket);
-        }
-        if meta.word_survivor_admin {
-            emit_word_survivor_admin(&app, &socket);
-        }
-        if meta.system_admin {
-            emit_system(&app, &socket);
-        }
-        if meta.leaderboard {
-            emit_leaderboard(&app, &socket);
+            emit_word_survivor_player(app, &socket);
         }
     }
+    send_views(app, Dirty::ALL);
+}
+
+/// Quiz state per socket, and each shared view built once for all of its subscribers.
+fn send_views(app: &App, views: Dirty) {
+    let Some(io) = app.io.get() else {
+        return;
+    };
+    let metas = app.meta.lock().expect("meta").clone();
+    let watched = |flag: fn(&SocketMeta) -> bool| metas.values().any(flag);
+    let (crossword, word_search, sudoku, maze, word_survivor, system, leaderboard) = {
+        let party = app.party.lock().expect("party");
+        (
+            (views.crossword && watched(|meta| meta.crossword_admin))
+                .then(|| party.crossword.admin_snapshot()),
+            (views.word_search && watched(|meta| meta.wordsearch_admin))
+                .then(|| party.word_search.admin_snapshot()),
+            (views.sudoku && watched(|meta| meta.sudoku_admin))
+                .then(|| party.sudoku.admin_snapshot()),
+            (views.maze && watched(|meta| meta.maze_admin)).then(|| party.maze.admin_snapshot()),
+            (views.word_survivor && watched(|meta| meta.word_survivor_admin))
+                .then(|| party.word_survivor.admin_snapshot()),
+            (views.system && watched(|meta| meta.system_admin)).then(|| party.snapshot()),
+            (views.leaderboard && watched(|meta| meta.leaderboard)).then(|| party.leaderboard()),
+        )
+    };
+    for socket in io.sockets() {
+        let Some(meta) = metas.get(&sid_of(&socket)) else {
+            continue;
+        };
+        if views.quiz && meta.wants_quiz() {
+            emit_game_for(app, &socket, meta);
+        }
+        if let Some(snapshot) = crossword.as_ref().filter(|_| meta.crossword_admin) {
+            let _ = socket.emit("crossword:admin:state", snapshot);
+        }
+        if let Some(snapshot) = word_search.as_ref().filter(|_| meta.wordsearch_admin) {
+            let _ = socket.emit("wordsearch:admin:state", snapshot);
+        }
+        if let Some(snapshot) = sudoku.as_ref().filter(|_| meta.sudoku_admin) {
+            let _ = socket.emit("sudoku:admin:state", snapshot);
+        }
+        if let Some(snapshot) = maze.as_ref().filter(|_| meta.maze_admin) {
+            let _ = socket.emit("maze:admin:state", snapshot);
+        }
+        if let Some(snapshot) = word_survivor.as_ref().filter(|_| meta.word_survivor_admin) {
+            let _ = socket.emit("wordsurvivor:admin:state", snapshot);
+        }
+        if let Some(snapshot) = system.as_ref().filter(|_| meta.system_admin) {
+            let _ = socket.emit("system:admin:state", snapshot);
+        }
+        if let Some(snapshot) = leaderboard.as_ref().filter(|_| meta.leaderboard) {
+            let _ = socket.emit("leaderboard:state", snapshot);
+        }
+    }
+}
+
+/// Quiz phase changes from the server clock.
+pub fn quiz_ticked(app: &App) {
+    send_views(
+        app,
+        Dirty {
+            quiz: true,
+            ..Dirty::default()
+        },
+    );
+    mark(
+        app,
+        Dirty {
+            system: true,
+            leaderboard: true,
+            ..Dirty::default()
+        },
+    );
 }
 
 fn emit_game(app: &App, socket: &SocketRef) {
@@ -2069,14 +2225,34 @@ fn emit_sudoku_admin(app: &App, socket: &SocketRef) {
 }
 
 fn emit_maze_player(app: &App, socket: &SocketRef) {
-    let Some(player_id) = player_id_of(app, socket) else {
+    let sid = sid_of(socket);
+    let Some((player_id, known)) = app
+        .meta
+        .lock()
+        .expect("meta")
+        .get(&sid)
+        .and_then(|meta| Some((meta.player_id.clone()?, meta.maze_puzzle.clone())))
+    else {
         return;
     };
-    let party = app.party.lock().expect("party");
-    let Some(snapshot) = party.maze.player_snapshot(&player_id) else {
+    let (key, snapshot) = {
+        let party = app.party.lock().expect("party");
+        let key = party.maze.puzzle_key(&player_id);
+        let snapshot = party
+            .maze
+            .player_snapshot_with(&player_id, key.is_none() || key != known);
+        (key, snapshot)
+    };
+    let Some(snapshot) = snapshot else {
         return;
     };
-    drop(party);
+    // Record and send under one lock so a slim update never overtakes the maze it relies on.
+    let mut meta = app.meta.lock().expect("meta");
+    if snapshot.puzzle.is_some() {
+        if let Some(entry) = meta.get_mut(&sid) {
+            entry.maze_puzzle = key;
+        }
+    }
     let _ = socket.emit("maze:state", &snapshot);
 }
 
@@ -2179,6 +2355,30 @@ fn find_socket(app: &App, socket_id: &str) -> Option<SocketRef> {
 
 fn sid_of(socket: &SocketRef) -> String {
     socket.id.to_string()
+}
+
+const RATE_LIMIT_MESSAGE: &str = "Too many requests";
+
+/// Admit one gameplay input, or ack-reject / disconnect a flooding socket.
+/// Returns the ack sender when the input may proceed.
+fn admit_input(app: &App, socket: &SocketRef, ack: AckSender) -> Option<AckSender> {
+    let sid = sid_of(socket);
+    let decision = {
+        let mut meta = app.meta.lock().expect("meta");
+        meta.entry(sid).or_default().input_rate.check(Instant::now())
+    };
+    match decision {
+        RateDecision::Allow => Some(ack),
+        RateDecision::Reject => {
+            let _ = ack.send(&fail(RATE_LIMIT_MESSAGE));
+            None
+        }
+        RateDecision::Disconnect => {
+            let _ = ack.send(&fail(RATE_LIMIT_MESSAGE));
+            let _ = socket.clone().disconnect();
+            None
+        }
+    }
 }
 
 fn fail(error: impl Into<String>) -> Value {

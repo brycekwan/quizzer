@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { useSudokuSocket } from '@/hooks/useSudokuSocket';
 import { computeElapsedMs, formatElapsedMs } from '@/lib/crosswordClient';
+import { usePlayInstructions } from '@/lib/usePlayInstructions';
 
 function useElapsedClock(
   elapsedMs: number,
@@ -94,7 +95,7 @@ function SudokuInstructions({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {showTrigger ? (
         <DialogTrigger asChild>
-          <Button type="button" variant="outline" size="sm">
+          <Button type="button" variant="outline" size="xs" className="border-2 shadow-none">
             Instructions
           </Button>
         </DialogTrigger>
@@ -162,19 +163,24 @@ export function SudokuPage() {
     toggleDraft,
     erase,
     hint,
+    pauseTimer,
+    resumeTimer,
   } = useSudokuSocket('player');
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(
     null
   );
   const [draftMode, setDraftMode] = useState(false);
-  const [instructionsOpen, setInstructionsOpen] = useState(true);
-  const [intro, setIntro] = useState(true);
-  const instructionsOpenRef = useRef(true);
+  const {
+    open: instructionsOpen,
+    intro,
+    instructionsOpenRef,
+    onOpenChange: onInstructionsOpenChange,
+  } = usePlayInstructions(playerState, pauseTimer, resumeTimer);
 
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
-    false,
+    instructionsOpen,
     playerState?.completed ?? false
   );
 
@@ -182,14 +188,6 @@ export function SudokuPage() {
   useEffect(() => {
     setSelected(null);
   }, [puzzleId]);
-
-  const onInstructionsOpenChange = (open: boolean) => {
-    setInstructionsOpen(open);
-    instructionsOpenRef.current = open;
-    if (!open) {
-      setIntro(false);
-    }
-  };
 
   const selectedCell: SudokuCellState | null =
     selected && playerState
@@ -290,12 +288,6 @@ export function SudokuPage() {
         <Button asChild size="lg" variant="outline" className="mt-8">
           <Link to="/">Return to Lobby</Link>
         </Button>
-        <SudokuInstructions
-          open={instructionsOpen}
-          onOpenChange={onInstructionsOpenChange}
-          intro={intro}
-          showTrigger={false}
-        />
       </div>
     );
   }
@@ -309,7 +301,6 @@ export function SudokuPage() {
         <GamePlayHeader
           game="Sudoku"
           title={playerState.puzzle.title}
-          detail={playerName}
           elapsedLabel={elapsedLabel}
           instructions={
             <SudokuInstructions

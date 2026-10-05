@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { useWordSearchSocket } from '@/hooks/useWordSearchSocket';
 import { computeElapsedMs, formatElapsedMs } from '@/lib/crosswordClient';
+import { usePlayInstructions } from '@/lib/usePlayInstructions';
 
 function useElapsedClock(
   elapsedMs: number,
@@ -92,7 +93,7 @@ function WordSearchInstructions({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {showTrigger ? (
         <DialogTrigger asChild>
-          <Button type="button" variant="outline" size="sm">
+          <Button type="button" variant="outline" size="xs" className="border-2 shadow-none">
             Instructions
           </Button>
         </DialogTrigger>
@@ -130,16 +131,21 @@ export function WordSearchPage() {
     error,
     kicked,
     submitSelection,
+    pauseTimer,
+    resumeTimer,
   } = useWordSearchSocket('player');
   const [selection, setSelection] = useState<WordSearchCellRef[]>([]);
-  const [instructionsOpen, setInstructionsOpen] = useState(true);
-  const [intro, setIntro] = useState(true);
-  const instructionsOpenRef = useRef(true);
+  const {
+    open: instructionsOpen,
+    intro,
+    instructionsOpenRef,
+    onOpenChange: onInstructionsOpenChange,
+  } = usePlayInstructions(playerState, pauseTimer, resumeTimer);
 
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
-    false,
+    instructionsOpen,
     playerState?.completed ?? false
   );
 
@@ -147,14 +153,6 @@ export function WordSearchPage() {
   useEffect(() => {
     setSelection([]);
   }, [puzzleId]);
-
-  const onInstructionsOpenChange = (open: boolean) => {
-    setInstructionsOpen(open);
-    instructionsOpenRef.current = open;
-    if (!open) {
-      setIntro(false);
-    }
-  };
 
   if (!playerId || !playerName) {
     return <Navigate to="/login" replace />;
@@ -181,12 +179,6 @@ export function WordSearchPage() {
         <Button asChild size="lg" variant="outline" className="mt-8">
           <Link to="/">Return to Lobby</Link>
         </Button>
-        <WordSearchInstructions
-          open={instructionsOpen}
-          onOpenChange={onInstructionsOpenChange}
-          intro={intro}
-          showTrigger={false}
-        />
       </div>
     );
   }
@@ -200,7 +192,6 @@ export function WordSearchPage() {
           <GamePlayHeader
             game="Word search"
             title={playerState.puzzle.title}
-            detail={`${playerName} · ${playerState.found.length}/${playerState.totalWords} words`}
             elapsedLabel={elapsedLabel}
             instructions={
               <WordSearchInstructions
@@ -227,7 +218,7 @@ export function WordSearchPage() {
         ) : null}
 
         <div className="flex flex-col md:flex-row md:items-start md:gap-6">
-          <div className="w-full md:max-w-lg md:shrink-0">
+          <div className="w-full px-3 md:max-w-lg md:shrink-0 md:px-0">
             <WordSearchGrid
               letters={playerState.puzzle.grid}
               selection={selection}

@@ -213,10 +213,10 @@ impl WordSurvivorEngine {
             let used = player.guesses.len() as i64 + 1;
             player.score += score_word(used);
             player.words_cleared += 1;
-            player.guesses = vec![WordSurvivorGuess {
+            player.guesses.push(WordSurvivorGuess {
                 marks: vec![TileMark::Correct; guess.chars().count()],
                 word: guess,
-            }];
+            });
             player.phase = WordSurvivorPhase::Reveal;
             player.reveal_until = Some(now + REVEAL_MS);
             Self::pause_clock(player, now);
@@ -572,13 +572,21 @@ mod tests {
         game.ensure_player("p1", "Ada");
         game.ack_intro("p1").unwrap();
         let answer = game.campaign("p1").unwrap()[0].clone();
+        let miss = if answer == "AAAAA" {
+            "BBBBB"
+        } else {
+            "AAAAA"
+        };
+        type_word(&mut game, "p1", miss);
         type_word(&mut game, "p1", &answer);
         let revealed = game.player_snapshot("p1").unwrap();
         assert_eq!(revealed.phase, WordSurvivorPhase::Reveal);
-        assert_eq!(revealed.score, 120);
+        assert_eq!(revealed.score, 115);
         assert_eq!(revealed.word_number, 1);
-        assert_eq!(revealed.guesses[0].word, answer);
-        assert!(revealed.guesses[0]
+        assert_eq!(revealed.guesses.len(), 2);
+        assert_eq!(revealed.guesses[0].word, miss);
+        assert_eq!(revealed.guesses[1].word, answer);
+        assert!(revealed.guesses[1]
             .marks
             .iter()
             .all(|mark| *mark == TileMark::Correct));
@@ -639,7 +647,8 @@ mod tests {
         assert_eq!(snap.score, 100);
         assert_eq!(snap.phase, WordSurvivorPhase::Reveal);
         assert_eq!(snap.words_cleared, 1);
-        assert!(snap.guesses[0]
+        assert_eq!(snap.guesses.len(), 5);
+        assert!(snap.guesses[4]
             .marks
             .iter()
             .all(|mark| *mark == TileMark::Correct));

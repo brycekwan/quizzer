@@ -102,6 +102,7 @@ export function MazePage() {
     restart,
     pauseTimer,
     resumeTimer,
+    subscription,
   } = useMazeSocket('player');
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const [showSplash, setShowSplash] = useState(false);
@@ -110,7 +111,6 @@ export function MazePage() {
   const instructionsOpenRef = useRef(instructionsOpen);
   instructionsOpenRef.current = instructionsOpen;
   const seen = useRef<{ phase: MazePhase; level: string } | null>(null);
-  const moving = useRef(false);
 
   useEffect(() => {
     if (!playerState) {
@@ -132,21 +132,6 @@ export function MazePage() {
     return () => window.clearTimeout(id);
   }, [showSplash, playerState?.splashUntil]);
 
-  useEffect(() => {
-    if (!playerState || finished(playerState.phase)) {
-      return;
-    }
-    const splashBlocking =
-      playerState.phase === 'splash' &&
-      (showSplash || (playerState.splashUntil != null && playerState.splashUntil > Date.now()));
-    const hold = instructionsOpen || splashBlocking || playerState.phase === 'intro';
-    if (hold) {
-      void pauseTimer();
-      return;
-    }
-    void resumeTimer();
-  }, [instructionsOpen, pauseTimer, playerState, resumeTimer, showSplash]);
-
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
     if (playerState?.phase !== 'splash') {
@@ -159,6 +144,20 @@ export function MazePage() {
   const splashBlocking =
     playerState?.phase === 'splash' &&
     (showSplash || (playerState.splashUntil != null && playerState.splashUntil > tick));
+
+  // Keyed on the hold itself: each pause or resume answers with new state,
+  // so depending on `playerState` would send them in a loop.
+  const timerHeld =
+    playerState == null || finished(playerState.phase)
+      ? null
+      : instructionsOpen || Boolean(splashBlocking) || playerState.phase === 'intro';
+  useEffect(() => {
+    if (timerHeld == null || subscription === 0) {
+      return;
+    }
+    void (timerHeld ? pauseTimer() : resumeTimer());
+  }, [timerHeld, subscription, pauseTimer, resumeTimer]);
+
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
@@ -167,7 +166,7 @@ export function MazePage() {
   );
 
   const sendMove = async (direction: MazeDirection) => {
-    if (moving.current || !playerState) {
+    if (!playerState) {
       return;
     }
     if (playerState.phase !== 'playing' && playerState.phase !== 'splash') {
@@ -176,12 +175,14 @@ export function MazePage() {
     if (instructionsOpenRef.current || showSplash || splashBlocking) {
       return;
     }
-    moving.current = true;
     const result = await move(direction);
-    moving.current = false;
     if (!result?.ok) {
       const message = result?.error ?? '';
-      if (message === 'That way is blocked' || message === 'You cannot go back') {
+      if (
+        result?.dropped ||
+        message === 'That way is blocked' ||
+        message === 'You cannot go back'
+      ) {
         return;
       }
       setError(message || 'Could not move');
@@ -338,7 +339,7 @@ export function MazePage() {
             const result = await restart();
             setConfirming(false);
             setConfirmRestart(false);
-            if (!result.ok) {
+            if (!result.ok && !result.dropped) {
               setError(result.error ?? 'Could not restart');
             }
           })();

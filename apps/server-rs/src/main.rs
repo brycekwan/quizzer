@@ -30,6 +30,9 @@ use tracing::info;
 
 use crate::state::App;
 
+/// How often host, system, and leaderboard views catch up with player input.
+const VIEW_FLUSH_INTERVAL: Duration = Duration::from_millis(300);
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -59,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ = tokio::time::sleep(Duration::from_millis(wait)) => {
                         let changed = timer_app.party.lock().expect("party").quiz.fire_due();
                         if changed {
-                            socket::broadcast(&timer_app);
+                            socket::quiz_ticked(&timer_app);
                         }
                     }
                     _ = &mut notified => {}
@@ -67,6 +70,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 notified.await;
             }
+        }
+    });
+
+    let flush_app = app.clone();
+    tokio::spawn(async move {
+        let mut ticks = tokio::time::interval(VIEW_FLUSH_INTERVAL);
+        ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            ticks.tick().await;
+            socket::flush(&flush_app);
         }
     });
 

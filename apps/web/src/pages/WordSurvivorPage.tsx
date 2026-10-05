@@ -92,11 +92,11 @@ export function WordSurvivorPage() {
     submit,
     pauseTimer,
     resumeTimer,
+    subscription,
   } = useWordSurvivorSocket('player');
   const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const seen = useRef<WordSurvivorPhase | null>(null);
-  const chain = useRef(Promise.resolve());
 
   useEffect(() => {
     if (!playerState) {
@@ -116,25 +116,6 @@ export function WordSurvivorPage() {
     const id = window.setTimeout(() => setShowSplash(false), delay);
     return () => window.clearTimeout(id);
   }, [showSplash, playerState?.splashUntil]);
-
-  useEffect(() => {
-    if (!playerState || finished(playerState.phase)) {
-      return;
-    }
-    const splashBlocking =
-      playerState.phase === 'splash' &&
-      (showSplash || (playerState.splashUntil != null && playerState.splashUntil > Date.now()));
-    const hold =
-      instructionsOpen ||
-      splashBlocking ||
-      playerState.phase === 'intro' ||
-      playerState.phase === 'reveal';
-    if (hold) {
-      void pauseTimer();
-      return;
-    }
-    void resumeTimer();
-  }, [instructionsOpen, pauseTimer, playerState, resumeTimer, showSplash]);
 
   useEffect(() => {
     if (playerState?.phase !== 'reveal' || playerState.revealUntil == null) {
@@ -175,6 +156,23 @@ export function WordSurvivorPage() {
   const splashBlocking =
     playerState?.phase === 'splash' &&
     (showSplash || (playerState.splashUntil != null && playerState.splashUntil > tick));
+
+  // Keyed on the hold itself: each pause or resume answers with new state,
+  // so depending on `playerState` would send them in a loop.
+  const timerHeld =
+    playerState == null || finished(playerState.phase)
+      ? null
+      : instructionsOpen ||
+        Boolean(splashBlocking) ||
+        playerState.phase === 'intro' ||
+        playerState.phase === 'reveal';
+  useEffect(() => {
+    if (timerHeld == null || subscription === 0) {
+      return;
+    }
+    void (timerHeld ? pauseTimer() : resumeTimer());
+  }, [timerHeld, subscription, pauseTimer, resumeTimer]);
+
   const elapsedLabel = useElapsedClock(
     playerState?.elapsedMs ?? 0,
     playerState?.activeSince ?? null,
@@ -182,9 +180,11 @@ export function WordSurvivorPage() {
     playerState != null && finished(playerState.phase)
   );
 
-  const play = (run: () => Promise<{ ok: boolean; error?: string }>) => {
-    chain.current = chain.current.then(async () => {
-      const result = await run();
+  const play = (run: () => Promise<{ ok: boolean; error?: string; dropped?: boolean }>) => {
+    void run().then((result) => {
+      if (result?.dropped) {
+        return;
+      }
       if (!result?.ok) {
         setError(result?.error || 'Could not play');
       } else {

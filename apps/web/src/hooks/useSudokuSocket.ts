@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { SudokuAdminSnapshot, SudokuPlayerSnapshot } from '@party/shared';
+import type {
+  SudokuAdminSnapshot,
+  SudokuCellState,
+  SudokuPlayerSnapshot,
+} from '@party/shared';
 import {
   clearStoredSession,
   readStoredSession,
@@ -9,8 +13,66 @@ import {
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
+import {
+  DROPPED,
+  createOptimisticQueue,
+  emitInput,
+  type InputAck,
+  type OptimisticQueue,
+} from '@/lib/optimisticInput';
 
-type Ack = { ok: boolean; error?: string; correct?: boolean };
+type Ack = InputAck & { correct?: boolean };
+
+type SudokuInput =
+  | { kind: 'commit' | 'draft'; row: number; col: number; value: number }
+  | { kind: 'erase'; row: number; col: number }
+  | { kind: 'hint'; row?: number; col?: number };
+
+/**
+ * Notes follow the server's rules exactly. A committed digit shows plain until
+ * the server says whether it is right. Erase and hint wait for the server.
+ */
+function applySudokuInput(state: SudokuPlayerSnapshot, input: SudokuInput): SudokuPlayerSnapshot {
+  if (state.completed || (input.kind !== 'commit' && input.kind !== 'draft')) {
+    return state;
+  }
+  const cell = state.cells[input.row]?.[input.col];
+  if (!cell || cell.given || cell.solved) {
+    return state;
+  }
+  let next: SudokuCellState;
+  if (input.kind === 'commit') {
+    next = { ...cell, value: input.value, wrong: false };
+  } else if (cell.wrongDrafts.includes(input.value)) {
+    return state;
+  } else if (cell.drafts.includes(input.value)) {
+    next = { ...cell, drafts: cell.drafts.filter((digit) => digit !== input.value) };
+  } else {
+    next = { ...cell, drafts: [...cell.drafts, input.value].sort((a, b) => a - b) };
+  }
+  return {
+    ...state,
+    cells: state.cells.map((cells, row) =>
+      row === input.row ? cells.map((entry, col) => (col === input.col ? next : entry)) : cells
+    ),
+  };
+}
+
+function sudokuEvent(input: SudokuInput): [string, unknown] {
+  switch (input.kind) {
+    case 'commit':
+      return ['sudoku:commit', { row: input.row, col: input.col, value: input.value }];
+    case 'draft':
+      return ['sudoku:draft', { row: input.row, col: input.col, value: input.value }];
+    case 'erase':
+      return ['sudoku:erase', { row: input.row, col: input.col }];
+    case 'hint':
+      return [
+        'sudoku:hint',
+        input.row == null || input.col == null ? {} : { row: input.row, col: input.col },
+      ];
+  }
+}
 
 export function useSudokuSocket(
   role: 'player' | 'admin' = 'player',
@@ -33,6 +95,18 @@ export function useSudokuSocket(
   playerIdRef.current = playerId;
   const playerNameRef = useRef(playerName);
   playerNameRef.current = playerName;
+  const queueRef = useRef<OptimisticQueue<SudokuPlayerSnapshot, SudokuInput> | null>(null);
+  if (!queueRef.current) {
+    const queue = createOptimisticQueue<SudokuPlayerSnapshot, SudokuInput>({
+      apply: applySudokuInput,
+      send: (input, done) => {
+        const [event, payload] = sudokuEvent(input);
+        emitInput(socketRef.current, event, payload, done);
+      },
+      onChange: () => setPlayerState(queue.view()),
+    });
+    queueRef.current = queue;
+  }
 
   useEffect(() => {
     const socket = io({
@@ -41,6 +115,8 @@ export function useSudokuSocket(
     });
     socketRef.current = socket;
     let active = true;
+    const queue = queueRef.current;
+    queue?.reset();
 
     const clearSession = () => {
       clearStoredSession();
@@ -121,9 +197,12 @@ export function useSudokuSocket(
         });
       }
     });
-    socket.on('disconnect', () => setConnected(false));
+    socket.on('disconnect', () => {
+      setConnected(false);
+      queue?.reset();
+    });
     socket.on('sudoku:state', (snapshot: SudokuPlayerSnapshot) => {
-      setPlayerState(snapshot);
+      queue?.receive(snapshot);
     });
     socket.on('sudoku:admin:state', (snapshot: SudokuAdminSnapshot) => {
       setAdminState(snapshot);
@@ -157,14 +236,16 @@ export function useSudokuSocket(
       new Promise<Ack>((resolve) => {
         socketRef.current?.emit(event, payload, resolve);
       });
+    const queue = queueRef.current;
+    const input = (next: SudokuInput): Promise<Ack> =>
+      queue ? queue.push(next) : Promise.resolve(DROPPED);
     return {
       commit: (row: number, col: number, value: number) =>
-        emit('sudoku:commit', { row, col, value }),
+        input({ kind: 'commit', row, col, value }),
       toggleDraft: (row: number, col: number, value: number) =>
-        emit('sudoku:draft', { row, col, value }),
-      erase: (row: number, col: number) => emit('sudoku:erase', { row, col }),
-      hint: (row?: number, col?: number) =>
-        emit('sudoku:hint', row == null || col == null ? {} : { row, col }),
+        input({ kind: 'draft', row, col, value }),
+      erase: (row: number, col: number) => input({ kind: 'erase', row, col }),
+      hint: (row?: number, col?: number) => input({ kind: 'hint', row, col }),
       pauseTimer: () => emit('sudoku:pauseTimer', {}),
       resumeTimer: () => emit('sudoku:resumeTimer', {}),
       reset: () => emit('sudoku:admin:reset', {}),

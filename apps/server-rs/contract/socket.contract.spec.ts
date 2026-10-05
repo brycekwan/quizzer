@@ -253,8 +253,12 @@ describe('rust socket contract', () => {
     const walls = mazeState.puzzle.walls[mazeState.position.row]?.[mazeState.position.col];
     const direction = walls && !walls.e ? 'e' : walls && !walls.s ? 's' : walls && !walls.w ? 'w' : 'n';
     await new Promise((resolve) => setTimeout(resolve, 5_200));
+    const slimPromise = waitFor<Partial<MazeState>>(player, 'maze:state');
     const moved = await emitAck(player, 'maze:move', { direction });
     expect(moved.ok).toBe(true);
+    const slim = await slimPromise;
+    expect(slim.puzzle).toBeUndefined();
+    expect(slim.position).not.toEqual(mazeState.position);
 
     const boardPromise = waitFor<SystemState>(admin, 'system:admin:state');
     const subscribed = await emitAck(admin, 'system:admin:subscribe', {});

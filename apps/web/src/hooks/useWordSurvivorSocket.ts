@@ -9,8 +9,37 @@ import {
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
+import {
+  DROPPED,
+  createOptimisticQueue,
+  emitInput,
+  type InputAck,
+  type OptimisticQueue,
+} from '@/lib/optimisticInput';
 
-type Ack = { ok: boolean; error?: string; message?: string };
+type Ack = InputAck & { message?: string };
+
+type SurvivorInput = { kind: 'letter'; letter: string } | { kind: 'backspace' } | { kind: 'submit' };
+
+/** Typing and erasing follow the server's rules. A submit waits for the server's verdict. */
+function applySurvivorInput(
+  state: WordSurvivorPlayerSnapshot,
+  input: SurvivorInput
+): WordSurvivorPlayerSnapshot {
+  if (state.phase !== 'playing') {
+    return state;
+  }
+  if (input.kind === 'letter') {
+    if (!/^[a-zA-Z]$/.test(input.letter) || state.draft.length >= state.length) {
+      return state;
+    }
+    return { ...state, draft: state.draft + input.letter.toUpperCase() };
+  }
+  if (input.kind === 'backspace') {
+    return { ...state, draft: state.draft.slice(0, -1) };
+  }
+  return state;
+}
 
 export function useWordSurvivorSocket(
   role: 'player' | 'admin' = 'player',
@@ -27,10 +56,32 @@ export function useWordSurvivorSocket(
   const [error, setError] = useState<string | null>(null);
   const [kicked, setKicked] = useState(false);
   const [hostReady, setHostReady] = useState(role !== 'admin');
+  /** Counts successful subscribes, so the page can resume the clock after a reconnect. */
+  const [subscription, setSubscription] = useState(0);
   const playerIdRef = useRef(playerId);
   playerIdRef.current = playerId;
   const playerNameRef = useRef(playerName);
   playerNameRef.current = playerName;
+  const queueRef = useRef<OptimisticQueue<WordSurvivorPlayerSnapshot, SurvivorInput> | null>(
+    null
+  );
+  if (!queueRef.current) {
+    const queue = createOptimisticQueue<WordSurvivorPlayerSnapshot, SurvivorInput>({
+      apply: applySurvivorInput,
+      send: (input, done) => {
+        const socket = socketRef.current;
+        if (input.kind === 'letter') {
+          emitInput(socket, 'wordsurvivor:letter', { letter: input.letter }, done);
+        } else if (input.kind === 'backspace') {
+          emitInput(socket, 'wordsurvivor:backspace', {}, done);
+        } else {
+          emitInput(socket, 'wordsurvivor:submit', {}, done);
+        }
+      },
+      onChange: () => setPlayerState(queue.view()),
+    });
+    queueRef.current = queue;
+  }
 
   useEffect(() => {
     const socket = io({
@@ -39,6 +90,8 @@ export function useWordSurvivorSocket(
     });
     socketRef.current = socket;
     let active = true;
+    const queue = queueRef.current;
+    queue?.reset();
 
     const clearSession = () => {
       clearStoredSession();
@@ -114,14 +167,19 @@ export function useWordSurvivorSocket(
           socket.emit('wordsurvivor:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
             if (result?.ok === false) {
               setError(result.error ?? 'Could not join word survivor');
+              return;
             }
+            setSubscription((count) => count + 1);
           });
         });
       }
     });
-    socket.on('disconnect', () => setConnected(false));
+    socket.on('disconnect', () => {
+      setConnected(false);
+      queue?.reset();
+    });
     socket.on('wordsurvivor:state', (snapshot: WordSurvivorPlayerSnapshot) => {
-      setPlayerState(snapshot);
+      queue?.receive(snapshot);
     });
     socket.on('wordsurvivor:admin:state', (snapshot: WordSurvivorAdminSnapshot) => {
       setAdminState(snapshot);
@@ -158,11 +216,19 @@ export function useWordSurvivorSocket(
       new Promise<Ack>((resolve) => {
         socketRef.current?.emit(event, payload, resolve);
       });
+    const queue = queueRef.current;
+    const input = (next: SurvivorInput): Promise<Ack> => {
+      // Letters after Enter belong to the next row, which only the server's verdict reveals.
+      if (!queue || queue.pending().some((entry) => entry.kind === 'submit')) {
+        return Promise.resolve(DROPPED);
+      }
+      return queue.push(next);
+    };
     return {
       ackIntro: () => emit('wordsurvivor:ackIntro', {}),
-      typeLetter: (letter: string) => emit('wordsurvivor:letter', { letter }),
-      backspace: () => emit('wordsurvivor:backspace', {}),
-      submit: () => emit('wordsurvivor:submit', {}),
+      typeLetter: (letter: string) => input({ kind: 'letter', letter }),
+      backspace: () => input({ kind: 'backspace' }),
+      submit: () => input({ kind: 'submit' }),
       pauseTimer: () => emit('wordsurvivor:pauseTimer', {}),
       resumeTimer: () => emit('wordsurvivor:resumeTimer', {}),
       reset: () => emit('wordsurvivor:admin:reset', {}),
@@ -183,6 +249,7 @@ export function useWordSurvivorSocket(
     kicked,
     setError,
     hostReady,
+    subscription,
     ...api,
   };
 }

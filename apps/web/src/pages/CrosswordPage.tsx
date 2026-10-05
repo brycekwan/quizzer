@@ -193,6 +193,7 @@ export function CrosswordPage() {
     letters: (string | null)[][];
     correctWordIds: string[];
   } | null>(null);
+  const [, setGridVersion] = useState(0);
   const keyQueueRef = useRef(Promise.resolve());
   const seenLettersRef = useRef<(string | null)[][] | null>(null);
   const puzzleIdRef = useRef<string | null>(null);
@@ -448,15 +449,8 @@ export function CrosswordPage() {
     const { row, col } = current;
     const dir = directionRef.current;
     if (key === 'Backspace' || key === 'Delete') {
-      const cleared = await clearLetter(row, col);
-      if (cleared.ok && cleared.correctWordIds && gridRef.current) {
-        gridRef.current = {
-          letters: gridRef.current.letters.map((letterRow, r) =>
-            letterRow.map((letter, c) => (r === row && c === col ? '' : letter))
-          ),
-          correctWordIds: cleared.correctWordIds,
-        };
-      }
+      writeCell(row, col, '');
+      void clearLetter(row, col).then((result) => settleCell(row, col, '', result));
       if (key === 'Backspace') {
         moveInDirection(row, col, dir, -1);
       }
@@ -496,27 +490,29 @@ export function CrosswordPage() {
       return;
     }
     collapseClues();
-    const baseline =
-      gridRef.current ??
-      ({
-        letters: playerState.letters,
-        correctWordIds: playerState.correctWordIds,
-      } as const);
-    const previousCorrect = new Set(baseline.correctWordIds);
-    const result = await setLetter(row, col, key);
-    if (!result.ok || !result.correctWordIds) {
-      return;
-    }
-    const letters = baseline.letters.map((letterRow, r) =>
-      letterRow.map((letter, c) =>
-        r === row && c === col ? key.toUpperCase() : letter
-      )
+    const letter = key.toUpperCase();
+    const previousCorrect = new Set(
+      gridRef.current?.correctWordIds ?? playerState.correctWordIds
     );
-    gridRef.current = { letters, correctWordIds: result.correctWordIds };
+    const letters = writeCell(row, col, letter);
+    const answered = setLetter(row, col, key).then((result) => {
+      settleCell(row, col, letter, result);
+      return result;
+    });
 
     const covering = wordsAtCell(words, row, col);
     const word = covering.find((entry) => entry.direction === dir) ?? covering[0];
     if (!word) {
+      return;
+    }
+    const nextCell = nextEmptyCellInWord(word, letters, { row, col });
+    if (nextCell) {
+      focusCell(nextCell);
+      return;
+    }
+    // A full word may be solved, and only the server knows, so the cursor waits for it here.
+    const result = await answered;
+    if (!result.ok || !result.correctWordIds) {
       return;
     }
     const justSolved =
@@ -524,13 +520,46 @@ export function CrosswordPage() {
     if (justSolved) {
       const nextClue = nextUnsolvedClue(words, word.id, result.correctWordIds);
       if (nextClue) {
-        focusCell(firstEmptyCellInWord(nextClue, letters), nextClue.direction);
+        focusCell(
+          firstEmptyCellInWord(nextClue, gridRef.current?.letters ?? letters),
+          nextClue.direction
+        );
+      }
+    }
+  };
+
+  const writeCell = (row: number, col: number, letter: string) => {
+    const base = gridRef.current ?? {
+      letters: playerState?.letters ?? [],
+      correctWordIds: playerState?.correctWordIds ?? [],
+    };
+    const letters = base.letters.map((letterRow, r) =>
+      letterRow.map((value, c) => (r === row && c === col ? letter : value))
+    );
+    gridRef.current = { letters, correctWordIds: base.correctWordIds };
+    setGridVersion((version) => version + 1);
+    return letters;
+  };
+
+  const settleCell = (
+    row: number,
+    col: number,
+    letter: string,
+    result: { ok: boolean; correctWordIds?: string[] }
+  ) => {
+    const grid = gridRef.current;
+    if (!grid) {
+      return;
+    }
+    if (result.ok) {
+      if (result.correctWordIds) {
+        gridRef.current = { ...grid, correctWordIds: result.correctWordIds };
       }
       return;
     }
-    const nextCell = nextEmptyCellInWord(word, letters, { row, col });
-    if (nextCell) {
-      focusCell(nextCell);
+    // Refused: show what the server holds, unless the square was typed over since.
+    if (grid.letters[row]?.[col] === letter) {
+      writeCell(row, col, seenLettersRef.current?.[row]?.[col] ?? '');
     }
   };
 
@@ -605,7 +634,7 @@ export function CrosswordPage() {
     <CrosswordGrid
       open={playerState.puzzle.open}
       cellNumbers={playerState.puzzle.cellNumbers}
-      letters={playerState.letters}
+      letters={gridRef.current?.letters ?? playerState.letters}
       selected={selected}
       highlighted={highlighted}
       correctCells={correctCells}

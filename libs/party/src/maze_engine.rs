@@ -258,10 +258,24 @@ impl MazeEngine {
     }
 
     pub fn player_snapshot(&self, player_id: &str) -> Option<MazePlayerSnapshot> {
+        self.player_snapshot_with(player_id, true)
+    }
+
+    /// The maze a player is on, as `(level, puzzle id)`.
+    pub fn puzzle_key(&self, player_id: &str) -> Option<(MazeDifficulty, String)> {
+        let level = self.players.get(player_id)?.level;
+        Some((level, self.slot(level).puzzle.id.clone()))
+    }
+
+    pub fn player_snapshot_with(
+        &self,
+        player_id: &str,
+        include_puzzle: bool,
+    ) -> Option<MazePlayerSnapshot> {
         let now = self.now();
         let player = self.players.get(player_id)?;
         let level = player.level;
-        let puzzle = self.slot(level).public_puzzle.clone();
+        let puzzle = include_puzzle.then(|| self.slot(level).public_puzzle.clone());
         let score = maze_campaign_score(player.levels_cleared, player.lives, player.phase);
         let elapsed_ms = current_elapsed_ms(
             player.elapsed_ms,
@@ -621,6 +635,31 @@ mod tests {
             engine.player_snapshot("p1").unwrap().phase,
             MazePhase::Playing
         );
+    }
+
+    #[test]
+    fn snapshot_can_leave_out_the_maze_and_the_key_follows_the_level() {
+        let mut engine = campaign(0);
+        engine.ensure_player("p1", "Ada");
+        assert_eq!(
+            engine.puzzle_key("p1"),
+            Some((MazeDifficulty::Easy, "nursery".to_string()))
+        );
+        assert!(engine.player_snapshot("p1").unwrap().puzzle.is_some());
+        let slim = engine.player_snapshot_with("p1", false).unwrap();
+        assert!(slim.puzzle.is_none());
+        let json = serde_json::to_value(&slim).unwrap();
+        assert!(json.get("puzzle").is_none());
+        assert!(json.get("position").is_some());
+
+        engine.ack_intro("p1").unwrap();
+        engine.clock().set(MAZE_SPLASH_MS);
+        engine.move_player("p1", MazeDirection::E).unwrap();
+        assert_eq!(
+            engine.puzzle_key("p1"),
+            Some((MazeDifficulty::Medium, "kitchen".to_string()))
+        );
+        assert_eq!(engine.puzzle_key("nobody"), None);
     }
 
     #[test]

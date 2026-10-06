@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import {
   clearStoredSession,
   readStoredSession,
@@ -11,14 +10,17 @@ import {
   isSystemRemoval,
   noteSystemRemoval,
 } from '@/lib/systemRemoval';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 type LoginResult =
   | { ok: true; playerId: string; name: string }
   | { ok: false; error: string };
 
 export function useSession() {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
   const stored = readStoredSession();
   const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
   const [playerName, setPlayerName] = useState<string | null>(stored.playerName);
@@ -30,11 +32,6 @@ export function useSession() {
   playerNameRef.current = playerName;
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
     let active = true;
 
     const clearSession = () => {
@@ -58,6 +55,9 @@ export function useSession() {
           name?: string;
           error?: string;
         }) => {
+          if (!active) {
+            return;
+          }
           if (result.ok && result.playerId && result.name) {
             writeStoredSession(result.playerId, result.name);
             setPlayerId(result.playerId);
@@ -73,12 +73,8 @@ export function useSession() {
       );
     };
 
-    socket.on('connect', () => {
-      setConnected(true);
-      rejoinIfNeeded();
-    });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('player:kicked', (payload?: { reason?: string }) => {
+    const detachReady = whenConnected(socket, rejoinIfNeeded);
+    const onKicked = (payload?: { reason?: string }) => {
       if (!active) {
         return;
       }
@@ -93,14 +89,15 @@ export function useSession() {
       }
       setKicked(true);
       clearSession();
-    });
+    };
+    socket.on('player:kicked', onKicked);
 
     return () => {
       active = false;
-      socket.disconnect();
-      socketRef.current = null;
+      detachReady();
+      socket.off('player:kicked', onKicked);
     };
-  }, []);
+  }, [socket]);
 
   const api = useMemo(
     () => ({

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import type { GameConfig, GameStateSnapshot, QuestionSetMode } from '@party/shared';
 import {
   clearStoredSession,
@@ -9,14 +8,17 @@ import {
 import { isQuizRemoval, noteQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 export function useGameSocket(
   role: 'player' | 'admin' = 'player',
   hostSecret: string | null = null,
   hostAttempt = 0
 ) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
   const [state, setState] = useState<GameStateSnapshot | null>(null);
   const stored = readStoredSession();
   const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
@@ -33,11 +35,6 @@ export function useGameSocket(
   playerNameRef.current = playerName;
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
     let active = true;
 
     const clearSession = () => {
@@ -62,6 +59,9 @@ export function useGameSocket(
           name?: string;
           error?: string;
         }) => {
+          if (!active) {
+            return;
+          }
           if (!loginResult.ok || !loginResult.playerId || !loginResult.name) {
             clearSession();
             if (loginResult.error) {
@@ -81,6 +81,9 @@ export function useGameSocket(
               name?: string;
               error?: string;
             }) => {
+              if (!active) {
+                return;
+              }
               if (joinResult.ok && joinResult.playerId && joinResult.name) {
                 writeStoredSession(joinResult.playerId, joinResult.name);
                 setPlayerId(joinResult.playerId);
@@ -100,8 +103,7 @@ export function useGameSocket(
       );
     };
 
-    socket.on('connect', () => {
-      setConnected(true);
+    const onReady = () => {
       if (role === 'admin') {
         unlockHost(
           socket,
@@ -125,12 +127,13 @@ export function useGameSocket(
       } else {
         ensureSessionThenJoinQuiz();
       }
-    });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('game:state', (snapshot: GameStateSnapshot) => {
+    };
+
+    const detachReady = whenConnected(socket, onReady);
+    const onState = (snapshot: GameStateSnapshot) => {
       setState(snapshot);
-    });
-    socket.on('player:kicked', (payload?: { reason?: string }) => {
+    };
+    const onKicked = (payload?: { reason?: string }) => {
       if (!active) {
         return;
       }
@@ -149,19 +152,24 @@ export function useGameSocket(
       }
       setKicked(true);
       clearSession();
-    });
-    socket.on('game:reset', () => {
+    };
+    const onReset = () => {
       setJoinedQuizzer(false);
       setGameReset(true);
       setError('Game was reset — return to the lobby.');
-    });
+    };
+    socket.on('game:state', onState);
+    socket.on('player:kicked', onKicked);
+    socket.on('game:reset', onReset);
 
     return () => {
       active = false;
-      socket.disconnect();
-      socketRef.current = null;
+      detachReady();
+      socket.off('game:state', onState);
+      socket.off('player:kicked', onKicked);
+      socket.off('game:reset', onReset);
     };
-  }, [role, hostSecret, hostAttempt]);
+  }, [socket, role, hostSecret, hostAttempt]);
 
   const api = useMemo(
     () => ({

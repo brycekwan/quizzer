@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import {
   predictMazeMove,
   type MazeAdminSnapshot,
@@ -24,6 +23,8 @@ import {
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 type Ack = InputAck;
 
@@ -34,8 +35,9 @@ export function useMazeSocket(
   hostSecret: string | null = null,
   hostAttempt = 0
 ) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
   const stored = readStoredSession();
   const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
   const [playerName, setPlayerName] = useState<string | null>(stored.playerName);
@@ -66,11 +68,6 @@ export function useMazeSocket(
   }
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
     let active = true;
     const queue = queueRef.current;
     puzzleRef.current = null;
@@ -97,6 +94,9 @@ export function useMazeSocket(
           name?: string;
           error?: string;
         }) => {
+          if (!active) {
+            return;
+          }
           if (!result.ok || !result.playerId || !result.name) {
             clearSession();
             setError(result.error ?? 'Session expired');
@@ -110,8 +110,7 @@ export function useMazeSocket(
       );
     };
 
-    socket.on('connect', () => {
-      setConnected(true);
+    const onReady = () => {
       if (role === 'admin') {
         unlockHost(
           socket,
@@ -144,6 +143,9 @@ export function useMazeSocket(
       } else {
         ensureSession(() => {
           socket.emit('maze:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
+            if (!active) {
+              return;
+            }
             if (result?.ok === false) {
               setError(result.error ?? 'Could not join the maze');
               return;
@@ -152,24 +154,25 @@ export function useMazeSocket(
           });
         });
       }
-    });
-    socket.on('disconnect', () => {
-      setConnected(false);
+    };
+
+    const detachReady = whenConnected(socket, onReady);
+    const onDisconnect = () => {
       puzzleRef.current = null;
       queue?.reset();
-    });
-    socket.on('maze:state', (update: MazeStateUpdate) => {
+    };
+    const onPlayerState = (update: MazeStateUpdate) => {
       const puzzle = update.puzzle ?? puzzleRef.current;
       if (!puzzle) {
         return;
       }
       puzzleRef.current = puzzle;
       queue?.receive({ ...update, puzzle });
-    });
-    socket.on('maze:admin:state', (snapshot: MazeAdminSnapshot) => {
+    };
+    const onAdminState = (snapshot: MazeAdminSnapshot) => {
       setAdminState(snapshot);
-    });
-    socket.on('player:kicked', (payload?: { reason?: string }) => {
+    };
+    const onKicked = (payload?: { reason?: string }) => {
       if (!active) {
         return;
       }
@@ -184,17 +187,24 @@ export function useMazeSocket(
       }
       setKicked(true);
       clearSession();
-    });
+    };
+    socket.on('disconnect', onDisconnect);
+    socket.on('maze:state', onPlayerState);
+    socket.on('maze:admin:state', onAdminState);
+    socket.on('player:kicked', onKicked);
 
     return () => {
       active = false;
       if (role === 'player') {
         socket.emit('maze:pauseTimer', {});
       }
-      socket.disconnect();
-      socketRef.current = null;
+      detachReady();
+      socket.off('disconnect', onDisconnect);
+      socket.off('maze:state', onPlayerState);
+      socket.off('maze:admin:state', onAdminState);
+      socket.off('player:kicked', onKicked);
     };
-  }, [role, hostSecret, hostAttempt]);
+  }, [socket, role, hostSecret, hostAttempt]);
 
   const api = useMemo(() => {
     const emit = (event: string, payload: unknown) =>

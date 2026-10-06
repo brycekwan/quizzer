@@ -1,30 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { useEffect, useState } from 'react';
 import type { PartyLeaderboardSnapshot } from '@party/shared';
 import { unlockHost } from '@/lib/hostSecret';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 export function useLeaderboardSocket(host?: {
   secret: string | null;
   attempt: number;
 }) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
   const [board, setBoard] = useState<PartyLeaderboardSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hostReady, setHostReady] = useState(host == null);
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
+    let active = true;
 
     const subscribe = () => {
       socket.emit(
         'leaderboard:subscribe',
         {},
         (result: { ok?: boolean; error?: string }) => {
+          if (!active) {
+            return;
+          }
           if (result?.ok === false) {
             setError(result.error ?? 'Could not open the leaderboard');
             return;
@@ -34,8 +33,7 @@ export function useLeaderboardSocket(host?: {
       );
     };
 
-    socket.on('connect', () => {
-      setConnected(true);
+    const onReady = () => {
       if (!host) {
         setHostReady(true);
         subscribe();
@@ -45,25 +43,34 @@ export function useLeaderboardSocket(host?: {
         socket,
         host.secret,
         () => {
+          if (!active) {
+            return;
+          }
           setHostReady(true);
           subscribe();
         },
         (message) => {
+          if (!active) {
+            return;
+          }
           setHostReady(false);
           setError(message);
         }
       );
-    });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('leaderboard:state', (snapshot: PartyLeaderboardSnapshot) => {
+    };
+
+    const detachReady = whenConnected(socket, onReady);
+    const onBoard = (snapshot: PartyLeaderboardSnapshot) => {
       setBoard(snapshot);
-    });
+    };
+    socket.on('leaderboard:state', onBoard);
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      active = false;
+      detachReady();
+      socket.off('leaderboard:state', onBoard);
     };
-  }, [host?.secret, host?.attempt]);
+  }, [socket, host?.secret, host?.attempt]);
 
   return { connected, board, error, hostReady };
 }

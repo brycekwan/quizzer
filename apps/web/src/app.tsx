@@ -20,6 +20,7 @@ import { WordSurvivorAdminPage } from './pages/WordSurvivorAdminPage';
 import { SystemAdminPage } from './pages/SystemAdminPage';
 import { HostLeaderboardPage } from './pages/HostLeaderboardPage';
 import { PlayerLeaderboardPage } from './pages/PlayerLeaderboardPage';
+import { PartySocketProvider } from './components/PartySocketProvider';
 import { PartyThemeProvider } from './components/PartyThemeProvider';
 
 function RequirePlayer({ children }: { children: ReactNode }) {
@@ -33,6 +34,7 @@ function RequirePlayer({ children }: { children: ReactNode }) {
 
 export function App() {
   return (
+    <PartySocketProvider>
     <PartyThemeProvider>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
@@ -114,6 +116,7 @@ export function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </PartyThemeProvider>
+    </PartySocketProvider>
   );
 }
 

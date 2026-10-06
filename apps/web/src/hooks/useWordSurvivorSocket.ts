@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import type { WordSurvivorAdminSnapshot, WordSurvivorPlayerSnapshot } from '@party/shared';
 import {
   clearStoredSession,
@@ -16,6 +15,8 @@ import {
   type InputAck,
   type OptimisticQueue,
 } from '@/lib/optimisticInput';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 type Ack = InputAck & { message?: string };
 
@@ -46,8 +47,9 @@ export function useWordSurvivorSocket(
   hostSecret: string | null = null,
   hostAttempt = 0
 ) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
   const stored = readStoredSession();
   const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
   const [playerName, setPlayerName] = useState<string | null>(stored.playerName);
@@ -69,13 +71,13 @@ export function useWordSurvivorSocket(
     const queue = createOptimisticQueue<WordSurvivorPlayerSnapshot, SurvivorInput>({
       apply: applySurvivorInput,
       send: (input, done) => {
-        const socket = socketRef.current;
+        const activeSocket = socketRef.current;
         if (input.kind === 'letter') {
-          emitInput(socket, 'wordsurvivor:letter', { letter: input.letter }, done);
+          emitInput(activeSocket, 'wordsurvivor:letter', { letter: input.letter }, done);
         } else if (input.kind === 'backspace') {
-          emitInput(socket, 'wordsurvivor:backspace', {}, done);
+          emitInput(activeSocket, 'wordsurvivor:backspace', {}, done);
         } else {
-          emitInput(socket, 'wordsurvivor:submit', {}, done);
+          emitInput(activeSocket, 'wordsurvivor:submit', {}, done);
         }
       },
       onChange: () => setPlayerState(queue.view()),
@@ -84,11 +86,6 @@ export function useWordSurvivorSocket(
   }
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
     let active = true;
     const queue = queueRef.current;
     queue?.reset();
@@ -114,6 +111,9 @@ export function useWordSurvivorSocket(
           name?: string;
           error?: string;
         }) => {
+          if (!active) {
+            return;
+          }
           if (!result.ok || !result.playerId || !result.name) {
             clearSession();
             setError(result.error ?? 'Session expired');
@@ -127,8 +127,7 @@ export function useWordSurvivorSocket(
       );
     };
 
-    socket.on('connect', () => {
-      setConnected(true);
+    const onReady = () => {
       if (role === 'admin') {
         unlockHost(
           socket,
@@ -165,6 +164,9 @@ export function useWordSurvivorSocket(
       } else {
         ensureSession(() => {
           socket.emit('wordsurvivor:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
+            if (!active) {
+              return;
+            }
             if (result?.ok === false) {
               setError(result.error ?? 'Could not join word survivor');
               return;
@@ -173,18 +175,19 @@ export function useWordSurvivorSocket(
           });
         });
       }
-    });
-    socket.on('disconnect', () => {
-      setConnected(false);
+    };
+
+    const detachReady = whenConnected(socket, onReady);
+    const onDisconnect = () => {
       queue?.reset();
-    });
-    socket.on('wordsurvivor:state', (snapshot: WordSurvivorPlayerSnapshot) => {
+    };
+    const onPlayerState = (snapshot: WordSurvivorPlayerSnapshot) => {
       queue?.receive(snapshot);
-    });
-    socket.on('wordsurvivor:admin:state', (snapshot: WordSurvivorAdminSnapshot) => {
+    };
+    const onAdminState = (snapshot: WordSurvivorAdminSnapshot) => {
       setAdminState(snapshot);
-    });
-    socket.on('player:kicked', (payload?: { reason?: string }) => {
+    };
+    const onKicked = (payload?: { reason?: string }) => {
       if (!active) {
         return;
       }
@@ -199,17 +202,24 @@ export function useWordSurvivorSocket(
       }
       setKicked(true);
       clearSession();
-    });
+    };
+    socket.on('disconnect', onDisconnect);
+    socket.on('wordsurvivor:state', onPlayerState);
+    socket.on('wordsurvivor:admin:state', onAdminState);
+    socket.on('player:kicked', onKicked);
 
     return () => {
       active = false;
       if (role === 'player') {
         socket.emit('wordsurvivor:pauseTimer', {});
       }
-      socket.disconnect();
-      socketRef.current = null;
+      detachReady();
+      socket.off('disconnect', onDisconnect);
+      socket.off('wordsurvivor:state', onPlayerState);
+      socket.off('wordsurvivor:admin:state', onAdminState);
+      socket.off('player:kicked', onKicked);
     };
-  }, [role, hostSecret, hostAttempt]);
+  }, [socket, role, hostSecret, hostAttempt]);
 
   const api = useMemo(() => {
     const emit = (event: string, payload: unknown) =>

@@ -1,3 +1,10 @@
+## [2.8.2](https://github.com/brycekwan/quizzer/compare/v2.8.1...v2.8.2) (2026-10-06)
+
+
+### Bug Fixes
+
+* additional server enhancements ([dd61d3f](https://github.com/brycekwan/quizzer/commit/dd61d3fe82a7a1faf138a2f55234fdb9a019bf75))
+
 ## [2.8.1](https://github.com/brycekwan/quizzer/compare/v2.8.0...v2.8.1) (2026-10-05)
 
 

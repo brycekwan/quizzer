@@ -1,3 +1,10 @@
+## [2.8.3](https://github.com/brycekwan/quizzer/compare/v2.8.2...v2.8.3) (2026-10-06)
+
+
+### Bug Fixes
+
+* fixes for game freezes ([18b1639](https://github.com/brycekwan/quizzer/commit/18b16396897dfeeda174b4e127859599bbd995fc))
+
 ## [2.8.2](https://github.com/brycekwan/quizzer/compare/v2.8.1...v2.8.2) (2026-10-06)
 
 

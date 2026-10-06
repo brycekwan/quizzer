@@ -119,6 +119,8 @@ export function useMazeSocket(
             if (!active) {
               return;
             }
+            setError(null);
+            setHostReady(true);
             socket.emit('maze:admin:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
               if (!active) {
                 return;
@@ -126,10 +128,7 @@ export function useMazeSocket(
               if (result?.ok === false) {
                 setHostReady(false);
                 setError(result.error ?? 'Could not subscribe as maze admin');
-                return;
               }
-              setError(null);
-              setHostReady(true);
             });
           },
           (message) => {
@@ -171,6 +170,7 @@ export function useMazeSocket(
     };
     const onAdminState = (snapshot: MazeAdminSnapshot) => {
       setAdminState(snapshot);
+      setHostReady(true);
     };
     const onKicked = (payload?: { reason?: string }) => {
       if (!active) {

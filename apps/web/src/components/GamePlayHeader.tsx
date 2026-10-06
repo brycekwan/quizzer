@@ -6,12 +6,14 @@ export function GamePlayHeader({
   game,
   title,
   topic,
+  score,
   elapsedLabel,
   instructions,
 }: {
   game: string;
   title?: string;
   topic?: string | null;
+  score?: number;
   elapsedLabel: string;
   instructions: ReactNode;
 }) {
@@ -40,34 +42,30 @@ export function GamePlayHeader({
       ) : (
         <span className="col-start-1 row-start-2" />
       )}
-      <p
-        className="col-start-2 row-start-2 self-center text-right font-display text-xl font-bold tabular-nums leading-none sm:text-2xl"
-        aria-live="polite"
-        aria-label={`Elapsed time ${elapsedLabel}`}
-      >
-        {elapsedLabel}
-      </p>
+      <div className="col-start-2 row-start-2 flex items-end justify-end gap-3 self-center">
+        {score != null ? (
+          <p className="text-right" aria-live="polite" aria-label={`Score ${score}`}>
+            <span className="block text-[0.65rem] font-extrabold uppercase tracking-wider text-ink/45">
+              Score
+            </span>
+            <span className="font-display text-xl font-bold tabular-nums leading-none text-grape sm:text-2xl">
+              {score}
+            </span>
+          </p>
+        ) : null}
+        <p
+          className="text-right font-display text-xl font-bold tabular-nums leading-none sm:text-2xl"
+          aria-live="polite"
+          aria-label={`Elapsed time ${elapsedLabel}`}
+        >
+          {elapsedLabel}
+        </p>
+      </div>
       {topicText ? (
         <p className="col-span-2 col-start-1 row-start-3 min-w-0 break-words text-[0.65rem] font-extrabold uppercase tracking-wider text-grape">
           {topicText}
         </p>
       ) : null}
     </header>
-  );
-}
-
-export function GameScore({ score }: { score: number }) {
-  return (
-    <div className="py-1 text-center">
-      <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink/45">
-        Score
-      </p>
-      <p
-        className="font-display text-2xl font-bold tabular-nums leading-none text-grape sm:text-3xl"
-        aria-live="polite"
-      >
-        {score}
-      </p>
-    </div>
   );
 }

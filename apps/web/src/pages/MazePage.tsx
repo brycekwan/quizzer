@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import type { MazeDirection, MazePhase } from '@party/shared';
-import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
+import { GamePlayHeader } from '@/components/GamePlayHeader';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { MazeGrid } from '@/components/maze/MazeGrid';
 import { MazePad } from '@/components/maze/MazePad';
@@ -275,6 +275,7 @@ export function MazePage() {
         <GamePlayHeader
           game="Maze"
           title={playerState.puzzle.title}
+          score={playerState.score}
           elapsedLabel={elapsedLabel}
           instructions={
             <MazeInstructions
@@ -285,7 +286,6 @@ export function MazePage() {
             />
           }
         />
-        <GameScore score={playerState.score} />
 
         {error ? (
           <p role="alert" className="pb-2 text-center font-bold text-coral">

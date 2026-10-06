@@ -91,6 +91,8 @@ export function useCrosswordSocket(
             if (!active) {
               return;
             }
+            setError(null);
+            setHostReady(true);
             socket.emit('crossword:admin:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
               if (!active) {
                 return;
@@ -98,10 +100,7 @@ export function useCrosswordSocket(
               if (result?.ok === false) {
                 setHostReady(false);
                 setError(result.error ?? 'Could not subscribe as crossword admin');
-                return;
               }
-              setError(null);
-              setHostReady(true);
             });
           },
           (message) => {
@@ -132,6 +131,7 @@ export function useCrosswordSocket(
     };
     const onAdminState = (snapshot: CrosswordAdminSnapshot) => {
       setAdminState(snapshot);
+      setHostReady(true);
     };
     const onKicked = (payload?: { reason?: string }) => {
       if (!active) {

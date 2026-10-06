@@ -5,7 +5,7 @@ import {
   type CrosswordCluePublic,
   type CrosswordDirection,
 } from '@party/shared';
-import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
+import { GamePlayHeader } from '@/components/GamePlayHeader';
 import { useCrosswordSocket } from '@/hooks/useCrosswordSocket';
 import { CrosswordGrid } from '@/components/crossword/CrosswordGrid';
 import {
@@ -650,6 +650,7 @@ export function CrosswordPage() {
       <GamePlayHeader
         game="Crossword"
         title={playerState.puzzle.title}
+        score={crosswordWordPoints(playerState.correctWordIds.length)}
         elapsedLabel={elapsedLabel}
         instructions={
           <CrosswordInstructions
@@ -660,7 +661,6 @@ export function CrosswordPage() {
           />
         }
       />
-      <GameScore score={crosswordWordPoints(playerState.correctWordIds.length)} />
 
       {playerState.completed ? (
         <div className="rounded-xl border-2 border-mint/40 bg-mint/20 px-3 py-2 text-center shadow-pop-sm">

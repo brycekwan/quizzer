@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { wordSearchWordPoints, type WordSearchCellRef } from '@party/shared';
-import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
+import { GamePlayHeader } from '@/components/GamePlayHeader';
 import { WordSearchGrid } from '@/components/wordsearch/WordSearchGrid';
 import { Button } from '@/components/ui/button';
 import {
@@ -192,6 +192,7 @@ export function WordSearchPage() {
           <GamePlayHeader
             game="Word search"
             title={playerState.puzzle.title}
+            score={wordSearchWordPoints(playerState.found.length)}
             elapsedLabel={elapsedLabel}
             instructions={
               <WordSearchInstructions
@@ -202,7 +203,6 @@ export function WordSearchPage() {
               />
             }
           />
-          <GameScore score={wordSearchWordPoints(playerState.found.length)} />
         </div>
 
         {playerState.completed ? (

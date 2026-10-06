@@ -21,6 +21,10 @@ export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 
           if (!active) {
             return;
           }
+          // Leave "Checking passphrase" as soon as unlock succeeds. Waiting on
+          // the subscribe ack left the UI stuck when that reply was lost.
+          setError(null);
+          setHostReady(true);
           socket.emit(
             'system:admin:subscribe',
             {},
@@ -31,10 +35,7 @@ export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 
               if (result?.ok === false) {
                 setHostReady(false);
                 setError(result.error ?? 'Could not subscribe as system admin');
-                return;
               }
-              setError(null);
-              setHostReady(true);
             }
           );
         },
@@ -51,6 +52,7 @@ export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 
     const detachReady = whenConnected(socket, onReady);
     const onAdminState = (snapshot: SystemAdminSnapshot) => {
       setAdminState(snapshot);
+      setHostReady(true);
     };
     socket.on('system:admin:state', onAdminState);
 

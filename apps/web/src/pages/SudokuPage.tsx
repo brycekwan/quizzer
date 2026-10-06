@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import type { SudokuCellState } from '@party/shared';
-import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
+import { GamePlayHeader } from '@/components/GamePlayHeader';
 import { SudokuGrid } from '@/components/sudoku/SudokuGrid';
 import { SudokuKeyboard } from '@/components/sudoku/SudokuKeyboard';
 import { Button } from '@/components/ui/button';
@@ -301,6 +301,7 @@ export function SudokuPage() {
         <GamePlayHeader
           game="Sudoku"
           title={playerState.puzzle.title}
+          score={playerState.score}
           elapsedLabel={elapsedLabel}
           instructions={
             <SudokuInstructions
@@ -311,7 +312,6 @@ export function SudokuPage() {
             />
           }
         />
-        <GameScore score={playerState.score} />
 
         {playerState.completed ? (
           <p className="mb-2 rounded-xl border-2 border-mint/40 bg-mint/20 px-3 py-2 text-center font-display font-bold">

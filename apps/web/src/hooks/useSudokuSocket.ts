@@ -161,6 +161,8 @@ export function useSudokuSocket(
             if (!active) {
               return;
             }
+            setError(null);
+            setHostReady(true);
             socket.emit('sudoku:admin:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
               if (!active) {
                 return;
@@ -168,10 +170,7 @@ export function useSudokuSocket(
               if (result?.ok === false) {
                 setHostReady(false);
                 setError(result.error ?? 'Could not subscribe as sudoku admin');
-                return;
               }
-              setError(null);
-              setHostReady(true);
             });
           },
           (message) => {
@@ -209,6 +208,7 @@ export function useSudokuSocket(
     };
     const onAdminState = (snapshot: SudokuAdminSnapshot) => {
       setAdminState(snapshot);
+      setHostReady(true);
     };
     const onKicked = (payload?: { reason?: string }) => {
       if (!active) {

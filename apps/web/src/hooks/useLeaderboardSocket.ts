@@ -46,6 +46,7 @@ export function useLeaderboardSocket(host?: {
           if (!active) {
             return;
           }
+          setError(null);
           setHostReady(true);
           subscribe();
         },
@@ -62,6 +63,9 @@ export function useLeaderboardSocket(host?: {
     const detachReady = whenConnected(socket, onReady);
     const onBoard = (snapshot: PartyLeaderboardSnapshot) => {
       setBoard(snapshot);
+      if (host) {
+        setHostReady(true);
+      }
     };
     socket.on('leaderboard:state', onBoard);
 

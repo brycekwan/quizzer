@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import type { WordSurvivorPhase } from '@party/shared';
-import { GamePlayHeader, GameScore } from '@/components/GamePlayHeader';
+import { GamePlayHeader } from '@/components/GamePlayHeader';
 import { SurvivorBoard } from '@/components/wordsurvivor/Board';
 import { SurvivorKeyboard } from '@/components/wordsurvivor/Keyboard';
 import { WinnerConfetti } from '@/components/WinnerConfetti';
@@ -117,15 +117,38 @@ export function WordSurvivorPage() {
     return () => window.clearTimeout(id);
   }, [showSplash, playerState?.splashUntil]);
 
+  const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
-    if (playerState?.phase !== 'reveal' || playerState.revealUntil == null) {
+    if (playerState?.phase !== 'splash') {
       return;
     }
-    const revealUntil = playerState.revealUntil;
+    const id = window.setInterval(() => setTick(Date.now()), 200);
+    return () => window.clearInterval(id);
+  }, [playerState?.phase]);
+
+  const splashBlocking =
+    playerState?.phase === 'splash' &&
+    (showSplash || (playerState.splashUntil != null && playerState.splashUntil > tick));
+
+  // Reveal and splash only move forward when the client nudges `resumeTimer`
+  // (which runs sync on the server). Poll until the phase leaves, otherwise a
+  // single early nudge — clock skew or a late ack — leaves the board empty and
+  // the keyboard locked.
+  useEffect(() => {
+    const phase = playerState?.phase;
+    const until =
+      phase === 'reveal'
+        ? playerState?.revealUntil
+        : phase === 'splash' && !splashBlocking
+          ? playerState?.splashUntil
+          : null;
+    if (until == null) {
+      return;
+    }
     let cancelled = false;
     let timer = 0;
     const advance = () => {
-      const wait = Math.max(0, revealUntil - Date.now());
+      const wait = Math.max(0, until - Date.now());
       timer = window.setTimeout(() => {
         if (cancelled) {
           return;
@@ -142,20 +165,13 @@ export function WordSurvivorPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [playerState?.phase, playerState?.revealUntil, resumeTimer]);
-
-  const [tick, setTick] = useState(() => Date.now());
-  useEffect(() => {
-    if (playerState?.phase !== 'splash') {
-      return;
-    }
-    const id = window.setInterval(() => setTick(Date.now()), 200);
-    return () => window.clearInterval(id);
-  }, [playerState?.phase]);
-
-  const splashBlocking =
-    playerState?.phase === 'splash' &&
-    (showSplash || (playerState.splashUntil != null && playerState.splashUntil > tick));
+  }, [
+    playerState?.phase,
+    playerState?.revealUntil,
+    playerState?.splashUntil,
+    splashBlocking,
+    resumeTimer,
+  ]);
 
   // Keyed on the hold itself: each pause or resume answers with new state,
   // so depending on `playerState` would send them in a loop.
@@ -282,6 +298,7 @@ export function WordSurvivorPage() {
           game="Word Survivor"
           title={`Word ${playerState.wordNumber} of ${playerState.wordCount}`}
           topic={playerState.topic}
+          score={playerState.score}
           elapsedLabel={elapsedLabel}
           instructions={
             <Instructions
@@ -292,7 +309,6 @@ export function WordSurvivorPage() {
             />
           }
         />
-        <GameScore score={playerState.score} />
 
         {error ? (
           <p role="alert" className="pb-2 text-center font-bold text-coral">

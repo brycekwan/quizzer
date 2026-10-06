@@ -65,6 +65,7 @@ function PadButton({
       variant="outline"
       className="h-12 w-12 text-2xl min-[380px]:h-14 min-[380px]:w-14"
       aria-label={arrow.label}
+      tabIndex={-1}
       disabled={disabled}
       onClick={() => onMove(arrow.direction)}
     >

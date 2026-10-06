@@ -136,6 +136,8 @@ export function useWordSurvivorSocket(
             if (!active) {
               return;
             }
+            setError(null);
+            setHostReady(true);
             socket.emit(
               'wordsurvivor:admin:subscribe',
               {},
@@ -146,10 +148,7 @@ export function useWordSurvivorSocket(
                 if (result?.ok === false) {
                   setHostReady(false);
                   setError(result.error ?? 'Could not subscribe as word survivor admin');
-                  return;
                 }
-                setError(null);
-                setHostReady(true);
               }
             );
           },
@@ -186,6 +185,7 @@ export function useWordSurvivorSocket(
     };
     const onAdminState = (snapshot: WordSurvivorAdminSnapshot) => {
       setAdminState(snapshot);
+      setHostReady(true);
     };
     const onKicked = (payload?: { reason?: string }) => {
       if (!active) {

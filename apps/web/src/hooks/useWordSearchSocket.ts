@@ -88,6 +88,8 @@ export function useWordSearchSocket(
             if (!active) {
               return;
             }
+            setError(null);
+            setHostReady(true);
             socket.emit(
               'wordsearch:admin:subscribe',
               {},
@@ -98,10 +100,7 @@ export function useWordSearchSocket(
                 if (result?.ok === false) {
                   setHostReady(false);
                   setError(result.error ?? 'Could not subscribe as word search admin');
-                  return;
                 }
-                setError(null);
-                setHostReady(true);
               }
             );
           },
@@ -137,6 +136,7 @@ export function useWordSearchSocket(
     };
     const onAdminState = (snapshot: WordSearchAdminSnapshot) => {
       setAdminState(snapshot);
+      setHostReady(true);
     };
     const onKicked = (payload?: { reason?: string }) => {
       if (!active) {

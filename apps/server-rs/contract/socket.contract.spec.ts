@@ -260,6 +260,14 @@ describe('rust socket contract', () => {
     expect(slim.puzzle).toBeUndefined();
     expect(slim.position).not.toEqual(mazeState.position);
 
+    // Leaving the page clears the client cache; a second subscribe must send the maze again.
+    const resubscribePromise = waitFor<MazeState>(player, 'maze:state');
+    const mazeAgain = await emitAck(player, 'maze:subscribe', {});
+    expect(mazeAgain.ok).toBe(true);
+    const restored = await resubscribePromise;
+    expect(restored.puzzle).toEqual(mazeState.puzzle);
+    expect(restored.position).toEqual(slim.position);
+
     const boardPromise = waitFor<SystemState>(admin, 'system:admin:state');
     const subscribed = await emitAck(admin, 'system:admin:subscribe', {});
     expect(subscribed.ok).toBe(true);

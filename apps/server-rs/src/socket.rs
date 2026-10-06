@@ -1496,7 +1496,12 @@ fn on_maze_subscribe(app: Arc<App>, socket: SocketRef, ack: AckSender) {
         let mut party = app.party.lock().expect("party");
         party.maze.ensure_player(&player_id, &name);
     }
-    flag_mut(&app, &socket, |meta| meta.maze_player = true);
+    // Remount clears the client's maze cache; forget the last puzzle so this
+    // subscribe always includes a full board instead of a slim progress update.
+    flag_mut(&app, &socket, |meta| {
+        meta.maze_player = true;
+        meta.maze_puzzle = None;
+    });
     let _ = ack.send(&json!({ "ok": true }));
     played(&app, &socket, Game::Maze);
 }

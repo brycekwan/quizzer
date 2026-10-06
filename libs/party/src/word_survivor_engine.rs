@@ -235,6 +235,7 @@ impl WordSurvivorEngine {
 
     pub fn pause_timer(&mut self, player_id: &str) {
         let now = self.now();
+        self.sync_player(player_id, now);
         let Some(player) = self.players.get_mut(player_id) else {
             return;
         };
@@ -602,8 +603,35 @@ mod tests {
         assert_eq!(splash.word_number, 2);
         assert_eq!(splash.length, 5);
         assert!(splash.guesses.is_empty());
+        // An early nudge must not clear the splash; later nudges still advance.
+        game.resume_timer("p1");
+        assert_eq!(
+            game.player_snapshot("p1").unwrap().phase,
+            WordSurvivorPhase::Splash
+        );
         game.clock().set(2_000 + REVEAL_MS + DEFAULT_SPLASH_MS);
         game.resume_timer("p1");
+        assert_eq!(
+            game.player_snapshot("p1").unwrap().phase,
+            WordSurvivorPhase::Playing
+        );
+    }
+
+    #[test]
+    fn pause_after_the_splash_deadline_still_opens_the_next_word() {
+        let mut game = engine(2_000);
+        game.ensure_player("p1", "Ada");
+        game.ack_intro("p1").unwrap();
+        let answer = game.campaign("p1").unwrap()[0].clone();
+        type_word(&mut game, "p1", &answer);
+        game.clock().set(2_000 + REVEAL_MS);
+        game.resume_timer("p1");
+        assert_eq!(
+            game.player_snapshot("p1").unwrap().phase,
+            WordSurvivorPhase::Splash
+        );
+        game.clock().set(2_000 + REVEAL_MS + DEFAULT_SPLASH_MS);
+        game.pause_timer("p1");
         assert_eq!(
             game.player_snapshot("p1").unwrap().phase,
             WordSurvivorPhase::Playing

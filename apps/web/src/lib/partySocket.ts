@@ -5,6 +5,9 @@ export const POLLING_FIRST = ['polling', 'websocket'] as const;
 
 export type PartySocketOptions = Partial<ManagerOptions & SocketOptions>;
 
+/** After this long in the background, drop and reopen the socket (mobile screen lock). */
+export const BACKGROUND_RECONNECT_MS = 2_000;
+
 /** Shared Socket.IO options tuned for Safari/iOS WebSocket flakiness. */
 export function createPartySocketOptions(): PartySocketOptions {
   return {
@@ -13,7 +16,34 @@ export function createPartySocketOptions(): PartySocketOptions {
     tryAllTransports: true,
     autoConnect: true,
     reconnection: true,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 3_000,
   };
+}
+
+/** True when the tab was hidden long enough that the socket is likely stale. */
+export function shouldRefreshSocketAfterBackground(
+  hiddenAt: number | null,
+  now: number
+): boolean {
+  if (hiddenAt == null) {
+    return false;
+  }
+  return now - hiddenAt >= BACKGROUND_RECONNECT_MS;
+}
+
+/** Start a new connection attempt; disconnect first when forcing a refresh. */
+export function refreshSocketConnection(socket: Socket, force: boolean): void {
+  if (!force) {
+    if (!socket.connected) {
+      socket.connect();
+    }
+    return;
+  }
+  if (socket.connected) {
+    socket.disconnect();
+  }
+  socket.connect();
 }
 
 export function createPartySocket(
@@ -64,10 +94,23 @@ export function attachPartySocketLifecycle(socket: Socket): () => void {
     hardenTransportOnConnectError(socket, error);
   };
 
+  let hiddenAt: number | null = null;
+
   const onVisibilityChange = () => {
-    if (document.visibilityState === 'visible' && !socket.connected) {
-      socket.connect();
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+      return;
     }
+    const now = Date.now();
+    const stale = shouldRefreshSocketAfterBackground(hiddenAt, now);
+    hiddenAt = null;
+    if (stale || !socket.connected) {
+      refreshSocketConnection(socket, stale);
+    }
+  };
+
+  const onOnline = () => {
+    refreshSocketConnection(socket, !socket.connected);
   };
 
   const onPageHide = () => {
@@ -84,12 +127,14 @@ export function attachPartySocketLifecycle(socket: Socket): () => void {
 
   socket.on('connect_error', onConnectError);
   document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('online', onOnline);
   window.addEventListener('pagehide', onPageHide);
   window.addEventListener('pageshow', onPageShow);
 
   return () => {
     socket.off('connect_error', onConnectError);
     document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('online', onOnline);
     window.removeEventListener('pagehide', onPageHide);
     window.removeEventListener('pageshow', onPageShow);
   };

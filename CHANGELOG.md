@@ -1,3 +1,10 @@
+## [2.8.5](https://github.com/brycekwan/quizzer/compare/v2.8.4...v2.8.5) (2026-10-06)
+
+
+### Bug Fixes
+
+* select none on cursor keys ([007c5cc](https://github.com/brycekwan/quizzer/commit/007c5cc1337f036c27de7517a86f351682e27a93))
+
 ## [2.8.4](https://github.com/brycekwan/quizzer/compare/v2.8.3...v2.8.4) (2026-10-06)
 
 

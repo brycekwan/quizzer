@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  BACKGROUND_RECONNECT_MS,
   POLLING_FIRST,
   WEBSOCKET_FIRST,
   createPartySocketOptions,
   hardenTransportOnConnectError,
+  refreshSocketConnection,
   resetPartySocketForTests,
+  shouldRefreshSocketAfterBackground,
 } from './partySocket';
 
 describe('partySocket options', () => {
@@ -18,6 +21,27 @@ describe('partySocket options', () => {
     expect(options.transports).toEqual([...WEBSOCKET_FIRST]);
     expect(options.tryAllTransports).toBe(true);
     expect(options.reconnection).toBe(true);
+    expect(options.reconnectionDelay).toBe(500);
+    expect(options.reconnectionDelayMax).toBe(3_000);
+  });
+
+  it('refreshes the socket after a long background', () => {
+    const now = 10_000;
+    expect(shouldRefreshSocketAfterBackground(null, now)).toBe(false);
+    expect(shouldRefreshSocketAfterBackground(now - 500, now)).toBe(false);
+    expect(
+      shouldRefreshSocketAfterBackground(now - BACKGROUND_RECONNECT_MS, now)
+    ).toBe(true);
+  });
+
+  it('refreshSocketConnection disconnects when forcing a stale socket', () => {
+    const connect = vi.fn();
+    const disconnect = vi.fn();
+    const socket = { connected: true, connect, disconnect };
+
+    refreshSocketConnection(socket as never, true);
+    expect(disconnect).toHaveBeenCalled();
+    expect(connect).toHaveBeenCalled();
   });
 
   it('switches to polling-first after a WebSocket-first timeout', () => {

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import type {
   SudokuAdminSnapshot,
   SudokuCellState,
@@ -20,6 +19,8 @@ import {
   type InputAck,
   type OptimisticQueue,
 } from '@/lib/optimisticInput';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 type Ack = InputAck & { correct?: boolean };
 
@@ -79,8 +80,9 @@ export function useSudokuSocket(
   hostSecret: string | null = null,
   hostAttempt = 0
 ) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
   const stored = readStoredSession();
   const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
   const [playerName, setPlayerName] = useState<string | null>(stored.playerName);
@@ -109,11 +111,6 @@ export function useSudokuSocket(
   }
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
     let active = true;
     const queue = queueRef.current;
     queue?.reset();
@@ -139,6 +136,9 @@ export function useSudokuSocket(
           name?: string;
           error?: string;
         }) => {
+          if (!active) {
+            return;
+          }
           if (!result.ok || !result.playerId || !result.name) {
             clearSession();
             setError(result.error ?? 'Session expired');
@@ -152,8 +152,7 @@ export function useSudokuSocket(
       );
     };
 
-    socket.on('connect', () => {
-      setConnected(true);
+    const onReady = () => {
       if (role === 'admin') {
         unlockHost(
           socket,
@@ -189,6 +188,9 @@ export function useSudokuSocket(
             'sudoku:subscribe',
             {},
             (result: { ok?: boolean; error?: string }) => {
+              if (!active) {
+                return;
+              }
               if (result?.ok === false) {
                 setError(result.error ?? 'Could not join sudoku');
               }
@@ -196,18 +198,19 @@ export function useSudokuSocket(
           );
         });
       }
-    });
-    socket.on('disconnect', () => {
-      setConnected(false);
+    };
+
+    const detachReady = whenConnected(socket, onReady);
+    const onDisconnect = () => {
       queue?.reset();
-    });
-    socket.on('sudoku:state', (snapshot: SudokuPlayerSnapshot) => {
+    };
+    const onPlayerState = (snapshot: SudokuPlayerSnapshot) => {
       queue?.receive(snapshot);
-    });
-    socket.on('sudoku:admin:state', (snapshot: SudokuAdminSnapshot) => {
+    };
+    const onAdminState = (snapshot: SudokuAdminSnapshot) => {
       setAdminState(snapshot);
-    });
-    socket.on('player:kicked', (payload?: { reason?: string }) => {
+    };
+    const onKicked = (payload?: { reason?: string }) => {
       if (!active) {
         return;
       }
@@ -222,17 +225,24 @@ export function useSudokuSocket(
       }
       setKicked(true);
       clearSession();
-    });
+    };
+    socket.on('disconnect', onDisconnect);
+    socket.on('sudoku:state', onPlayerState);
+    socket.on('sudoku:admin:state', onAdminState);
+    socket.on('player:kicked', onKicked);
 
     return () => {
       active = false;
       if (role === 'player') {
         socket.emit('sudoku:pauseTimer', {});
       }
-      socket.disconnect();
-      socketRef.current = null;
+      detachReady();
+      socket.off('disconnect', onDisconnect);
+      socket.off('sudoku:state', onPlayerState);
+      socket.off('sudoku:admin:state', onAdminState);
+      socket.off('player:kicked', onKicked);
     };
-  }, [role, hostSecret, hostAttempt]);
+  }, [socket, role, hostSecret, hostAttempt]);
 
   const api = useMemo(() => {
     const emit = (event: string, payload: unknown) =>

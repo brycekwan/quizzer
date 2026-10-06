@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { io } from 'socket.io-client';
 import { isPartyTheme, type PartyTheme } from '@party/shared';
+import { usePartySocket } from '@/components/PartySocketProvider';
 
 const ThemeContext = createContext<PartyTheme>('standard');
 
@@ -27,6 +27,7 @@ function applyTheme(theme: PartyTheme) {
 }
 
 export function PartyThemeProvider({ children }: { children: ReactNode }) {
+  const { socket } = usePartySocket();
   const [theme, setTheme] = useState<PartyTheme>(readSavedTheme);
 
   useEffect(() => {
@@ -34,19 +35,16 @@ export function PartyThemeProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socket.on('party:theme', (payload: { theme?: unknown }) => {
+    const onTheme = (payload: { theme?: unknown }) => {
       if (isPartyTheme(payload?.theme)) {
         setTheme(payload.theme);
       }
-    });
-    return () => {
-      socket.disconnect();
     };
-  }, []);
+    socket.on('party:theme', onTheme);
+    return () => {
+      socket.off('party:theme', onTheme);
+    };
+  }, [socket]);
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
 }

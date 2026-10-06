@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import type {
   CrosswordAdminSnapshot,
   CrosswordPlayerSnapshot,
@@ -13,6 +12,8 @@ import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
 import { createSerialSender, emitInput, type InputAck } from '@/lib/optimisticInput';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 type LetterAck = InputAck & { correctWordIds?: string[] };
 
@@ -21,8 +22,9 @@ export function useCrosswordSocket(
   hostSecret: string | null = null,
   hostAttempt = 0
 ) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
   const stored = readStoredSession();
   const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
   const [playerName, setPlayerName] = useState<string | null>(stored.playerName);
@@ -41,11 +43,6 @@ export function useCrosswordSocket(
   playerNameRef.current = playerName;
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
     let active = true;
 
     const clearSession = () => {
@@ -69,6 +66,9 @@ export function useCrosswordSocket(
           name?: string;
           error?: string;
         }) => {
+          if (!active) {
+            return;
+          }
           if (!result.ok || !result.playerId || !result.name) {
             clearSession();
             setError(result.error ?? 'Session expired');
@@ -82,8 +82,7 @@ export function useCrosswordSocket(
       );
     };
 
-    socket.on('connect', () => {
-      setConnected(true);
+    const onReady = () => {
       if (role === 'admin') {
         unlockHost(
           socket,
@@ -116,21 +115,25 @@ export function useCrosswordSocket(
       } else {
         ensureSession(() => {
           socket.emit('crossword:subscribe', {}, (result: { ok?: boolean; error?: string }) => {
+            if (!active) {
+              return;
+            }
             if (result?.ok === false) {
               setError(result.error ?? 'Could not join crossword');
             }
           });
         });
       }
-    });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('crossword:state', (snapshot: CrosswordPlayerSnapshot) => {
+    };
+
+    const detachReady = whenConnected(socket, onReady);
+    const onPlayerState = (snapshot: CrosswordPlayerSnapshot) => {
       setPlayerState(snapshot);
-    });
-    socket.on('crossword:admin:state', (snapshot: CrosswordAdminSnapshot) => {
+    };
+    const onAdminState = (snapshot: CrosswordAdminSnapshot) => {
       setAdminState(snapshot);
-    });
-    socket.on('player:kicked', (payload?: { reason?: string }) => {
+    };
+    const onKicked = (payload?: { reason?: string }) => {
       if (!active) {
         return;
       }
@@ -145,17 +148,22 @@ export function useCrosswordSocket(
       }
       setKicked(true);
       clearSession();
-    });
+    };
+    socket.on('crossword:state', onPlayerState);
+    socket.on('crossword:admin:state', onAdminState);
+    socket.on('player:kicked', onKicked);
 
     return () => {
       active = false;
       if (role === 'player') {
         socket.emit('crossword:pauseTimer', {});
       }
-      socket.disconnect();
-      socketRef.current = null;
+      detachReady();
+      socket.off('crossword:state', onPlayerState);
+      socket.off('crossword:admin:state', onAdminState);
+      socket.off('player:kicked', onKicked);
     };
-  }, [role, hostSecret, hostAttempt]);
+  }, [socket, role, hostSecret, hostAttempt]);
 
   const api = useMemo(() => {
     const send = createSerialSender();

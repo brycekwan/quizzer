@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import type {
   WordSearchAdminSnapshot,
   WordSearchPlayerSnapshot,
@@ -12,14 +11,17 @@ import {
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 export function useWordSearchSocket(
   role: 'player' | 'admin' = 'player',
   hostSecret: string | null = null,
   hostAttempt = 0
 ) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
   const stored = readStoredSession();
   const [playerId, setPlayerId] = useState<string | null>(stored.playerId);
   const [playerName, setPlayerName] = useState<string | null>(stored.playerName);
@@ -38,11 +40,6 @@ export function useWordSearchSocket(
   playerNameRef.current = playerName;
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
     let active = true;
 
     const clearSession = () => {
@@ -66,6 +63,9 @@ export function useWordSearchSocket(
           name?: string;
           error?: string;
         }) => {
+          if (!active) {
+            return;
+          }
           if (!result.ok || !result.playerId || !result.name) {
             clearSession();
             setError(result.error ?? 'Session expired');
@@ -79,8 +79,7 @@ export function useWordSearchSocket(
       );
     };
 
-    socket.on('connect', () => {
-      setConnected(true);
+    const onReady = () => {
       if (role === 'admin') {
         unlockHost(
           socket,
@@ -120,6 +119,9 @@ export function useWordSearchSocket(
             'wordsearch:subscribe',
             {},
             (result: { ok?: boolean; error?: string }) => {
+              if (!active) {
+                return;
+              }
               if (result?.ok === false) {
                 setError(result.error ?? 'Could not join word search');
               }
@@ -127,15 +129,16 @@ export function useWordSearchSocket(
           );
         });
       }
-    });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('wordsearch:state', (snapshot: WordSearchPlayerSnapshot) => {
+    };
+
+    const detachReady = whenConnected(socket, onReady);
+    const onPlayerState = (snapshot: WordSearchPlayerSnapshot) => {
       setPlayerState(snapshot);
-    });
-    socket.on('wordsearch:admin:state', (snapshot: WordSearchAdminSnapshot) => {
+    };
+    const onAdminState = (snapshot: WordSearchAdminSnapshot) => {
       setAdminState(snapshot);
-    });
-    socket.on('player:kicked', (payload?: { reason?: string }) => {
+    };
+    const onKicked = (payload?: { reason?: string }) => {
       if (!active) {
         return;
       }
@@ -150,17 +153,22 @@ export function useWordSearchSocket(
       }
       setKicked(true);
       clearSession();
-    });
+    };
+    socket.on('wordsearch:state', onPlayerState);
+    socket.on('wordsearch:admin:state', onAdminState);
+    socket.on('player:kicked', onKicked);
 
     return () => {
       active = false;
       if (role === 'player') {
         socket.emit('wordsearch:pauseTimer', {});
       }
-      socket.disconnect();
-      socketRef.current = null;
+      detachReady();
+      socket.off('wordsearch:state', onPlayerState);
+      socket.off('wordsearch:admin:state', onAdminState);
+      socket.off('player:kicked', onKicked);
     };
-  }, [role, hostSecret, hostAttempt]);
+  }, [socket, role, hostSecret, hostAttempt]);
 
   const api = useMemo(
     () => ({

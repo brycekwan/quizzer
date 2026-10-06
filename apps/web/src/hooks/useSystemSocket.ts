@@ -1,32 +1,33 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { useEffect, useMemo, useState } from 'react';
 import type { PartyTheme, SystemAdminSnapshot } from '@party/shared';
 import { unlockHost } from '@/lib/hostSecret';
+import { usePartySocket } from '@/components/PartySocketProvider';
+import { whenConnected } from '@/lib/partySocket';
 
 export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 0) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const { socket, connected } = usePartySocket();
   const [adminState, setAdminState] = useState<SystemAdminSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hostReady, setHostReady] = useState(false);
 
   useEffect(() => {
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
+    let active = true;
 
-    socket.on('connect', () => {
-      setConnected(true);
+    const onReady = () => {
       unlockHost(
         socket,
         hostSecret,
         () => {
+          if (!active) {
+            return;
+          }
           socket.emit(
             'system:admin:subscribe',
             {},
             (result: { ok?: boolean; error?: string }) => {
+              if (!active) {
+                return;
+              }
               if (result?.ok === false) {
                 setHostReady(false);
                 setError(result.error ?? 'Could not subscribe as system admin');
@@ -38,42 +39,44 @@ export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 
           );
         },
         (message) => {
+          if (!active) {
+            return;
+          }
           setHostReady(false);
           setError(message);
         }
       );
-    });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('system:admin:state', (snapshot: SystemAdminSnapshot) => {
+    };
+
+    const detachReady = whenConnected(socket, onReady);
+    const onAdminState = (snapshot: SystemAdminSnapshot) => {
       setAdminState(snapshot);
-    });
+    };
+    socket.on('system:admin:state', onAdminState);
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      active = false;
+      detachReady();
+      socket.off('system:admin:state', onAdminState);
     };
-  }, [hostSecret, hostAttempt]);
+  }, [socket, hostSecret, hostAttempt]);
 
   const api = useMemo(
     () => ({
       kick: (playerId: string) =>
         new Promise<{ ok: boolean; error?: string }>((resolve) => {
-          socketRef.current?.emit(
-            'system:admin:kick',
-            { playerId },
-            resolve
-          );
+          socket.emit('system:admin:kick', { playerId }, resolve);
         }),
       resetAll: () =>
         new Promise<{ ok: boolean; error?: string }>((resolve) => {
-          socketRef.current?.emit('system:admin:reset', {}, resolve);
+          socket.emit('system:admin:reset', {}, resolve);
         }),
       setTheme: (theme: PartyTheme) =>
         new Promise<{ ok: boolean; error?: string; theme?: PartyTheme }>((resolve) => {
-          socketRef.current?.emit('system:admin:setTheme', { theme }, resolve);
+          socket.emit('system:admin:setTheme', { theme }, resolve);
         }),
     }),
-    []
+    [socket]
   );
 
   return { connected, adminState, error, setError, hostReady, ...api };

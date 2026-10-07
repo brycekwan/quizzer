@@ -404,20 +404,21 @@ mod tests {
     fn accepts_burptowel_letter_boards() {
         for (name, raw) in [
             (
-                "burptowel-easy",
-                include_str!("../../../apps/server/sudoku/puzzles/burptowel-easy.json"),
+                "baby-easy",
+                include_str!("../../../apps/server/sudoku/puzzles/baby-easy.json"),
             ),
             (
-                "burptowel-medium",
-                include_str!("../../../apps/server/sudoku/puzzles/burptowel-medium.json"),
+                "baby-medium",
+                include_str!("../../../apps/server/sudoku/puzzles/baby-medium.json"),
             ),
             (
-                "burptowel-hard",
-                include_str!("../../../apps/server/sudoku/puzzles/burptowel-hard.json"),
+                "baby-hard",
+                include_str!("../../../apps/server/sudoku/puzzles/baby-hard.json"),
             ),
         ] {
             let puzzle: SudokuFile = serde_json::from_str(raw).expect(name);
             assert!(validate_sudoku_file(&puzzle).is_none(), "{name}");
+            assert_eq!(puzzle.id, name);
             let public = to_public_sudoku(&puzzle);
             assert_eq!(
                 public.alphabet,

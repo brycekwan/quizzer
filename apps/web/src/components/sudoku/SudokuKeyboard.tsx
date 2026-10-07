@@ -1,12 +1,15 @@
+import { sudokuSymbol } from '@party/shared';
 import { cn } from '@/lib/utils';
 
 export function SudokuKeyboard({
+  alphabet,
   draftMode,
   drafts,
   wrongDrafts,
   disabled,
   onDigit,
 }: {
+  alphabet: string[];
   draftMode: boolean;
   drafts: number[];
   wrongDrafts: number[];
@@ -14,9 +17,10 @@ export function SudokuKeyboard({
   onDigit: (value: number) => void;
 }) {
   return (
-    <div className="grid grid-cols-9 gap-1" role="group" aria-label="Numbers">
+    <div className="grid grid-cols-9 gap-1" role="group" aria-label="Symbols">
       {Array.from({ length: 9 }, (_, index) => {
         const value = index + 1;
+        const label = sudokuSymbol(alphabet, value);
         const noted = drafts.includes(value);
         const wrong = wrongDrafts.includes(value);
         const pressed = draftMode && noted;
@@ -25,7 +29,7 @@ export function SudokuKeyboard({
             key={value}
             type="button"
             aria-pressed={draftMode && !wrong ? pressed : undefined}
-            aria-label={keyLabel(value, draftMode, noted, wrong)}
+            aria-label={keyLabel(label, draftMode, noted, wrong)}
             disabled={disabled || wrong}
             onClick={() => onDigit(value)}
             className={cn(
@@ -35,7 +39,7 @@ export function SudokuKeyboard({
               wrong && 'bg-[#ffc9c9] text-ink'
             )}
           >
-            {value}
+            {label}
           </button>
         );
       })}
@@ -44,19 +48,19 @@ export function SudokuKeyboard({
 }
 
 function keyLabel(
-  value: number,
+  label: string,
   draftMode: boolean,
   noted: boolean,
   wrong: boolean
 ): string {
   if (wrong) {
-    return `${value}, incorrect`;
+    return `${label}, incorrect`;
   }
   if (!noted) {
-    return String(value);
+    return label;
   }
   if (draftMode) {
-    return `${value}, in notes`;
+    return `${label}, in notes`;
   }
-  return `${value}, noted`;
+  return `${label}, noted`;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
-import type { SudokuCellState } from '@party/shared';
+import { SUDOKU_DEFAULT_ALPHABET, type SudokuCellState } from '@party/shared';
 import { GamePlayHeader } from '@/components/GamePlayHeader';
 import { SudokuGrid } from '@/components/sudoku/SudokuGrid';
 import { SudokuKeyboard } from '@/components/sudoku/SudokuKeyboard';
@@ -17,6 +17,31 @@ import {
 import { useSudokuSocket } from '@/hooks/useSudokuSocket';
 import { computeElapsedMs, formatElapsedMs } from '@/lib/crosswordClient';
 import { usePlayInstructions } from '@/lib/usePlayInstructions';
+
+function isNumericAlphabet(alphabet: readonly string[]): boolean {
+  return alphabet.every((symbol, index) => symbol === String(index + 1));
+}
+
+function formatAlphabetList(alphabet: readonly string[]): string {
+  if (alphabet.length === 0) {
+    return '';
+  }
+  if (alphabet.length === 1) {
+    return alphabet[0] ?? '';
+  }
+  if (alphabet.length === 2) {
+    return `${alphabet[0]} and ${alphabet[1]}`;
+  }
+  return `${alphabet.slice(0, -1).join(', ')}, and ${alphabet[alphabet.length - 1]}`;
+}
+
+function digitFromKey(key: string, alphabet: readonly string[]): number | null {
+  const upper = key.length === 1 ? key.toUpperCase() : key;
+  const index = alphabet.findIndex(
+    (symbol) => symbol.toUpperCase() === upper
+  );
+  return index >= 0 ? index + 1 : null;
+}
 
 function useElapsedClock(
   elapsedMs: number,
@@ -85,12 +110,18 @@ function SudokuInstructions({
   onOpenChange,
   intro,
   showTrigger,
+  alphabet,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   intro: boolean;
   showTrigger: boolean;
+  alphabet: readonly string[];
 }) {
+  const numeric = isNumericAlphabet(alphabet);
+  const symbols = formatAlphabetList(alphabet);
+  const unit = numeric ? 'number' : 'letter';
+  const units = numeric ? 'numbers' : 'letters';
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {showTrigger ? (
@@ -108,14 +139,14 @@ function SudokuInstructions({
           <ul className="space-y-3 overflow-y-auto text-base font-semibold leading-relaxed text-ink/80 md:text-sm">
             <li>
               Fill the 9×9 grid so each row, each column, and each 3×3 box
-              contains the numbers 1–9 once.
+              contains the {units} {symbols} once.
             </li>
-            <li>Shaded numbers are given and cannot be changed.</li>
+            <li>Shaded {units} are given and cannot be changed.</li>
             <li>
-              Select a square, then enter a number. A correct number turns
+              Select a square, then enter a {unit}. A correct {unit} turns
               green, then fades to the locked shade, and is worth 10 points. A
-              wrong number fills the square in red and costs 10 points. That
-              number cannot be entered in the square again.
+              wrong {unit} fills the square in red and costs 10 points. That{' '}
+              {unit} cannot be entered in the square again.
             </li>
             <li>
               The timer starts on your first entry. It stays stopped while these
@@ -123,17 +154,17 @@ function SudokuInstructions({
               stops when the puzzle is finished.
             </li>
             <li>
-              Notes lets you pencil in candidates. Keys for numbers already in
+              Notes lets you pencil in candidates. Keys for {units} already in
               the square start pressed, and pressing one adds or removes that
-              note. A number already entered wrong in that square cannot be
+              note. A {unit} already entered wrong in that square cannot be
               added as a note. Notes are not scored.
             </li>
             <li>
-              Erase removes the red number from the selected square, and removes
+              Erase removes the red {unit} from the selected square, and removes
               it from the notes there too.
             </li>
             <li>
-              Hint reveals one number and is not worth points. You can use it
+              Hint reveals one {unit} and is not worth points. You can use it
               up to 3 times. Each unused hint is worth 10 points when you finish.
             </li>
             <li>Finishing the puzzle is worth 100 extra points.</li>
@@ -210,7 +241,7 @@ export function SudokuPage() {
       : commit(selected.row, selected.col, value);
     void action.then((result) => {
       if (!result?.ok) {
-        setError(result?.error ?? 'Could not enter that number');
+        setError(result?.error ?? 'Could not enter that value');
         return;
       }
       setError(null);
@@ -243,6 +274,9 @@ export function SudokuPage() {
   enterDigitRef.current = enterDigit;
   const clearMistakeRef = useRef(clearMistake);
   clearMistakeRef.current = clearMistake;
+  const alphabet = playerState?.puzzle.alphabet ?? [...SUDOKU_DEFAULT_ALPHABET];
+  const alphabetRef = useRef(alphabet);
+  alphabetRef.current = alphabet;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -254,9 +288,10 @@ export function SudokuPage() {
         clearMistakeRef.current();
         return;
       }
-      if (/^[1-9]$/.test(event.key)) {
+      const digit = digitFromKey(event.key, alphabetRef.current);
+      if (digit != null) {
         event.preventDefault();
-        enterDigitRef.current(Number(event.key));
+        enterDigitRef.current(digit);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -309,6 +344,7 @@ export function SudokuPage() {
               onOpenChange={onInstructionsOpenChange}
               intro={intro}
               showTrigger
+              alphabet={alphabet}
             />
           }
         />
@@ -326,6 +362,7 @@ export function SudokuPage() {
         ) : null}
 
         <SudokuGrid
+          alphabet={alphabet}
           cells={playerState.cells}
           selected={selected}
           onSelect={(row, col) => setSelected({ row, col })}
@@ -364,6 +401,7 @@ export function SudokuPage() {
 
         <div className="mt-3 pb-4">
           <SudokuKeyboard
+            alphabet={alphabet}
             draftMode={draftMode}
             drafts={selectedCell?.drafts ?? []}
             wrongDrafts={selectedCell?.wrongDrafts ?? []}

@@ -11,9 +11,27 @@ export const SUDOKU_RANK_BONUS_FIRST = 1000;
 export const SUDOKU_RANK_BONUS_STEP = 100;
 export const SUDOKU_RANK_BONUS_MAX_PLACE = 10;
 
+/** Display symbols for digits 1–9 when a puzzle omits `alphabet`. */
+export const SUDOKU_DEFAULT_ALPHABET = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+] as const;
+
 export interface SudokuFile {
   id: string;
   title: string;
+  /**
+   * Optional display symbols for digits 1–9 (index 0 → digit 1).
+   * Internally the board stays numeric; clients render these labels.
+   */
+  alphabet?: string[];
   /** Completed 9×9 board. Never sent to players. */
   solution: number[][];
   /** Starting digits. `null` is an empty cell. */
@@ -25,6 +43,19 @@ export interface SudokuPublicPuzzle {
   title: string;
   rows: number;
   cols: number;
+  /** Display symbols for digits 1–9 (index 0 → digit 1). */
+  alphabet: string[];
+}
+
+/** Label for digit 1–9 from a public alphabet. */
+export function sudokuSymbol(alphabet: readonly string[], digit: number): string {
+  return alphabet[digit - 1] ?? String(digit);
+}
+
+export function sudokuAlphabet(puzzle: Pick<SudokuFile, 'alphabet'>): string[] {
+  return puzzle.alphabet?.length === SUDOKU_SIZE
+    ? [...puzzle.alphabet]
+    : [...SUDOKU_DEFAULT_ALPHABET];
 }
 
 export interface SudokuCellState {

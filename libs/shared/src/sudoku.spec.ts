@@ -63,4 +63,36 @@ describe('validateSudokuFile', () => {
     puzzle.givens = puzzle.solution.map((row) => row.map(() => null));
     expect(validateSudokuFile(puzzle)).toContain('exactly one solution');
   });
+
+  it('accepts BURPTOWEL letter boards', () => {
+    for (const name of [
+      'burptowel-easy.json',
+      'burptowel-medium.json',
+      'burptowel-hard.json',
+    ]) {
+      const file = path.resolve(
+        __dirname,
+        `../../../apps/server/sudoku/puzzles/${name}`
+      );
+      const puzzle = JSON.parse(readFileSync(file, 'utf8')) as SudokuFile;
+      expect(validateSudokuFile(puzzle)).toBeNull();
+      expect(puzzle.alphabet).toEqual([
+        'B',
+        'U',
+        'R',
+        'P',
+        'T',
+        'O',
+        'W',
+        'E',
+        'L',
+      ]);
+    }
+  });
+
+  it('rejects a duplicate alphabet symbol', () => {
+    const puzzle = sample();
+    puzzle.alphabet = ['B', 'U', 'R', 'P', 'T', 'O', 'W', 'E', 'B'];
+    expect(validateSudokuFile(puzzle)).toContain('unique');
+  });
 });

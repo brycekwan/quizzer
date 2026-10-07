@@ -1,0 +1,236 @@
+{
+  "id": "foods",
+  "title": "Foods",
+  "grid": [
+    [
+      "F",
+      "R",
+      "Q",
+      "I",
+      "H",
+      "S",
+      "U",
+      "S",
+      "R",
+      "G",
+      "N",
+      "D"
+    ],
+    [
+      "Y",
+      "J",
+      "E",
+      "U",
+      "C",
+      "M",
+      "L",
+      "S",
+      "C",
+      "X",
+      "V",
+      "Q"
+    ],
+    [
+      "W",
+      "E",
+      "I",
+      "K",
+      "O",
+      "O",
+      "C",
+      "E",
+      "O",
+      "H",
+      "Z",
+      "C"
+    ],
+    [
+      "H",
+      "J",
+      "D",
+      "A",
+      "L",
+      "A",
+      "S",
+      "Y",
+      "N",
+      "V",
+      "Q",
+      "U"
+    ],
+    [
+      "N",
+      "A",
+      "G",
+      "B",
+      "R",
+      "O",
+      "Y",
+      "O",
+      "X",
+      "D",
+      "V",
+      "A"
+    ],
+    [
+      "Y",
+      "N",
+      "P",
+      "T",
+      "A",
+      "C",
+      "O",
+      "A",
+      "Z",
+      "Z",
+      "I",
+      "P"
+    ],
+    [
+      "J",
+      "A",
+      "O",
+      "X",
+      "Z",
+      "D",
+      "U",
+      "P",
+      "I",
+      "K",
+      "V",
+      "L"
+    ],
+    [
+      "W",
+      "N",
+      "K",
+      "W",
+      "L",
+      "Q",
+      "V",
+      "U",
+      "R",
+      "W",
+      "T",
+      "R"
+    ],
+    [
+      "C",
+      "A",
+      "N",
+      "E",
+      "P",
+      "X",
+      "M",
+      "Z",
+      "H",
+      "S",
+      "Z",
+      "T"
+    ],
+    [
+      "G",
+      "B",
+      "S",
+      "B",
+      "G",
+      "B",
+      "U",
+      "R",
+      "G",
+      "E",
+      "R",
+      "F"
+    ],
+    [
+      "E",
+      "K",
+      "R",
+      "Y",
+      "E",
+      "Q",
+      "A",
+      "T",
+      "S",
+      "A",
+      "P",
+      "I"
+    ],
+    [
+      "E",
+      "S",
+      "E",
+      "E",
+      "H",
+      "C",
+      "L",
+      "A",
+      "F",
+      "P",
+      "R",
+      "J"
+    ]
+  ],
+  "words": [
+    {
+      "word": "PIZZA",
+      "row": 5,
+      "col": 11,
+      "direction": "W"
+    },
+    {
+      "word": "PASTA",
+      "row": 10,
+      "col": 10,
+      "direction": "W"
+    },
+    {
+      "word": "BURGER",
+      "row": 9,
+      "col": 5,
+      "direction": "E"
+    },
+    {
+      "word": "SALAD",
+      "row": 3,
+      "col": 6,
+      "direction": "W"
+    },
+    {
+      "word": "SUSHI",
+      "row": 0,
+      "col": 7,
+      "direction": "W"
+    },
+    {
+      "word": "TACO",
+      "row": 5,
+      "col": 3,
+      "direction": "E"
+    },
+    {
+      "word": "NOODLE",
+      "row": 3,
+      "col": 8,
+      "direction": "SW"
+    },
+    {
+      "word": "COOKIE",
+      "row": 2,
+      "col": 6,
+      "direction": "W"
+    },
+    {
+      "word": "BANANA",
+      "row": 9,
+      "col": 1,
+      "direction": "N"
+    },
+    {
+      "word": "CHEESE",
+      "row": 11,
+      "col": 5,
+      "direction": "W"
+    }
+  ]
+}

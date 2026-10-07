@@ -91,7 +91,7 @@ JSON under `apps/server/wordsearch/puzzles/`: `{ id, title, grid, words }`. `gri
 
 ## Sudoku packs
 
-JSON under `apps/server/sudoku/puzzles/`: `{ id, title, solution, givens }`. Both grids are 9×9. `solution` is the finished board. `givens` uses those digits or `null` for blanks. The solution must be a valid sudoku and the only board that fits the givens. Validate via `validateSudokuFile`. Players receive givens and their own entries, not the solution.
+JSON under `apps/server/sudoku/puzzles/`: `{ id, title, solution, givens, alphabet? }`. Both grids are 9×9 with digits **1–9**. `solution` is the finished board. `givens` uses those digits or `null` for blanks. Optional `alphabet` is nine unique single-character symbols (e.g. `["B","U","R","P","T","O","W","E","L"]`) mapped to digits 1–9 for display on the soft keyboard, grid, and instructions; omit it for classic 1–9. The solution must be a valid sudoku and the only board that fits the givens. Validate via `validateSudokuFile`. Players receive givens and their own entries, not the solution.
 
 ## Maze packs
 

@@ -543,7 +543,16 @@ mod tests {
         assert_eq!(puzzle.id, "canada");
         assert_eq!(words.len(), 10);
         let listed = list_word_search_puzzles(&dir);
-        assert!(listed.iter().any(|puzzle| puzzle.label == "canada.json"));
+        for label in ["canada.json", "baby.json", "foods.json", "hospital.json"] {
+            assert!(
+                listed.iter().any(|puzzle| puzzle.label == label),
+                "{label} missing"
+            );
+            let id = label.trim_end_matches(".json");
+            let (loaded, loaded_words) = load_word_search_puzzle(id, &dir).unwrap();
+            assert_eq!(loaded.id, id);
+            assert_eq!(loaded_words.len(), 10);
+        }
     }
 
     #[test]

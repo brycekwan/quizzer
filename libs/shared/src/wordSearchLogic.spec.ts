@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   WORD_SEARCH_SIZE,
@@ -57,6 +59,18 @@ describe('validateWordSearchFile', () => {
     expect(validateWordSearchFile(puzzle)).toBeNull();
     const words = deriveWordSearchWords(puzzle);
     expect(Array.isArray(words) && words).toHaveLength(WORD_SEARCH_WORD_COUNT);
+  });
+
+  it('accepts the baby, foods, and hospital packs', () => {
+    for (const name of ['baby.json', 'foods.json', 'hospital.json']) {
+      const file = path.resolve(
+        __dirname,
+        `../../../apps/server/wordsearch/puzzles/${name}`
+      );
+      const puzzle = JSON.parse(readFileSync(file, 'utf8')) as WordSearchFile;
+      expect(validateWordSearchFile(puzzle)).toBeNull();
+      expect(puzzle.words).toHaveLength(WORD_SEARCH_WORD_COUNT);
+    }
   });
 
   it('rejects a grid that is not 12×12', () => {

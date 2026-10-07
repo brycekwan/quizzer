@@ -10,11 +10,17 @@ pub const SUDOKU_RANK_BONUS_FIRST: i64 = 1000;
 pub const SUDOKU_RANK_BONUS_STEP: i64 = 100;
 pub const SUDOKU_RANK_BONUS_MAX_PLACE: i64 = 10;
 
+pub const SUDOKU_DEFAULT_ALPHABET: [&str; 9] =
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SudokuFile {
     pub id: String,
     pub title: String,
+    /// Optional display symbols for digits 1–9 (index 0 → digit 1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alphabet: Option<Vec<String>>,
     pub solution: Vec<Vec<u8>>,
     pub givens: Vec<Vec<Option<u8>>>,
 }
@@ -26,6 +32,8 @@ pub struct SudokuPublicPuzzle {
     pub title: String,
     pub rows: i64,
     pub cols: i64,
+    /// Display symbols for digits 1–9 (index 0 → digit 1).
+    pub alphabet: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,12 +114,66 @@ pub fn sudoku_admin_score(player_score: i64, _rank: i64) -> i64 {
     player_score
 }
 
+fn normalize_alphabet_symbol(raw: &str) -> Option<String> {
+    let symbol = raw.trim();
+    let mut chars = symbol.chars();
+    let first = chars.next()?;
+    if chars.next().is_some() {
+        return None;
+    }
+    if first.is_ascii_alphabetic() {
+        Some(first.to_ascii_uppercase().to_string())
+    } else {
+        Some(first.to_string())
+    }
+}
+
+pub fn sudoku_alphabet(puzzle: &SudokuFile) -> Vec<String> {
+    match &puzzle.alphabet {
+        Some(symbols) if symbols.len() == SUDOKU_SIZE => symbols
+            .iter()
+            .enumerate()
+            .map(|(index, raw)| {
+                normalize_alphabet_symbol(raw)
+                    .unwrap_or_else(|| SUDOKU_DEFAULT_ALPHABET[index].to_string())
+            })
+            .collect(),
+        _ => SUDOKU_DEFAULT_ALPHABET
+            .iter()
+            .map(|symbol| (*symbol).to_string())
+            .collect(),
+    }
+}
+
+fn alphabet_error(puzzle: &SudokuFile) -> Option<String> {
+    let Some(symbols) = &puzzle.alphabet else {
+        return None;
+    };
+    if symbols.len() != SUDOKU_SIZE {
+        return Some("Alphabet must list 9 symbols".into());
+    }
+    let mut seen = std::collections::HashSet::new();
+    for (index, raw) in symbols.iter().enumerate() {
+        let Some(symbol) = normalize_alphabet_symbol(raw) else {
+            return Some(format!(
+                "Alphabet symbol at {index} must be a single character"
+            ));
+        };
+        let key = symbol.to_ascii_uppercase();
+        if !seen.insert(key) {
+            return Some("Alphabet symbols must be unique".into());
+        }
+    }
+    None
+}
+
 pub fn to_public_sudoku(puzzle: &SudokuFile) -> SudokuPublicPuzzle {
     SudokuPublicPuzzle {
         id: puzzle.id.clone(),
         title: puzzle.title.clone(),
         rows: SUDOKU_SIZE as i64,
         cols: SUDOKU_SIZE as i64,
+        alphabet: sudoku_alphabet(puzzle),
     }
 }
 
@@ -256,6 +318,9 @@ pub fn validate_sudoku_file(puzzle: &SudokuFile) -> Option<String> {
     if puzzle.title.trim().is_empty() {
         return Some("Sudoku title is required".into());
     }
+    if let Some(error) = alphabet_error(puzzle) {
+        return Some(error);
+    }
     let (solution, givens) = match parsed_grids(puzzle) {
         Ok(grids) => grids,
         Err(error) => return Some(error),
@@ -333,5 +398,44 @@ mod tests {
         }
         let error = validate_sudoku_file(&puzzle).unwrap();
         assert!(error.contains("exactly one solution"));
+    }
+
+    #[test]
+    fn accepts_burptowel_letter_boards() {
+        for (name, raw) in [
+            (
+                "burptowel-easy",
+                include_str!("../../../apps/server/sudoku/puzzles/burptowel-easy.json"),
+            ),
+            (
+                "burptowel-medium",
+                include_str!("../../../apps/server/sudoku/puzzles/burptowel-medium.json"),
+            ),
+            (
+                "burptowel-hard",
+                include_str!("../../../apps/server/sudoku/puzzles/burptowel-hard.json"),
+            ),
+        ] {
+            let puzzle: SudokuFile = serde_json::from_str(raw).expect(name);
+            assert!(validate_sudoku_file(&puzzle).is_none(), "{name}");
+            let public = to_public_sudoku(&puzzle);
+            assert_eq!(
+                public.alphabet,
+                vec!["B", "U", "R", "P", "T", "O", "W", "E", "L"]
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_a_duplicate_alphabet_symbol() {
+        let mut puzzle = classic_sudoku_file();
+        puzzle.alphabet = Some(
+            ["B", "U", "R", "P", "T", "O", "W", "E", "B"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        );
+        let error = validate_sudoku_file(&puzzle).unwrap();
+        assert!(error.contains("unique"));
     }
 }

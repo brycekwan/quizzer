@@ -1,6 +1,8 @@
 import {
   SUDOKU_BOX,
+  SUDOKU_DEFAULT_ALPHABET,
   SUDOKU_SIZE,
+  sudokuAlphabet,
   type SudokuFile,
   type SudokuPublicPuzzle,
 } from './sudoku';
@@ -167,12 +169,45 @@ export function sudokuSolutionCount(givens: readonly (number | null)[][]): numbe
   return found;
 }
 
+function alphabetError(puzzle: SudokuFile): string | null {
+  if (puzzle.alphabet == null) {
+    return null;
+  }
+  if (
+    !Array.isArray(puzzle.alphabet) ||
+    puzzle.alphabet.length !== SUDOKU_SIZE
+  ) {
+    return 'Alphabet must list 9 symbols';
+  }
+  const seen = new Set<string>();
+  for (let index = 0; index < SUDOKU_SIZE; index++) {
+    const raw = puzzle.alphabet[index];
+    if (typeof raw !== 'string') {
+      return `Alphabet symbol at ${index} must be a single character`;
+    }
+    const symbol = raw.trim();
+    if (symbol.length !== 1) {
+      return `Alphabet symbol at ${index} must be a single character`;
+    }
+    const key = symbol.toUpperCase();
+    if (seen.has(key)) {
+      return 'Alphabet symbols must be unique';
+    }
+    seen.add(key);
+  }
+  return null;
+}
+
 export function validateSudokuFile(puzzle: SudokuFile): string | null {
   if (puzzle.id?.trim() === '' || puzzle.id == null) {
     return 'Sudoku id is required';
   }
   if (puzzle.title?.trim() === '' || puzzle.title == null) {
     return 'Sudoku title is required';
+  }
+  const alphabetIssue = alphabetError(puzzle);
+  if (alphabetIssue) {
+    return alphabetIssue;
   }
   const solution = solutionGrid(puzzle);
   if ('error' in solution) {
@@ -192,10 +227,20 @@ export function validateSudokuFile(puzzle: SudokuFile): string | null {
 }
 
 export function toPublicSudoku(puzzle: SudokuFile): SudokuPublicPuzzle {
+  const alphabet = sudokuAlphabet(puzzle).map((symbol, index) => {
+    const trimmed = symbol.trim();
+    if (trimmed.length === 1 && /[a-z]/i.test(trimmed)) {
+      return trimmed.toUpperCase();
+    }
+    return trimmed.length === 1
+      ? trimmed
+      : (SUDOKU_DEFAULT_ALPHABET[index] ?? String(index + 1));
+  });
   return {
     id: puzzle.id,
     title: puzzle.title,
     rows: SUDOKU_SIZE,
     cols: SUDOKU_SIZE,
+    alphabet,
   };
 }

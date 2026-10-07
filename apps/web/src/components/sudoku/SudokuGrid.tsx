@@ -1,14 +1,16 @@
-import type { SudokuCellState } from '@party/shared';
+import { sudokuSymbol, type SudokuCellState } from '@party/shared';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const CORRECT_FLASH_MS = 3000;
 
 export function SudokuGrid({
+  alphabet,
   cells,
   selected,
   onSelect,
 }: {
+  alphabet: string[];
   cells: SudokuCellState[][];
   selected: { row: number; col: number } | null;
   onSelect: (row: number, col: number) => void;
@@ -51,7 +53,7 @@ export function SudokuGrid({
               type="button"
               role="gridcell"
               aria-selected={isSelected}
-              aria-label={cellLabel(rowIndex, colIndex, cell)}
+              aria-label={cellLabel(rowIndex, colIndex, cell, alphabet)}
               onClick={() => onSelect(rowIndex, colIndex)}
               className={cn(
                 'relative aspect-square border-b border-r border-ink/15 p-0 transition-colors',
@@ -63,7 +65,7 @@ export function SudokuGrid({
             >
               {cell.value != null ? (
                 <span className="flex h-full items-center justify-center font-display text-lg font-bold text-ink sm:text-2xl">
-                  {cell.value}
+                  {sudokuSymbol(alphabet, cell.value)}
                 </span>
               ) : (
                 <span className="grid h-full w-full grid-cols-3 grid-rows-3 p-0.5">
@@ -79,7 +81,7 @@ export function SudokuGrid({
                           noted && 'text-ink/75'
                         )}
                       >
-                        {digit}
+                        {sudokuSymbol(alphabet, digit)}
                       </span>
                     );
                   })}
@@ -150,19 +152,25 @@ function useCorrectFlashes(cells: SudokuCellState[][]): Set<string> {
   );
 }
 
-function cellLabel(row: number, col: number, cell: SudokuCellState): string {
+function cellLabel(
+  row: number,
+  col: number,
+  cell: SudokuCellState,
+  alphabet: string[]
+): string {
   const place = `Row ${row + 1}, column ${col + 1}`;
+  const label = (digit: number) => sudokuSymbol(alphabet, digit);
   if (cell.given && cell.value != null) {
-    return `${place}, given ${cell.value}`;
+    return `${place}, given ${label(cell.value)}`;
   }
   if (cell.solved && cell.value != null) {
-    return `${place}, ${cell.hinted ? 'hint' : 'correct'} ${cell.value}`;
+    return `${place}, ${cell.hinted ? 'hint' : 'correct'} ${label(cell.value)}`;
   }
   if (cell.wrong && cell.value != null) {
-    return `${place}, incorrect ${cell.value}`;
+    return `${place}, incorrect ${label(cell.value)}`;
   }
   if (cell.drafts.length > 0) {
-    return `${place}, notes ${cell.drafts.join(' ')}`;
+    return `${place}, notes ${cell.drafts.map(label).join(' ')}`;
   }
   return `${place}, empty`;
 }

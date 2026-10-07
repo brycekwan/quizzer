@@ -66,9 +66,9 @@ describe('validateSudokuFile', () => {
 
   it('accepts BURPTOWEL letter boards', () => {
     for (const name of [
-      'burptowel-easy.json',
-      'burptowel-medium.json',
-      'burptowel-hard.json',
+      'baby-easy.json',
+      'baby-medium.json',
+      'baby-hard.json',
     ]) {
       const file = path.resolve(
         __dirname,

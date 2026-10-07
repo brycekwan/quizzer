@@ -1,0 +1,236 @@
+{
+  "id": "hospital",
+  "title": "Hospital",
+  "grid": [
+    [
+      "P",
+      "M",
+      "R",
+      "L",
+      "E",
+      "P",
+      "L",
+      "A",
+      "C",
+      "S",
+      "M",
+      "F"
+    ],
+    [
+      "Y",
+      "A",
+      "O",
+      "P",
+      "L",
+      "K",
+      "S",
+      "L",
+      "Y",
+      "G",
+      "H",
+      "T"
+    ],
+    [
+      "M",
+      "B",
+      "B",
+      "N",
+      "D",
+      "O",
+      "C",
+      "T",
+      "O",
+      "R",
+      "E",
+      "S"
+    ],
+    [
+      "T",
+      "S",
+      "A",
+      "Y",
+      "R",
+      "E",
+      "G",
+      "R",
+      "U",
+      "S",
+      "G",
+      "Z"
+    ],
+    [
+      "N",
+      "Q",
+      "K",
+      "M",
+      "L",
+      "G",
+      "M",
+      "Y",
+      "X",
+      "D",
+      "A",
+      "B"
+    ],
+    [
+      "E",
+      "E",
+      "W",
+      "E",
+      "B",
+      "A",
+      "V",
+      "M",
+      "Y",
+      "V",
+      "D",
+      "Y"
+    ],
+    [
+      "I",
+      "C",
+      "N",
+      "S",
+      "J",
+      "U",
+      "T",
+      "Q",
+      "S",
+      "P",
+      "N",
+      "Q"
+    ],
+    [
+      "T",
+      "X",
+      "P",
+      "R",
+      "X",
+      "Z",
+      "L",
+      "I",
+      "D",
+      "Q",
+      "A",
+      "W"
+    ],
+    [
+      "A",
+      "O",
+      "G",
+      "U",
+      "U",
+      "J",
+      "T",
+      "A",
+      "P",
+      "R",
+      "B",
+      "W"
+    ],
+    [
+      "P",
+      "B",
+      "Y",
+      "N",
+      "O",
+      "C",
+      "I",
+      "E",
+      "N",
+      "S",
+      "P",
+      "A"
+    ],
+    [
+      "T",
+      "E",
+      "N",
+      "I",
+      "C",
+      "I",
+      "D",
+      "E",
+      "M",
+      "C",
+      "O",
+      "Y"
+    ],
+    [
+      "K",
+      "K",
+      "T",
+      "G",
+      "S",
+      "Y",
+      "R",
+      "I",
+      "N",
+      "G",
+      "E",
+      "H"
+    ]
+  ],
+  "words": [
+    {
+      "word": "DOCTOR",
+      "row": 2,
+      "col": 4,
+      "direction": "E"
+    },
+    {
+      "word": "NURSE",
+      "row": 9,
+      "col": 3,
+      "direction": "N"
+    },
+    {
+      "word": "PATIENT",
+      "row": 9,
+      "col": 0,
+      "direction": "N"
+    },
+    {
+      "word": "SURGERY",
+      "row": 3,
+      "col": 9,
+      "direction": "W"
+    },
+    {
+      "word": "BANDAGE",
+      "row": 8,
+      "col": 10,
+      "direction": "N"
+    },
+    {
+      "word": "SYRINGE",
+      "row": 11,
+      "col": 4,
+      "direction": "E"
+    },
+    {
+      "word": "HOSPITAL",
+      "row": 11,
+      "col": 11,
+      "direction": "NW"
+    },
+    {
+      "word": "MEDICINE",
+      "row": 10,
+      "col": 8,
+      "direction": "W"
+    },
+    {
+      "word": "AMBULANCE",
+      "row": 3,
+      "col": 2,
+      "direction": "SE"
+    },
+    {
+      "word": "SCALPEL",
+      "row": 0,
+      "col": 9,
+      "direction": "W"
+    }
+  ]
+}

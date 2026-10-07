@@ -1,0 +1,236 @@
+{
+  "id": "baby",
+  "title": "Baby",
+  "grid": [
+    [
+      "K",
+      "U",
+      "K",
+      "W",
+      "M",
+      "C",
+      "B",
+      "R",
+      "K",
+      "A",
+      "F",
+      "T"
+    ],
+    [
+      "H",
+      "B",
+      "Q",
+      "B",
+      "P",
+      "B",
+      "E",
+      "L",
+      "D",
+      "W",
+      "L",
+      "T"
+    ],
+    [
+      "X",
+      "Q",
+      "B",
+      "E",
+      "D",
+      "L",
+      "R",
+      "T",
+      "I",
+      "N",
+      "A",
+      "Q"
+    ],
+    [
+      "C",
+      "R",
+      "I",
+      "B",
+      "L",
+      "A",
+      "D",
+      "E",
+      "A",
+      "E",
+      "B",
+      "Y"
+    ],
+    [
+      "L",
+      "D",
+      "U",
+      "O",
+      "T",
+      "I",
+      "T",
+      "K",
+      "P",
+      "F",
+      "T",
+      "M"
+    ],
+    [
+      "Y",
+      "D",
+      "R",
+      "T",
+      "H",
+      "P",
+      "Y",
+      "N",
+      "E",
+      "N",
+      "E",
+      "B"
+    ],
+    [
+      "L",
+      "T",
+      "L",
+      "J",
+      "T",
+      "D",
+      "V",
+      "A",
+      "R",
+      "U",
+      "N",
+      "O"
+    ],
+    [
+      "S",
+      "E",
+      "Q",
+      "O",
+      "L",
+      "W",
+      "J",
+      "L",
+      "F",
+      "R",
+      "I",
+      "T"
+    ],
+    [
+      "E",
+      "I",
+      "Q",
+      "Q",
+      "C",
+      "C",
+      "U",
+      "B",
+      "D",
+      "S",
+      "S",
+      "T"
+    ],
+    [
+      "S",
+      "P",
+      "A",
+      "C",
+      "I",
+      "F",
+      "I",
+      "E",
+      "R",
+      "E",
+      "S",
+      "L"
+    ],
+    [
+      "R",
+      "P",
+      "G",
+      "P",
+      "R",
+      "S",
+      "V",
+      "E",
+      "X",
+      "R",
+      "A",
+      "E"
+    ],
+    [
+      "V",
+      "O",
+      "N",
+      "E",
+      "S",
+      "I",
+      "E",
+      "Q",
+      "Q",
+      "Y",
+      "B",
+      "O"
+    ]
+  ],
+  "words": [
+    {
+      "word": "BOTTLE",
+      "row": 5,
+      "col": 11,
+      "direction": "S"
+    },
+    {
+      "word": "DIAPER",
+      "row": 1,
+      "col": 8,
+      "direction": "S"
+    },
+    {
+      "word": "CRIB",
+      "row": 3,
+      "col": 0,
+      "direction": "E"
+    },
+    {
+      "word": "RATTLE",
+      "row": 2,
+      "col": 6,
+      "direction": "SW"
+    },
+    {
+      "word": "PACIFIER",
+      "row": 9,
+      "col": 1,
+      "direction": "E"
+    },
+    {
+      "word": "STROLLER",
+      "row": 7,
+      "col": 0,
+      "direction": "NE"
+    },
+    {
+      "word": "NURSERY",
+      "row": 5,
+      "col": 9,
+      "direction": "S"
+    },
+    {
+      "word": "BLANKET",
+      "row": 8,
+      "col": 7,
+      "direction": "N"
+    },
+    {
+      "word": "BASSINET",
+      "row": 11,
+      "col": 10,
+      "direction": "N"
+    },
+    {
+      "word": "ONESIE",
+      "row": 11,
+      "col": 1,
+      "direction": "E"
+    }
+  ]
+}

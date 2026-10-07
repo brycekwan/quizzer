@@ -1,3 +1,16 @@
+# [2.9.0](https://github.com/brycekwan/quizzer/compare/v2.8.5...v2.9.0) (2026-10-07)
+
+
+### Bug Fixes
+
+* **sudoku:** align baby pack ids with renamed puzzle files ([248deea](https://github.com/brycekwan/quizzer/commit/248deea238c028cafae740a4a58d7ba1da231018))
+
+
+### Features
+
+* add themed word search packs and center play header score ([a490c43](https://github.com/brycekwan/quizzer/commit/a490c43df5dc7082faff886241d008ea29a02f24))
+* **sudoku:** add BURPTOWEL letter alphabet boards ([a2cd133](https://github.com/brycekwan/quizzer/commit/a2cd1335c0f0bae286300c63bfbe22911820eaf7))
+
 ## [2.8.5](https://github.com/brycekwan/quizzer/compare/v2.8.4...v2.8.5) (2026-10-06)
 
 

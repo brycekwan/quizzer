@@ -18,6 +18,8 @@
     "lint": "nx run-many -t lint",
     "serve:web": "nx serve web",
     "serve:server": "env -u HOST_SECRET PATH=\"$HOME/.cargo/bin:$PATH\" nx serve server-rs",
+    "android:assemble": "nx run android:assembleDebug",
+    "android:test": "nx run android:test",
     "convert-maze": "node scripts/convert-maze.mjs",
     "release": "semantic-release"
   },

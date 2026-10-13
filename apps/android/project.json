@@ -1,0 +1,44 @@
+{
+  "name": "android",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/android/app/src",
+  "projectType": "application",
+  "tags": ["scope:android", "lang:kotlin"],
+  "targets": {
+    "assembleDebug": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/android",
+        "command": "./gradlew :app:assembleDebug"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/android",
+        "command": "./gradlew :app:assembleDebug"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/android",
+        "command": "./gradlew :app:testDebugUnitTest"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/android",
+        "command": "./gradlew :app:lintDebug"
+      }
+    },
+    "installDebug": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/android",
+        "command": "./gradlew :app:installDebug"
+      }
+    }
+  }
+}

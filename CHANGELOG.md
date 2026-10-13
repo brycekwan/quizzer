@@ -1,3 +1,11 @@
+# [2.10.0](https://github.com/brycekwan/quizzer/compare/v2.9.0...v2.10.0) (2026-10-13)
+
+
+### Features
+
+* add build to github actions ([8d94c2f](https://github.com/brycekwan/quizzer/commit/8d94c2ffcf0f61646cc2f7e9d1abadd7dfc7e88b))
+* **android:** add Compose player client for the party server ([9e211e3](https://github.com/brycekwan/quizzer/commit/9e211e3e4d412abaa52f06507d413552e24df4f3))
+
 # [2.9.0](https://github.com/brycekwan/quizzer/compare/v2.8.5...v2.9.0) (2026-10-07)
 
 

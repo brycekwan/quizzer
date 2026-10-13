@@ -4,10 +4,11 @@ Multi-game party platform: Kahoot-style quizzer, crossword, word search, sudoku,
 
 ## Stack
 
-- **Nx** monorepo: `apps/web`, `apps/server-rs`, `libs/party`, `libs/shared`
+- **Nx** monorepo: `apps/web`, `apps/server-rs`, `apps/android`, `libs/party`, `libs/shared`
 - React 19 + Vite + Tailwind + Radix/shadcn-style UI + React Router
 - Rust server (Axum + socketioxide) speaking the Socket.IO protocol; `@party/shared` stays TypeScript for the web app
-- Vitest + ESLint; TypeScript strict; Cargo tests for the server
+- Kotlin + Jetpack Compose Android player client (`apps/android`) using Socket.IO; player-only (no host admin)
+- Vitest + ESLint; TypeScript strict; Cargo tests for the server; Gradle unit tests for Android utilities
 - Shared package import: `@party/shared` → `libs/shared/src`
 
 ## Layout
@@ -28,6 +29,7 @@ Multi-game party platform: Kahoot-style quizzer, crossword, word search, sudoku,
 | `apps/web/src/components/maze/` | Maze grid, pad, and icons |
 | `apps/web/src/components/wordsurvivor/` | Word survivor board and keyboard |
 | `apps/server-rs/` | Rust binary: HTTP, static files, Socket.IO handlers (`party-server`) |
+| `apps/android/` | Native Android player client (Compose); login picks server URL + display name |
 | `libs/party/` | Session registry, quizzer, crossword, word search, sudoku, maze, word survivor, system admin |
 | `apps/server/questions/*.json` | Quizzer question packs |
 | `apps/server/crossword/puzzles/*.json` | Crossword packs (grid-first) |
@@ -45,9 +47,20 @@ npm run dev      # web :4200 + server :8080 (web proxies /socket.io)
 npm test
 npm run lint
 npm run build
+nx run android:assembleDebug   # requires Android SDK / JDK 17+
+nx run android:test
+nx run android:installDebug
 ```
 
 Prod: one Docker image serves API + built web on **8080**.
+
+### Android player
+
+- Gradle project under `apps/android` (Nx project name `android`). Details in [`apps/android/README.md`](apps/android/README.md).
+- Login screen: **server base URL** (persisted) + display name. Emulator example: `http://10.0.2.2:8080`. LAN device: `http://<host-lan-ip>:8080`.
+- Speaks the same Socket.IO events as the web player. No `Origin` header (allowed by the Rust server). No host unlock / admin UI.
+- Cleartext HTTP is permitted so LAN party servers work.
+- CI: `.github/workflows/android.yml` builds and uploads the debug APK artifact when `apps/android/**` changes.
 
 ## Routes
 

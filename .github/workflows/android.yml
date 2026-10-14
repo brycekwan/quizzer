@@ -1,10 +1,6 @@
 name: Android
 
 on:
-  pull_request:
-    paths:
-      - 'apps/android/**'
-      - '.github/workflows/android.yml'
   push:
     branches: [main]
     paths:

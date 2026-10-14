@@ -43,9 +43,10 @@ jobs:
         working-directory: apps/android
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
-      - name: Test and assemble debug APK
+      - name: Lint, test, and assemble debug APK
         working-directory: apps/android
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
+        # Single Gradle invocation so tasks share one build dir (no parallel races).
+        run: ./gradlew :app:lintDebug :app:testDebugUnitTest :app:assembleDebug --stacktrace
 
       - name: Name APK for download
         run: |

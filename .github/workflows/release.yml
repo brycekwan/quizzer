@@ -42,7 +42,8 @@ jobs:
         run: npm ci
 
       - name: Lint and test
-        run: npx nx run-many -t lint,test,contract --parallel=3
+        # Android targets run in .github/workflows/android.yml (SDK + sequential Gradle).
+        run: npx nx run-many -t lint,test,contract --exclude=android --parallel=3
         env:
           NX_DAEMON: 'false'
 

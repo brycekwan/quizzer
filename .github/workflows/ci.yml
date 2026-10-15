@@ -16,6 +16,8 @@ jobs:
         with:
           components: clippy, rustfmt
       - run: npm ci
-      - run: npx nx run-many -t lint,test,contract --parallel=3
+      # Android lint/test need the SDK and must not share a Gradle build dir in
+      # parallel with each other; they run in .github/workflows/android.yml.
+      - run: npx nx run-many -t lint,test,contract --exclude=android --parallel=3
         env:
           NX_DAEMON: 'false'

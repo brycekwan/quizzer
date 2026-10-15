@@ -26,7 +26,7 @@ Or from this directory:
 
 ## CI
 
-GitHub Actions workflow [`.github/workflows/android.yml`](../../.github/workflows/android.yml) runs when files under `apps/android/` change (PRs and pushes to `main`). It runs unit tests, builds the debug APK, and uploads a downloadable artifact named **party-android-debug** (`party-android-debug.apk`).
+GitHub Actions workflow [`.github/workflows/android.yml`](../../.github/workflows/android.yml) runs after changes under `apps/android/` land on `main` (not on PRs). It lints, runs unit tests, builds the debug APK, and uploads a downloadable artifact named **party-android-debug** (`party-android-debug.apk`).
 
 Download from the workflow run’s **Artifacts** section on GitHub.
 

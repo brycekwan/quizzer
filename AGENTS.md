@@ -60,7 +60,7 @@ Prod: one Docker image serves API + built web on **8080**.
 - Login screen: **server base URL** (persisted) + display name. Emulator example: `http://10.0.2.2:8080`. LAN device: `http://<host-lan-ip>:8080`.
 - Speaks the same Socket.IO events as the web player. No `Origin` header (allowed by the Rust server). No host unlock / admin UI.
 - Cleartext HTTP is permitted so LAN party servers work.
-- CI: `.github/workflows/android.yml` builds and uploads the debug APK artifact when `apps/android/**` changes.
+- CI: `.github/workflows/android.yml` lints, tests, builds, and uploads the debug APK after `apps/android/**` changes merge to `main` (not on PRs). Root `lint`/`test` and the release job exclude `android` so Gradle is not run without the SDK or in parallel against the same build dir.
 
 ## Routes
 

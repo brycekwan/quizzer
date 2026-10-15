@@ -168,9 +168,21 @@ export function directionForCell(
   );
 }
 
-export function isCellCorrect(
-  correctWordIds: string[],
+function cellHasLetter(
+  letters: (string | null)[][],
+  row: number,
+  col: number
+): boolean {
+  return Boolean(letters[row]?.[col] ?? '');
+}
+
+/**
+ * A square is read-only once any word through it is solved. Editing it would
+ * change that completed word.
+ */
+export function isCellReadOnly(
   words: ClientCrosswordWord[],
+  correctWordIds: readonly string[],
   row: number,
   col: number
 ): boolean {
@@ -179,13 +191,32 @@ export function isCellCorrect(
   );
 }
 
-/** First empty cell in the word, or the first cell if all are filled. */
+export function isCellCorrect(
+  correctWordIds: string[],
+  words: ClientCrosswordWord[],
+  row: number,
+  col: number
+): boolean {
+  return isCellReadOnly(words, correctWordIds, row, col);
+}
+
+/**
+ * First cell the player can still type in.
+ * Skips filled squares and read-only squares from a completed word.
+ * If every open square is filled, returns the first square that is still editable.
+ */
 export function firstEmptyCellInWord(
   word: ClientCrosswordWord,
-  letters: (string | null)[][]
+  letters: (string | null)[][],
+  isLocked: (row: number, col: number) => boolean = () => false
 ): { row: number; col: number } {
   for (const cell of word.cells) {
-    if (!(letters[cell.row]?.[cell.col] ?? '')) {
+    if (!cellHasLetter(letters, cell.row, cell.col) && !isLocked(cell.row, cell.col)) {
+      return cell;
+    }
+  }
+  for (const cell of word.cells) {
+    if (!isLocked(cell.row, cell.col)) {
       return cell;
     }
   }
@@ -193,13 +224,16 @@ export function firstEmptyCellInWord(
 }
 
 /**
- * Next empty open cell after `from` along the word in the given direction.
- * Returns null if there is no later empty cell in the word.
+ * Next square to type in after `from`, moving forward through the word.
+ * Skips letters that are already filled (including shared crossings) and
+ * read-only squares from a completed word.
+ * Returns null when the rest of the word has nowhere left to type.
  */
 export function nextEmptyCellInWord(
   word: ClientCrosswordWord,
   letters: (string | null)[][],
-  from: { row: number; col: number }
+  from: { row: number; col: number },
+  isLocked: (row: number, col: number) => boolean = () => false
 ): { row: number; col: number } | null {
   const index = word.cells.findIndex(
     (cell) => cell.row === from.row && cell.col === from.col
@@ -209,11 +243,76 @@ export function nextEmptyCellInWord(
   }
   for (let i = index + 1; i < word.cells.length; i++) {
     const cell = word.cells[i];
-    if (!(letters[cell.row]?.[cell.col] ?? '')) {
+    if (isLocked(cell.row, cell.col)) {
+      continue;
+    }
+    if (!cellHasLetter(letters, cell.row, cell.col)) {
       return cell;
     }
   }
   return null;
+}
+
+/**
+ * Nearest earlier square in `word` that is not read-only.
+ * Completed-word squares are skipped. Null when nothing earlier can be edited.
+ */
+export function previousEditableInWord(
+  word: ClientCrosswordWord,
+  from: { row: number; col: number },
+  isLocked: (row: number, col: number) => boolean
+): { row: number; col: number } | null {
+  const index = word.cells.findIndex(
+    (cell) => cell.row === from.row && cell.col === from.col
+  );
+  if (index < 0) {
+    return null;
+  }
+  for (let i = index - 1; i >= 0; i--) {
+    const cell = word.cells[i];
+    if (!isLocked(cell.row, cell.col)) {
+      return cell;
+    }
+  }
+  return null;
+}
+
+export interface BackspaceTarget {
+  /** Square whose letter should be erased. Null when nothing editable is deleted. */
+  clear: { row: number; col: number } | null;
+  /** Square to select after the erase. Null keeps the current selection. */
+  focus: { row: number; col: number } | null;
+}
+
+/**
+ * Backspace erases an editable letter and leaves the selection on that square.
+ * A filled editable square is cleared in place. An empty square clears the
+ * previous editable letter in the word (skipping read-only squares) and selects it.
+ * A read-only square is never cleared; focus moves to the previous editable
+ * square in the word, or stays put when there is nothing earlier to edit.
+ */
+export function backspaceTarget(
+  word: ClientCrosswordWord,
+  letters: (string | null)[][],
+  row: number,
+  col: number,
+  isLocked: (row: number, col: number) => boolean
+): BackspaceTarget {
+  if (!isLocked(row, col) && cellHasLetter(letters, row, col)) {
+    return { clear: { row, col }, focus: null };
+  }
+
+  const prev = previousEditableInWord(word, { row, col }, isLocked);
+  if (!prev) {
+    return { clear: null, focus: null };
+  }
+  if (isLocked(row, col)) {
+    return { clear: null, focus: prev };
+  }
+  return {
+    clear: cellHasLetter(letters, prev.row, prev.col) ? prev : null,
+    focus: prev,
+  };
 }
 
 /** Format elapsed milliseconds as mm:ss or h:mm:ss. */

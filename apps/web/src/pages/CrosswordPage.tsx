@@ -24,12 +24,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  backspaceTarget,
   buildClientWords,
   computeElapsedMs,
   directionForCell,
   firstEmptyCellInWord,
   formatElapsedMs,
   isCellCorrect,
+  isCellReadOnly,
   nextEmptyCellInWord,
   nextUnsolvedClue,
   wordsAtCell,
@@ -148,7 +150,8 @@ function CrosswordInstructions({
             <li>Touch or click a square to start entering a letter.</li>
             <li>Double-click a square to toggle the direction.</li>
             <li>
-              Click a clue to highlight that word and start entering letters.
+              Click a clue to highlight that word and start entering letters. A
+              finished word locks, so its clue no longer moves the cursor.
             </li>
           </ul>
           <p className="mt-3 text-sm font-semibold text-ink/60">
@@ -414,14 +417,21 @@ export function CrosswordPage() {
     if (!playerState || instructionsOpenRef.current) {
       return;
     }
+    const correctWordIds =
+      gridRef.current?.correctWordIds ?? playerState.correctWordIds;
+    if (correctWordIds.includes(`${dir}-${clue.number}`)) {
+      return;
+    }
     collapseClues();
     const word = words.find(
       (entry) => entry.direction === dir && entry.number === clue.number
     );
     const letters = gridRef.current?.letters ?? playerState.letters;
+    const locked = (row: number, col: number) =>
+      isCellReadOnly(words, correctWordIds, row, col);
     focusCell(
       word
-        ? firstEmptyCellInWord(word, letters)
+        ? firstEmptyCellInWord(word, letters, locked)
         : { row: clue.row, col: clue.col },
       dir
     );
@@ -446,11 +456,43 @@ export function CrosswordPage() {
     }
     const { row, col } = current;
     const dir = directionRef.current;
+    const lettersNow = gridRef.current?.letters ?? playerState.letters;
+    const correctWordIds =
+      gridRef.current?.correctWordIds ?? playerState.correctWordIds;
+    const locked = (cellRow: number, cellCol: number) =>
+      isCellReadOnly(words, correctWordIds, cellRow, cellCol);
     if (key === 'Backspace' || key === 'Delete') {
-      writeCell(row, col, '');
-      void clearLetter(row, col).then((result) => settleCell(row, col, '', result));
-      if (key === 'Backspace') {
-        moveInDirection(row, col, dir, -1);
+      if (key === 'Delete') {
+        if (!locked(row, col) && (lettersNow[row]?.[col] ?? '')) {
+          writeCell(row, col, '');
+          void clearLetter(row, col).then((result) =>
+            settleCell(row, col, '', result)
+          );
+        }
+        return;
+      }
+      const covering = wordsAtCell(words, row, col);
+      const word =
+        covering.find((entry) => entry.direction === dir) ?? covering[0];
+      if (!word) {
+        if (!locked(row, col) && (lettersNow[row]?.[col] ?? '')) {
+          writeCell(row, col, '');
+          void clearLetter(row, col).then((result) =>
+            settleCell(row, col, '', result)
+          );
+        }
+        return;
+      }
+      const action = backspaceTarget(word, lettersNow, row, col, locked);
+      const clear = action.clear;
+      if (clear) {
+        writeCell(clear.row, clear.col, '');
+        void clearLetter(clear.row, clear.col).then((result) =>
+          settleCell(clear.row, clear.col, '', result)
+        );
+      }
+      if (action.focus) {
+        focusCell(action.focus);
       }
       return;
     }
@@ -487,26 +529,37 @@ export function CrosswordPage() {
     if (!/^[a-zA-Z]$/.test(key)) {
       return;
     }
-    collapseClues();
     const letter = key.toUpperCase();
-    const previousCorrect = new Set(
-      gridRef.current?.correctWordIds ?? playerState.correctWordIds
-    );
-    const letters = writeCell(row, col, letter);
-    const answered = setLetter(row, col, key).then((result) => {
-      settleCell(row, col, letter, result);
-      return result;
-    });
-
     const covering = wordsAtCell(words, row, col);
     const word = covering.find((entry) => entry.direction === dir) ?? covering[0];
     if (!word) {
       return;
     }
-    const nextCell = nextEmptyCellInWord(word, letters, { row, col });
+
+    let target = { row, col };
+    if (locked(row, col)) {
+      const dest = nextEmptyCellInWord(word, lettersNow, target, locked);
+      if (!dest) {
+        return;
+      }
+      target = dest;
+    }
+    collapseClues();
+
+    const previousCorrect = new Set(correctWordIds);
+    const letters = writeCell(target.row, target.col, letter);
+    const answered = setLetter(target.row, target.col, key).then((result) => {
+      settleCell(target.row, target.col, letter, result);
+      return result;
+    });
+
+    const nextCell = nextEmptyCellInWord(word, letters, target, locked);
     if (nextCell) {
       focusCell(nextCell);
       return;
+    }
+    if (target.row !== row || target.col !== col) {
+      focusCell(target);
     }
     // A full word may be solved, and only the server knows, so the cursor waits for it here.
     const result = await answered;
@@ -518,8 +571,14 @@ export function CrosswordPage() {
     if (justSolved) {
       const nextClue = nextUnsolvedClue(words, word.id, result.correctWordIds);
       if (nextClue) {
+        const solvedIds = result.correctWordIds;
         focusCell(
-          firstEmptyCellInWord(nextClue, gridRef.current?.letters ?? letters),
+          firstEmptyCellInWord(
+            nextClue,
+            gridRef.current?.letters ?? letters,
+            (cellRow, cellCol) =>
+              isCellReadOnly(words, solvedIds, cellRow, cellCol)
+          ),
           nextClue.direction
         );
       }

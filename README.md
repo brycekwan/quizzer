@@ -65,6 +65,6 @@ On each new version it:
 - Pause only after a question (leaderboard phase); clients stay on the leaderboard with a paused banner.
 - Reset clears scores, kicks every player, and returns everyone to the sign-in screen.
 - Question packs live in `apps/server/questions/*.json`; the host picks one from the admin dropdown.
-- Maze packs live in `apps/server/maze/easy`, `medium`, and `hard`. A player has 3 lives for the easy, medium, and then hard maze. Convert a wall grid with `node scripts/convert-maze.mjs maze_12x12.json easy 0,0 11,11 --out apps/server/maze/easy/maze-12x12.json --id maze-12x12 --title "Maze 12x12"`.
+- Maze packs live in `apps/server/maze/easy`, `medium`, and `hard`. A player has 3 lives for the easy, medium, and then hard maze. Convert a wall grid from https://toolpad.cc/ with `node scripts/convert-maze.mjs maze_12x12.json easy 0,0 11,11 --out apps/server/maze/easy/maze-12x12.json --id maze-12x12 --title "Maze 12x12"`.
 - Word Survivor lists live in `apps/server/wordsurvivor/`. `words.json` is the default; the host can submit babies, Canada, or food, plus an optional topic hint. A run is five words each of 5 through 9 letters.
 - After a game ends, only players who finished that round see the final leaderboard; newcomers wait for the next start.

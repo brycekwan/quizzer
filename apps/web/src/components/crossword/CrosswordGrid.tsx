@@ -53,6 +53,7 @@ export function CrosswordGrid({
               type="button"
               role="gridcell"
               aria-selected={isSelected}
+              aria-readonly={isCorrect || undefined}
               onClick={() => onSelect(row, col)}
               className={cn(
                 'relative aspect-square select-none rounded-sm border-2 border-ink/20 bg-white font-display text-[clamp(0.65rem,3.2vw,1.25rem)] font-bold uppercase text-ink shadow-sm transition-colors touch-manipulation',

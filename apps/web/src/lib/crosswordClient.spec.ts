@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CrosswordPublicPuzzle } from '@party/shared';
 import {
+  backspaceTarget,
   buildClientWords,
   computeElapsedMs,
   directionForCell,
@@ -8,6 +9,7 @@ import {
   formatElapsedMs,
   nextEmptyCellInWord,
   nextUnsolvedClue,
+  previousEditableInWord,
 } from './crosswordClient';
 
 const puzzle: CrosswordPublicPuzzle = {
@@ -51,6 +53,19 @@ describe('crosswordClient navigation helpers', () => {
     expect(firstEmptyCellInWord(across, letters)).toEqual({ row: 0, col: 0 });
   });
 
+  it('skips a read-only square when choosing where a clue starts', () => {
+    const letters = [
+      ['P', '', ''],
+      ['', null, null],
+      ['', null, null],
+    ];
+    const locked = (row: number, col: number) => row === 0 && col === 0;
+    expect(firstEmptyCellInWord(across, letters, locked)).toEqual({
+      row: 0,
+      col: 1,
+    });
+  });
+
   it('skips filled cells when advancing after a letter', () => {
     const letters = [
       ['P', 'I', ''],
@@ -72,6 +87,18 @@ describe('crosswordClient navigation helpers', () => {
     expect(
       nextEmptyCellInWord(across, letters, { row: 0, col: 0 })
     ).toBeNull();
+  });
+
+  it('skips read-only squares from a completed word while advancing', () => {
+    const letters = [
+      ['', '', ''],
+      ['', null, null],
+      ['', null, null],
+    ];
+    const locked = (row: number, col: number) => row === 0 && col === 1;
+    expect(
+      nextEmptyCellInWord(across, letters, { row: 0, col: 0 }, locked)
+    ).toEqual({ row: 0, col: 2 });
   });
 });
 
@@ -173,6 +200,90 @@ describe('clue advance and direction', () => {
     expect(down1.cells[0]).toEqual({ row: 0, col: 0 });
     expect(down2.cells[0]).toEqual({ row: 0, col: 1 });
     expect(across3.cells[0]).toEqual({ row: 1, col: 0 });
+  });
+});
+
+describe('backspace around read-only squares', () => {
+  const words = buildClientWords(crossing);
+  const across = words.find((word) => word.id === 'across-1')!;
+  const unlocked = () => false;
+  const middleLocked = (row: number, col: number) => row === 0 && col === 1;
+
+  it('clears the selected letter and stays there', () => {
+    const letters = [
+      ['P', 'I', ''],
+      ['', '', null],
+      ['', null, null],
+    ];
+    expect(backspaceTarget(across, letters, 0, 1, unlocked)).toEqual({
+      clear: { row: 0, col: 1 },
+      focus: null,
+    });
+  });
+
+  it('erases the previous letter when the selection is an empty square', () => {
+    const letters = [
+      ['P', 'I', ''],
+      ['', '', null],
+      ['', null, null],
+    ];
+    expect(backspaceTarget(across, letters, 0, 2, unlocked)).toEqual({
+      clear: { row: 0, col: 1 },
+      focus: { row: 0, col: 1 },
+    });
+  });
+
+  it('skips a read-only square and erases the editable letter before it', () => {
+    const letters = [
+      ['P', 'I', ''],
+      ['', '', null],
+      ['', null, null],
+    ];
+    expect(backspaceTarget(across, letters, 0, 2, middleLocked)).toEqual({
+      clear: { row: 0, col: 0 },
+      focus: { row: 0, col: 0 },
+    });
+  });
+
+  it('stays put when every square behind the cursor is read-only', () => {
+    const letters = [
+      ['P', 'I', ''],
+      ['', '', null],
+      ['', null, null],
+    ];
+    const locked = (row: number, col: number) => row === 0 && col < 2;
+    expect(backspaceTarget(across, letters, 0, 2, locked)).toEqual({
+      clear: null,
+      focus: null,
+    });
+    expect(
+      previousEditableInWord(across, { row: 0, col: 2 }, locked)
+    ).toBeNull();
+  });
+
+  it('does not erase a read-only square and moves to the previous editable one', () => {
+    const letters = [
+      ['P', 'I', 'E'],
+      ['', '', null],
+      ['', null, null],
+    ];
+    expect(backspaceTarget(across, letters, 0, 1, middleLocked)).toEqual({
+      clear: null,
+      focus: { row: 0, col: 0 },
+    });
+  });
+
+  it('stays on a read-only square when nothing editable comes before it', () => {
+    const letters = [
+      ['P', '', ''],
+      ['', '', null],
+      ['', null, null],
+    ];
+    const startLocked = (row: number, col: number) => row === 0 && col === 0;
+    expect(backspaceTarget(across, letters, 0, 0, startLocked)).toEqual({
+      clear: null,
+      focus: null,
+    });
   });
 });
 

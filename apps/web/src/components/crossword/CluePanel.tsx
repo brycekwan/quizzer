@@ -55,14 +55,15 @@ export function CluePanel({
               <li key={key}>
                 <button
                   type="button"
+                  disabled={solved}
                   onClick={() => onSelect(clue, direction)}
                   aria-current={active ? 'true' : undefined}
                   className={cn(
-                    'w-full rounded-lg px-2 py-1.5 text-left text-sm font-semibold transition-colors',
+                    'w-full rounded-lg px-2 py-1.5 text-left text-sm font-semibold transition-colors disabled:opacity-100',
                     solved
                       ? active
-                        ? 'bg-ink/5 text-ink/40 ring-2 ring-ink/15'
-                        : 'bg-white/40 text-ink/40 hover:bg-white/70'
+                        ? 'cursor-default bg-ink/5 text-ink/40 ring-2 ring-ink/15'
+                        : 'cursor-default bg-white/40 text-ink/40'
                       : active
                         ? 'bg-sun/50 text-ink ring-2 ring-grape/30'
                         : 'bg-white/60 text-ink/80 hover:bg-white'

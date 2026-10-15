@@ -1,5 +1,6 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import { returnPath } from '@/lib/returnPath';
 import { isValidPlayerName } from '@party/shared';
 import { useSession } from '@/hooks/useSession';
@@ -17,7 +18,15 @@ export function LoginPage() {
     useSession();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [removalMessage] = useState(() => readSystemRemovalMessage());
+
+  const joinUrl = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+    return `${window.location.origin}/login`;
+  }, []);
 
   if (playerId && playerName) {
     return <Navigate to={destination} replace />;
@@ -34,6 +43,19 @@ export function LoginPage() {
     setSubmitting(false);
     if (result.ok) {
       navigate(destination, { replace: true });
+    }
+  };
+
+  const copyJoinLink = async () => {
+    if (!joinUrl) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(joinUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
     }
   };
 
@@ -78,6 +100,32 @@ export function LoginPage() {
           {submitting ? 'Signing in…' : 'Continue'}
         </Button>
       </form>
+
+      {joinUrl ? (
+        <div className="mt-8 flex flex-col items-center gap-3 border-t-2 border-ink/10 pt-6">
+          <p className="text-sm font-extrabold uppercase tracking-wide text-ink/60">
+            Scan to join
+          </p>
+          <div className="rounded-3xl border-4 border-ink/10 bg-white p-4 shadow-pop-sm">
+            <QRCodeSVG
+              value={joinUrl}
+              size={180}
+              aria-label="QR code linking to this party login page"
+            />
+          </div>
+          <p className="max-w-[16rem] break-all text-xs font-semibold text-ink/45">
+            {joinUrl}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void copyJoinLink()}
+          >
+            {copied ? 'Copied' : 'Copy join link'}
+          </Button>
+        </div>
+      ) : null}
     </PageShell>
   );
 }

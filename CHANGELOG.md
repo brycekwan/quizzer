@@ -1,3 +1,12 @@
+## [2.10.1](https://github.com/brycekwan/quizzer/compare/v2.10.0...v2.10.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* fix android build ([74f8951](https://github.com/brycekwan/quizzer/commit/74f8951c29989fdef2b5b6e43a0fdd4e67875fb5))
+* fix release job ([e582f44](https://github.com/brycekwan/quizzer/commit/e582f442696086d8b3376c566b3357429322d2dc))
+* run only only main for android ([3e4e1de](https://github.com/brycekwan/quizzer/commit/3e4e1dec14a132afcc13d2f5bdab2e130eba81d5))
+
 # [2.10.0](https://github.com/brycekwan/quizzer/compare/v2.9.0...v2.10.0) (2026-10-13)
 
 

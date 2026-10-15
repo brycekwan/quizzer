@@ -1,3 +1,10 @@
+## [2.10.2](https://github.com/brycekwan/quizzer/compare/v2.10.1...v2.10.2) (2026-10-15)
+
+
+### Bug Fixes
+
+* ux updates for crossword ([b2925bb](https://github.com/brycekwan/quizzer/commit/b2925bb2f5ef34777f9b4c6c943eb017eb1a4f85))
+
 ## [2.10.1](https://github.com/brycekwan/quizzer/compare/v2.10.0...v2.10.1) (2026-10-15)
 
 

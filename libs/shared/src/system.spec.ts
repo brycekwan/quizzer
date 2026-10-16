@@ -67,6 +67,7 @@ describe('buildSystemLeaderboard', () => {
     ]);
     expect(board.theme).toBe('standard');
     expect(board.idleTimeoutMs).toBe(30 * 60 * 1_000);
+    expect(board.loginLocked).toBe(false);
     expect(board.players.map((entry) => entry.name)).toEqual(['Ada', 'Bea']);
     expect(isPartyTheme('baby')).toBe(true);
     expect(isPartyTheme('neon')).toBe(false);

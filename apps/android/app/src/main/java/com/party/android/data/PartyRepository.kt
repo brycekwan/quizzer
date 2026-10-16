@@ -7,6 +7,7 @@ import com.party.android.data.models.MazePlayerSnapshot
 import com.party.android.data.models.MazePuzzlePublic
 import com.party.android.data.models.PartyLeaderboardSnapshot
 import com.party.android.data.models.IDLE_TIMEOUT_REASON
+import com.party.android.data.models.LOGIN_LOCKED_REASON
 import com.party.android.data.models.QUIZ_REMOVAL_REASON
 import com.party.android.data.models.SYSTEM_REMOVAL_REASON
 import com.party.android.data.models.SudokuPlayerSnapshot
@@ -114,6 +115,17 @@ class PartyRepository(
                                 playerId = null,
                                 playerName = null,
                                 kickedReason = IDLE_TIMEOUT_REASON,
+                            )
+                    }
+                }
+                LOGIN_LOCKED_REASON -> {
+                    scope.launch {
+                        sessionStore.clearSession()
+                        _session.value =
+                            _session.value.copy(
+                                playerId = null,
+                                playerName = null,
+                                kickedReason = LOGIN_LOCKED_REASON,
                             )
                     }
                 }

@@ -171,3 +171,7 @@ pub const SYSTEM_REMOVAL_REASON: &str = "Removed from the system by admin";
 pub const QUIZ_REMOVAL_REASON: &str = "Removed from the quiz game";
 /// Emitted with `player:kicked` when the idle timeout drops a connected player.
 pub const IDLE_TIMEOUT_REASON: &str = "Signed out due to inactivity";
+/// Emitted with `player:kicked` when the host closes logins.
+pub const LOGIN_LOCKED_REASON: &str = "Signed out because logins are closed";
+/// Ack error when `session:login` is refused while logins are closed.
+pub const LOGIN_LOCKED_MESSAGE: &str = "Logins are closed by the host";

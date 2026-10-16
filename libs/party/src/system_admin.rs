@@ -24,6 +24,7 @@ pub struct SystemAdmin {
     pub word_survivor: WordSurvivorEngine,
     pub theme: PartyTheme,
     pub idle_timeout_ms: i64,
+    pub login_locked: bool,
 }
 
 impl SystemAdmin {
@@ -46,6 +47,7 @@ impl SystemAdmin {
             word_survivor,
             theme: PartyTheme::Standard,
             idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
+            login_locked: false,
         }
     }
 
@@ -65,10 +67,26 @@ impl SystemAdmin {
         Ok(idle_timeout_ms)
     }
 
+    /// Close or reopen player logins. Enabling does not wipe scores.
+    pub fn set_login_locked(&mut self, locked: bool) -> bool {
+        self.login_locked = locked;
+        locked
+    }
+
     /// Socket ids for connected players past the configured idle timeout.
     pub fn idle_socket_ids(&self, now: i64) -> Vec<String> {
         self.sessions
             .idle_socket_ids(now, self.idle_timeout_ms)
+    }
+
+    /// Socket ids for every connected player session.
+    pub fn connected_socket_ids(&self) -> Vec<String> {
+        self.sessions
+            .list()
+            .into_iter()
+            .filter(|session| session.connected)
+            .filter_map(|session| session.socket_id)
+            .collect()
     }
 
     pub fn snapshot(&self) -> SystemAdminSnapshot {
@@ -146,6 +164,7 @@ impl SystemAdmin {
         let mut snapshot = build_system_leaderboard(&inputs);
         snapshot.theme = self.theme;
         snapshot.idle_timeout_ms = self.idle_timeout_ms;
+        snapshot.login_locked = self.login_locked;
         snapshot
     }
 
@@ -619,6 +638,24 @@ mod tests {
             "Choose between 1 and 120 minutes"
         );
         assert_eq!(admin.idle_timeout_ms, 15 * 60_000);
+    }
+
+    #[test]
+    fn remembers_login_lock_and_lists_connected_sockets() {
+        let mut admin = admin();
+        assert!(!admin.snapshot().login_locked);
+        let ada = admin.sessions.login("Ada", "s-ada", None, 0).unwrap();
+        admin.sessions.login("Bea", "s-bea", None, 0).unwrap();
+        admin.sessions.mark_disconnected("s-bea");
+        assert_eq!(
+            admin.connected_socket_ids(),
+            vec!["s-ada".to_string()]
+        );
+        assert!(admin.set_login_locked(true));
+        assert!(admin.snapshot().login_locked);
+        assert!(!admin.set_login_locked(false));
+        assert!(!admin.snapshot().login_locked);
+        assert_eq!(admin.sessions.get(&ada.session.id).unwrap().name, "Ada");
     }
 
     #[test]

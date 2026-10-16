@@ -11,7 +11,8 @@ use party::clock::Clock;
 use party::maze::{MazeDifficulty, MazeDirection};
 use party::quizzer::SnapshotRole;
 use party::types::{
-    QuestionSetMode, IDLE_TIMEOUT_REASON, QUIZ_REMOVAL_REASON, SYSTEM_REMOVAL_REASON,
+    QuestionSetMode, IDLE_TIMEOUT_REASON, LOGIN_LOCKED_MESSAGE, LOGIN_LOCKED_REASON,
+    QUIZ_REMOVAL_REASON, SYSTEM_REMOVAL_REASON,
 };
 use party::word_search::WordSearchCellRef;
 use serde_json::{json, Value};
@@ -887,6 +888,23 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
             }
         },
     );
+    socket.on(
+        "system:admin:setLoginLocked",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let locked = payload
+                .get("locked")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            on_system_set_login_locked(app, locked, ack);
+        },
+    );
 
     socket.on_disconnect(async |socket: SocketRef, State(app): State<Arc<App>>| {
         let sid = sid_of(&socket);
@@ -912,6 +930,10 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
 }
 
 fn on_session_login(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSender) {
+    if login_locked(&app) {
+        let _ = ack.send(&fail(LOGIN_LOCKED_MESSAGE));
+        return;
+    }
     let name = payload.get("name").and_then(Value::as_str).unwrap_or("");
     let player_id = payload
         .get("playerId")
@@ -971,6 +993,10 @@ fn on_player_join(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSend
         };
         (session_id, session_name)
     } else {
+        if login_locked(&app) {
+            let _ = ack.send(&fail(LOGIN_LOCKED_MESSAGE));
+            return;
+        }
         let now = Clock::system().now();
         let login = {
             let mut party = app.party.lock().expect("party");
@@ -1372,6 +1398,36 @@ fn on_system_kick(app: Arc<App>, payload: Value, ack: AckSender) {
         }
     }
     changed(&app);
+}
+
+fn on_system_set_login_locked(app: Arc<App>, locked: bool, ack: AckSender) {
+    let socket_ids = {
+        let mut party = app.party.lock().expect("party");
+        let login_locked = party.set_login_locked(locked);
+        if login_locked {
+            party.connected_socket_ids()
+        } else {
+            Vec::new()
+        }
+    };
+    for socket_id in socket_ids {
+        let Some(target) = find_socket(&app, &socket_id) else {
+            continue;
+        };
+        // Leave meta.player_id so on_disconnect can pause clocks and free the session.
+        // Scores stay; only the connection is dropped until logins reopen.
+        let _ = target.emit(
+            "player:kicked",
+            &json!({ "reason": LOGIN_LOCKED_REASON }),
+        );
+        let _ = target.disconnect();
+    }
+    let _ = ack.send(&json!({ "ok": true, "loginLocked": locked }));
+    changed(&app);
+}
+
+fn login_locked(app: &App) -> bool {
+    app.party.lock().expect("party").login_locked
 }
 
 fn on_system_reset(app: Arc<App>, ack: AckSender) {

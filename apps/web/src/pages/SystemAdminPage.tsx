@@ -13,10 +13,12 @@ import {
   type PartyTheme,
 } from '@party/shared';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 type PendingAction =
   | { kind: 'reset' }
-  | { kind: 'kick'; playerId: string; name: string };
+  | { kind: 'kick'; playerId: string; name: string }
+  | { kind: 'loginLock' };
 
 export function SystemAdminPage() {
   const host = useHostSecret();
@@ -29,11 +31,13 @@ export function SystemAdminPage() {
     resetAll,
     setTheme,
     setIdleTimeout,
+    setLoginLocked,
     hostReady,
   } = useSystemSocket(host.secret, host.attempt);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [working, setWorking] = useState(false);
   const [idleMinutes, setIdleMinutes] = useState<string | null>(null);
+  const [loginLockedDraft, setLoginLockedDraft] = useState<boolean | null>(null);
 
   if (!hostReady) {
     return (
@@ -54,6 +58,8 @@ export function SystemAdminPage() {
     );
   }
 
+  const loginLockedValue = loginLockedDraft ?? adminState.loginLocked;
+
   const confirm = async () => {
     if (!pending) {
       return;
@@ -62,16 +68,23 @@ export function SystemAdminPage() {
     const result =
       pending.kind === 'reset'
         ? await resetAll()
-        : await kick(pending.playerId);
+        : pending.kind === 'loginLock'
+          ? await setLoginLocked(true)
+          : await kick(pending.playerId);
     setWorking(false);
     if (!result.ok) {
       setError(
         result.error ??
           (pending.kind === 'reset'
             ? 'Could not reset the party'
-            : 'Could not remove player')
+            : pending.kind === 'loginLock'
+              ? 'Could not close logins'
+              : 'Could not remove player')
       );
       return;
+    }
+    if (pending.kind === 'loginLock') {
+      setLoginLockedDraft(null);
     }
     setPending(null);
   };
@@ -98,6 +111,44 @@ export function SystemAdminPage() {
       setError(result?.error ?? 'Could not update the idle timeout');
     }
   };
+
+  const saveLoginLocked = async () => {
+    if (loginLockedValue === adminState.loginLocked) {
+      setLoginLockedDraft(null);
+      return;
+    }
+    if (loginLockedValue) {
+      setPending({ kind: 'loginLock' });
+      return;
+    }
+    setWorking(true);
+    const result = await setLoginLocked(false);
+    setWorking(false);
+    if (!result.ok) {
+      setError(result.error ?? 'Could not reopen logins');
+      return;
+    }
+    setLoginLockedDraft(null);
+  };
+
+  const confirmTitle =
+    pending?.kind === 'kick'
+      ? `Kick ${pending.name}?`
+      : pending?.kind === 'loginLock'
+        ? 'Close logins?'
+        : 'Reset the party?';
+  const confirmDescription =
+    pending?.kind === 'kick'
+      ? `${pending.name} will be removed from every game. Their scores will be wiped, and they will need to log in again.`
+      : pending?.kind === 'loginLock'
+        ? 'Every player will be sent to the login screen. Scores are kept, but nobody can log in until you turn this off.'
+        : 'Every player will be removed from the party. Scores in the quiz, crossword, word search, sudoku, maze, and word survivor will be wiped, and everyone will need to log in again.';
+  const confirmLabel =
+    pending?.kind === 'kick'
+      ? 'Kick'
+      : pending?.kind === 'loginLock'
+        ? 'Close logins'
+        : 'Reset all';
 
   return (
     <div className="min-h-screen bg-playfield px-4 py-6 text-ink">
@@ -177,6 +228,33 @@ export function SystemAdminPage() {
           </p>
         </section>
 
+        <section className="space-y-3 rounded-[2rem] border-4 border-white/60 bg-white/75 p-5 shadow-pop backdrop-blur">
+          <h2 className="font-display text-2xl font-bold">Close logins</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="login-locked"
+                checked={loginLockedValue}
+                onCheckedChange={(checked) => setLoginLockedDraft(checked)}
+              />
+              <Label htmlFor="login-locked" className="text-base font-bold">
+                {loginLockedValue ? 'Logins closed' : 'Logins open'}
+              </Label>
+            </div>
+            <Button
+              size="sm"
+              disabled={working || loginLockedValue === adminState.loginLocked}
+              onClick={() => void saveLoginLocked()}
+            >
+              Save
+            </Button>
+          </div>
+          <p className="text-sm font-semibold text-ink/55">
+            When closed, every player is sent to the login screen and new logins are
+            refused until you turn this off. Scores are kept.
+          </p>
+        </section>
+
         {error ? (
           <p role="alert" className="font-bold text-coral">
             {error}
@@ -202,17 +280,16 @@ export function SystemAdminPage() {
 
       <ConfirmDialog
         open={pending != null}
-        title={pending?.kind === 'kick' ? `Kick ${pending.name}?` : 'Reset the party?'}
-        description={
-          pending?.kind === 'kick'
-            ? `${pending.name} will be removed from every game. Their scores will be wiped, and they will need to log in again.`
-            : 'Every player will be removed from the party. Scores in the quiz, crossword, word search, sudoku, maze, and word survivor will be wiped, and everyone will need to log in again.'
-        }
-        confirmLabel={pending?.kind === 'kick' ? 'Kick' : 'Reset all'}
+        title={confirmTitle}
+        description={confirmDescription}
+        confirmLabel={confirmLabel}
         pending={working}
         onConfirm={() => void confirm()}
         onOpenChange={(open) => {
           if (!open) {
+            if (pending?.kind === 'loginLock') {
+              setLoginLockedDraft(null);
+            }
             setPending(null);
           }
         }}

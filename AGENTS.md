@@ -83,11 +83,11 @@ Prod: one Docker image serves API + built web on **8080**.
 | `/host/sudoku` | Sudoku admin and per-player reset |
 | `/host/maze` | Maze admin: easy, medium, and hard files, and per-player reset |
 | `/host/wordsurvivor` | Word survivor admin: word list, topic hint, splash time, and per-player reset |
-| `/host/system` | Theme, idle timeout, connected players, remove from the party, reset all |
+| `/host/system` | Theme, idle timeout, close logins, connected players, remove from the party, reset all |
 
 ## Architecture rules
 
-- **Platform session first.** `session:login` owns name uniqueness and single-connection displace. A stored player id can reclaim a session only after that socket has disconnected. Connected players with no gameplay input are signed out after the host idle timeout (default 30 minutes, 1–120 via system admin) so the name can be reused; scores stay until a host kick or reset.
+- **Platform session first.** `session:login` owns name uniqueness and single-connection displace. A stored player id can reclaim a session only after that socket has disconnected. Connected players with no gameplay input are signed out after the host idle timeout (default 30 minutes, 1–120 via system admin) so the name can be reused; scores stay until a host kick or reset. Host can also close logins (`system:admin:setLoginLocked`); that signs everyone out without wiping scores and refuses new logins until reopened.
 - **Host passphrase.** `HOST_SECRET` is required at process start. Host pages send it with `host:unlock`; admin and system events are rejected until that socket unlocks. Local dev reads a gitignored `.env`. `npm run dev` clears an exported `HOST_SECRET` so that file is used, because dotenv leaves an already-set variable in place. Production passes `-e HOST_SECRET` when the container starts.
 - **Server owns time** for quizzer timers; crossword, word search, sudoku, maze, and word survivor progress are server-authoritative. Those play clocks run from the first move until the puzzle is finished. The maze clock also pauses while instructions or a level splash is showing, and while the player is away from `/maze`. The word survivor clock starts on the first letter and pauses during instructions, between words, and while the player is away from `/wordsurvivor`. Maze splashes and word survivor reveals and splashes end on the server's timer, which pushes the new state; clients wait for that phase change instead of comparing `splashUntil` / `revealUntil` with their own clock. Quiz correctness and points stay hidden until the reveal phase.
 - **Shared logic in `@party/shared`.** Crossword answers are derived from the grid; word search placements are validated against the grid. Sudoku files carry a private solution and a starting grid. Maze files carry the open cells and the walls. Word survivor answers stay on the server. Clients get a public puzzle without sudoku solutions. The maze is fully visible.
@@ -147,7 +147,7 @@ Word survivor files under `apps/server/wordsurvivor/` list words under keys `"5"
 | `wordsurvivor:letter` / `backspace` / `submit` | Type the current letter, erase the previous letter, or submit the word |
 | `wordsurvivor:pauseTimer` / `resumeTimer` | Pause the clock for instructions, the splash, or leaving the page |
 | `wordsurvivor:admin:subscribe` / `select` / `setSplash` / `reset` / `resetPlayer` | Word survivor host (requires unlock). `select` sends `{ fileId, topic }`. `setSplash` sends `{ seconds }` |
-| `system:admin:subscribe` / `kick` / `reset` / `setTheme` / `setIdleTimeout` | System host: connected players, remove from the party, reset all, theme, and idle timeout in minutes (requires unlock) |
+| `system:admin:subscribe` / `kick` / `reset` / `setTheme` / `setIdleTimeout` / `setLoginLocked` | System host: connected players, remove from the party, reset all, theme, idle timeout in minutes, and close logins (requires unlock) |
 | `leaderboard:subscribe` | Overall and per-game leaderboard (no host unlock; players and host both subscribe) |
 
 Server → client: `game:state`, `game:reset`, `player:kicked`, `crossword:state`, `crossword:admin:state`, `wordsearch:state`, `wordsearch:admin:state`, `sudoku:state`, `sudoku:admin:state`, `maze:state`, `maze:admin:state`, `wordsurvivor:state`, `wordsurvivor:admin:state`, `system:admin:state`, `leaderboard:state`.

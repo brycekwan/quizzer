@@ -1,3 +1,10 @@
+## [2.12.1](https://github.com/brycekwan/quizzer/compare/v2.12.0...v2.12.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **maze:** end splash phases on a server timer ([f1bfda7](https://github.com/brycekwan/quizzer/commit/f1bfda71c5600a864dc9c79968e3b238c1326d59))
+
 # [2.12.0](https://github.com/brycekwan/quizzer/compare/v2.11.0...v2.12.0) (2026-10-16)
 
 

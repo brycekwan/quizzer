@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.ui.text.font.FontWeight
+import com.party.android.ui.components.PartyButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.party.android.ui.components.PartyButtonSize
+import com.party.android.ui.components.PartyButtonVariant
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -123,7 +125,7 @@ fun WordSearchScreen(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                PartyButton(
                     onClick = {
                         scope.launch {
                             val ack = repository.submitWordSearch(selection.toList())
@@ -138,8 +140,14 @@ fun WordSearchScreen(
                         }
                     },
                     enabled = selection.isNotEmpty(),
+                    fillMaxWidth = false,
                 ) { Text("Submit (${selection.size})") }
-                TextButton(onClick = { selection.clear() }) { Text("Clear") }
+                PartyButton(
+                    onClick = { selection.clear() },
+                    variant = PartyButtonVariant.Outline,
+                    size = PartyButtonSize.Default,
+                    fillMaxWidth = false,
+                ) { Text("Clear") }
             }
 
             Text("Words", style = MaterialTheme.typography.titleSmall)

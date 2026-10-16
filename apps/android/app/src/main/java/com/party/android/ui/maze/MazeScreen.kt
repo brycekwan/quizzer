@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.ui.text.font.FontWeight
+import com.party.android.ui.components.PartyButton
+import com.party.android.ui.components.PartyButtonSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -100,7 +102,7 @@ fun MazeScreen(
             when (snap.phase) {
                 "intro" -> {
                     Text("Find the target. You cannot revisit cells. Three lives across the campaign.")
-                    Button(onClick = {
+                    PartyButton(onClick = {
                         scope.launch {
                             val ack = repository.mazeAckIntro()
                             if (!ack.ok) error = ack.error
@@ -147,15 +149,19 @@ fun MazeScreen(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("n" to "↑", "w" to "←", "s" to "↓", "e" to "→").forEach { (dir, label) ->
-                                Button(onClick = {
-                                    scope.launch {
-                                        val ack = repository.mazeMove(dir)
-                                        if (!ack.ok) error = ack.error
-                                    }
-                                }) { Text(label) }
+                                PartyButton(
+                                    onClick = {
+                                        scope.launch {
+                                            val ack = repository.mazeMove(dir)
+                                            if (!ack.ok) error = ack.error
+                                        }
+                                    },
+                                    fillMaxWidth = false,
+                                    size = PartyButtonSize.Default,
+                                ) { Text(label) }
                             }
                         }
-                        Button(onClick = {
+                        PartyButton(onClick = {
                             scope.launch {
                                 val ack = repository.mazeRestart()
                                 if (!ack.ok) error = ack.error

@@ -2058,13 +2058,76 @@ fn played(app: &App, socket: &SocketRef, game: Game) {
         Game::Maze => {
             emit_maze_player(app, socket);
             dirty.maze = true;
+            app.notify.notify_one();
         }
         Game::WordSurvivor => {
             emit_word_survivor_player(app, socket);
             dirty.word_survivor = true;
+            app.notify.notify_one();
         }
     }
     mark(app, dirty);
+}
+
+/// Milliseconds until the next quiz, maze, or word survivor deadline.
+pub fn next_timer_wait(app: &App) -> Option<u64> {
+    let party = app.party.lock().expect("party");
+    [
+        (party.quiz.next_deadline(), party.quiz.clock().now()),
+        (party.maze.next_deadline(), party.maze.clock().now()),
+        (
+            party.word_survivor.next_deadline(),
+            party.word_survivor.clock().now(),
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(deadline, now)| deadline.map(|at| (at - now).max(0) as u64))
+    .min()
+}
+
+/// Advance every phase whose deadline passed and push the new state to its players.
+pub fn fire_timers(app: &App) {
+    let (quiz, maze, word_survivor) = {
+        let mut party = app.party.lock().expect("party");
+        (
+            party.quiz.fire_due(),
+            party.maze.fire_due(),
+            party.word_survivor.fire_due(),
+        )
+    };
+    if quiz {
+        quiz_ticked(app);
+    }
+    if maze.is_empty() && word_survivor.is_empty() {
+        return;
+    }
+    if let Some(io) = app.io.get() {
+        let metas = app.meta.lock().expect("meta").clone();
+        for socket in io.sockets() {
+            let Some(meta) = metas.get(&sid_of(&socket)) else {
+                continue;
+            };
+            let Some(player_id) = meta.player_id.as_ref() else {
+                continue;
+            };
+            if meta.maze_player && maze.contains(player_id) {
+                emit_maze_player(app, &socket);
+            }
+            if meta.word_survivor_player && word_survivor.contains(player_id) {
+                emit_word_survivor_player(app, &socket);
+            }
+        }
+    }
+    mark(
+        app,
+        Dirty {
+            maze: !maze.is_empty(),
+            word_survivor: !word_survivor.is_empty(),
+            system: true,
+            leaderboard: true,
+            ..Dirty::default()
+        },
+    );
 }
 
 pub fn mark(app: &App, dirty: Dirty) {

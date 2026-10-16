@@ -38,7 +38,6 @@ import com.party.android.ui.components.PartyScaffold
 import com.party.android.ui.components.StatusLine
 import com.party.android.util.formatDuration
 import com.party.android.util.liveElapsedMs
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -56,18 +55,10 @@ fun WordSurvivorScreen(
         if (!ack.ok) error = ack.error
     }
 
-    LaunchedEffect(state?.phase, state?.revealUntil, state?.splashUntil) {
+    // The server ends the reveal and splash on its own clock and pushes the new phase.
+    LaunchedEffect(state?.phase) {
         val snap = state ?: return@LaunchedEffect
-        when (snap.phase) {
-            "intro", "reveal", "splash", "won", "lost" -> repository.pauseWordSurvivor()
-            "playing" -> repository.resumeWordSurvivor()
-        }
-        val until = snap.revealUntil ?: snap.splashUntil
-        if (until != null && (snap.phase == "reveal" || snap.phase == "splash")) {
-            val wait = until - System.currentTimeMillis()
-            if (wait > 0) delay(wait)
-            repository.resumeWordSurvivor()
-        }
+        if (snap.phase == "playing") repository.resumeWordSurvivor() else repository.pauseWordSurvivor()
     }
 
     DisposableEffect(Unit) {

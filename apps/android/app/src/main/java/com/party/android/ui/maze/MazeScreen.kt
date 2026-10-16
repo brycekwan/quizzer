@@ -36,7 +36,6 @@ import com.party.android.ui.components.PartyScaffold
 import com.party.android.ui.components.StatusLine
 import com.party.android.util.formatDuration
 import com.party.android.util.liveElapsedMs
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -54,19 +53,10 @@ fun MazeScreen(
         if (!ack.ok) error = ack.error
     }
 
-    LaunchedEffect(state?.phase, state?.splashUntil) {
+    // The server ends the splash on its own clock and pushes the new phase.
+    LaunchedEffect(state?.phase) {
         val snap = state ?: return@LaunchedEffect
-        when (snap.phase) {
-            "intro", "splash" -> repository.pauseMaze()
-            "playing" -> repository.resumeMaze()
-            else -> repository.pauseMaze()
-        }
-        val until = snap.splashUntil
-        if (snap.phase == "splash" && until != null) {
-            val wait = until - System.currentTimeMillis()
-            if (wait > 0) delay(wait)
-            repository.resumeMaze()
-        }
+        if (snap.phase == "playing") repository.resumeMaze() else repository.pauseMaze()
     }
 
     DisposableEffect(Unit) {

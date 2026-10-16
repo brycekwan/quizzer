@@ -95,83 +95,9 @@ export function WordSurvivorPage() {
     subscription,
   } = useWordSurvivorSocket('player');
   const [instructionsOpen, setInstructionsOpen] = useState(false);
-  const [showSplash, setShowSplash] = useState(false);
-  const seen = useRef<WordSurvivorPhase | null>(null);
 
-  useEffect(() => {
-    if (!playerState) {
-      return;
-    }
-    if (playerState.phase === 'splash' && seen.current !== 'splash') {
-      setShowSplash(true);
-    }
-    seen.current = playerState.phase;
-  }, [playerState]);
-
-  useEffect(() => {
-    if (!showSplash || !playerState?.splashUntil) {
-      return;
-    }
-    const delay = Math.max(0, playerState.splashUntil - Date.now());
-    const id = window.setTimeout(() => setShowSplash(false), delay);
-    return () => window.clearTimeout(id);
-  }, [showSplash, playerState?.splashUntil]);
-
-  const [tick, setTick] = useState(() => Date.now());
-  useEffect(() => {
-    if (playerState?.phase !== 'splash') {
-      return;
-    }
-    const id = window.setInterval(() => setTick(Date.now()), 200);
-    return () => window.clearInterval(id);
-  }, [playerState?.phase]);
-
-  const splashBlocking =
-    playerState?.phase === 'splash' &&
-    (showSplash || (playerState.splashUntil != null && playerState.splashUntil > tick));
-
-  // Reveal and splash only move forward when the client nudges `resumeTimer`
-  // (which runs sync on the server). Poll until the phase leaves, otherwise a
-  // single early nudge — clock skew or a late ack — leaves the board empty and
-  // the keyboard locked.
-  useEffect(() => {
-    const phase = playerState?.phase;
-    const until =
-      phase === 'reveal'
-        ? playerState?.revealUntil
-        : phase === 'splash' && !splashBlocking
-          ? playerState?.splashUntil
-          : null;
-    if (until == null) {
-      return;
-    }
-    let cancelled = false;
-    let timer = 0;
-    const advance = () => {
-      const wait = Math.max(0, until - Date.now());
-      timer = window.setTimeout(() => {
-        if (cancelled) {
-          return;
-        }
-        void resumeTimer().finally(() => {
-          if (!cancelled) {
-            timer = window.setTimeout(advance, 400);
-          }
-        });
-      }, wait);
-    };
-    advance();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [
-    playerState?.phase,
-    playerState?.revealUntil,
-    playerState?.splashUntil,
-    splashBlocking,
-    resumeTimer,
-  ]);
+  // The server ends the reveal and splash on its own clock and pushes the new phase.
+  const splashBlocking = playerState?.phase === 'splash';
 
   // Keyed on the hold itself: each pause or resume answers with new state,
   // so depending on `playerState` would send them in a loop.
@@ -278,7 +204,7 @@ export function WordSurvivorPage() {
 
   const intro = playerState.phase === 'intro';
   const modalOpen = instructionsOpen || intro;
-  const splashVisible = Boolean(splashBlocking) && !modalOpen;
+  const splashVisible = splashBlocking && !modalOpen;
 
   const confirmInstructions = async () => {
     if (playerState.phase === 'intro') {

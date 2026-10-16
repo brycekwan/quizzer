@@ -5,6 +5,7 @@ import { returnPath } from '@/lib/returnPath';
 import { isValidPlayerName } from '@party/shared';
 import { useSession } from '@/hooks/useSession';
 import { readIdleTimeoutMessage } from '@/lib/idleTimeout';
+import { readLoginLockedMessage } from '@/lib/loginLocked';
 import { readSystemRemovalMessage } from '@/lib/systemRemoval';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +22,10 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [removalMessage] = useState(
-    () => readSystemRemovalMessage() ?? readIdleTimeoutMessage()
+    () =>
+      readSystemRemovalMessage() ??
+      readLoginLockedMessage() ??
+      readIdleTimeoutMessage()
   );
 
   const joinUrl = useMemo(() => {

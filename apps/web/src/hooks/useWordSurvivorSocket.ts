@@ -6,6 +6,7 @@ import {
   writeStoredSession,
 } from '@/lib/sessionStorage';
 import { isIdleTimeout, noteIdleTimeout } from '@/lib/idleTimeout';
+import { isLoginLocked, noteLoginLocked } from '@/lib/loginLocked';
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
@@ -200,6 +201,12 @@ export function useWordSurvivorSocket(
       }
       if (isIdleTimeout(payload)) {
         noteIdleTimeout();
+        setPlayerId(null);
+        setPlayerName(null);
+        return;
+      }
+      if (isLoginLocked(payload)) {
+        noteLoginLocked();
         setPlayerId(null);
         setPlayerName(null);
         return;

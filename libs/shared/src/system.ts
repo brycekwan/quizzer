@@ -7,6 +7,12 @@ export const QUIZ_REMOVAL_REASON = 'Removed from the quiz game';
 /** Sent with `player:kicked` when idle timeout signs a player out. */
 export const IDLE_TIMEOUT_REASON = 'Signed out due to inactivity';
 
+/** Sent with `player:kicked` when the host closes logins. */
+export const LOGIN_LOCKED_REASON = 'Signed out because logins are closed';
+
+/** Ack error when `session:login` is refused while logins are closed. */
+export const LOGIN_LOCKED_MESSAGE = 'Logins are closed by the host';
+
 /** Default connected-but-idle disconnect (30 minutes). */
 export const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1_000;
 
@@ -47,6 +53,8 @@ export interface SystemAdminSnapshot {
   theme: PartyTheme;
   /** Connected players with no gameplay input for this long are signed out. */
   idleTimeoutMs: number;
+  /** When true, session login is refused and connected players are signed out. */
+  loginLocked: boolean;
 }
 
 export interface SystemScoreInput {
@@ -88,6 +96,7 @@ export function buildSystemLeaderboard(
   return {
     theme: 'standard',
     idleTimeoutMs: DEFAULT_IDLE_TIMEOUT_MS,
+    loginLocked: false,
     players: ranked.map((player, index) => ({
       rank: index + 1,
       playerId: player.playerId,

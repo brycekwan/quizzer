@@ -11,6 +11,11 @@ import {
   noteIdleTimeout,
 } from '@/lib/idleTimeout';
 import {
+  clearLoginLockedMessage,
+  isLoginLocked,
+  noteLoginLocked,
+} from '@/lib/loginLocked';
+import {
   clearSystemRemovalMessage,
   isSystemRemoval,
   noteSystemRemoval,
@@ -95,6 +100,12 @@ export function useSession() {
         setPlayerName(null);
         return;
       }
+      if (isLoginLocked(payload)) {
+        noteLoginLocked();
+        setPlayerId(null);
+        setPlayerName(null);
+        return;
+      }
       if (isQuizRemoval(payload)) {
         return;
       }
@@ -127,6 +138,7 @@ export function useSession() {
                 writeStoredSession(result.playerId, result.name);
                 clearSystemRemovalMessage();
                 clearIdleTimeoutMessage();
+                clearLoginLockedMessage();
                 setPlayerId(result.playerId);
                 setPlayerName(result.name);
                 setKicked(false);

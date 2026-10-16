@@ -81,6 +81,10 @@ export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 
         new Promise<{ ok: boolean; error?: string; idleTimeoutMs?: number }>((resolve) => {
           socket.emit('system:admin:setIdleTimeout', { minutes }, resolve);
         }),
+      setLoginLocked: (locked: boolean) =>
+        new Promise<{ ok: boolean; error?: string; loginLocked?: boolean }>((resolve) => {
+          socket.emit('system:admin:setLoginLocked', { locked }, resolve);
+        }),
     }),
     [socket]
   );

@@ -26,7 +26,11 @@ interface GameState {
 
 interface SystemState {
   players: Array<{ playerId: string; name: string }>;
+  loginLocked?: boolean;
 }
+
+const LOGIN_LOCKED_REASON = 'Signed out because logins are closed';
+const LOGIN_LOCKED_MESSAGE = 'Logins are closed by the host';
 
 interface SudokuState {
   elapsedMs: number;
@@ -289,6 +293,38 @@ describe('rust socket contract', () => {
     expect(reset).toEqual({ ok: false, error: 'Host passphrase required' });
     const paused = await emitAck(intruder, 'sudoku:pauseTimer', {});
     expect(paused).toEqual({ ok: true });
+  });
+
+  it('closes logins, signs players out, and refuses new logins until reopened', async () => {
+    const player = connect();
+    await waitFor(player, 'game:state');
+    const login = await emitAck(player, 'session:login', { name: 'Lockee' });
+    expect(login.ok).toBe(true);
+
+    const admin = connect();
+    await waitFor(admin, 'game:state');
+    const unlocked = await emitAck(admin, 'host:unlock', { secret: 'test-host-secret' });
+    expect(unlocked.ok).toBe(true);
+    const boardPromise = waitFor<SystemState>(admin, 'system:admin:state');
+    const subscribed = await emitAck(admin, 'system:admin:subscribe', {});
+    expect(subscribed.ok).toBe(true);
+    const board = await boardPromise;
+    expect(board.loginLocked).toBe(false);
+
+    const kicked = waitFor<{ reason?: string }>(player, 'player:kicked');
+    const closed = await emitAck(admin, 'system:admin:setLoginLocked', { locked: true });
+    expect(closed).toEqual({ ok: true, loginLocked: true });
+    expect(await kicked).toEqual({ reason: LOGIN_LOCKED_REASON });
+
+    const blocked = connect();
+    await waitFor(blocked, 'game:state');
+    const refused = await emitAck(blocked, 'session:login', { name: 'Latecomer' });
+    expect(refused).toEqual({ ok: false, error: LOGIN_LOCKED_MESSAGE });
+
+    const reopened = await emitAck(admin, 'system:admin:setLoginLocked', { locked: false });
+    expect(reopened).toEqual({ ok: true, loginLocked: false });
+    const allowed = await emitAck(blocked, 'session:login', { name: 'Latecomer' });
+    expect(allowed.ok).toBe(true);
   });
 
   it('rejects gameplay floods over the per-socket rate limit', async () => {

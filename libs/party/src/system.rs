@@ -48,6 +48,8 @@ pub struct SystemAdminSnapshot {
     pub theme: PartyTheme,
     /// Connected players with no gameplay input for this long are signed out.
     pub idle_timeout_ms: i64,
+    /// When true, session login is refused and connected players are signed out.
+    pub login_locked: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +85,7 @@ pub fn build_system_leaderboard(players: &[SystemScoreInput]) -> SystemAdminSnap
     SystemAdminSnapshot {
         theme: PartyTheme::Standard,
         idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
+        login_locked: false,
         players: ranked
             .into_iter()
             .enumerate()
@@ -158,6 +161,7 @@ mod tests {
         assert_eq!(board.players[0].rank, 1);
         assert_eq!(board.players[2].rank, 3);
         assert_eq!(board.idle_timeout_ms, DEFAULT_IDLE_TIMEOUT_MS);
+        assert!(!board.login_locked);
     }
 
     #[test]

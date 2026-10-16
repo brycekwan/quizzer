@@ -1,3 +1,10 @@
+# [2.14.0](https://github.com/brycekwan/quizzer/compare/v2.13.0...v2.14.0) (2026-10-16)
+
+
+### Features
+
+* impelment lock ([ae19aa0](https://github.com/brycekwan/quizzer/commit/ae19aa08f64dae977ea3fe930beff583bbb66f55))
+
 # [2.13.0](https://github.com/brycekwan/quizzer/compare/v2.12.1...v2.13.0) (2026-10-16)
 
 

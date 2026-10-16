@@ -7,9 +7,12 @@ use party::load::{
     load_word_survivor_file, maze_difficulty_dir, resolve_crossword_dir, resolve_maze_dir,
     resolve_questions_dir, resolve_sudoku_dir, resolve_word_search_dir, resolve_word_survivor_dir,
 };
+use party::clock::Clock;
 use party::maze::{MazeDifficulty, MazeDirection};
 use party::quizzer::SnapshotRole;
-use party::types::{QuestionSetMode, QUIZ_REMOVAL_REASON, SYSTEM_REMOVAL_REASON};
+use party::types::{
+    QuestionSetMode, IDLE_TIMEOUT_REASON, QUIZ_REMOVAL_REASON, SYSTEM_REMOVAL_REASON,
+};
 use party::word_search::WordSearchCellRef;
 use serde_json::{json, Value};
 use socketioxide::extract::{AckSender, Data, SocketRef, State};
@@ -855,6 +858,35 @@ fn on_connect(socket: SocketRef, app: Arc<App>) {
             }
         },
     );
+    socket.on(
+        "system:admin:setIdleTimeout",
+        async |socket: SocketRef,
+               Data(payload): Data<Value>,
+               ack: AckSender,
+               State(app): State<Arc<App>>| {
+            if !is_host(&app, &socket) {
+                let _ = ack.send(&fail("Host passphrase required"));
+                return;
+            }
+            let minutes = payload
+                .get("minutes")
+                .and_then(value_i64)
+                .unwrap_or(0);
+            let result = {
+                let mut party = app.party.lock().expect("party");
+                match party.set_idle_timeout_minutes(minutes) {
+                    Ok(idle_timeout_ms) => {
+                        json!({ "ok": true, "idleTimeoutMs": idle_timeout_ms })
+                    }
+                    Err(error) => fail(error),
+                }
+            };
+            let _ = ack.send(&result);
+            if result.get("ok").and_then(Value::as_bool) == Some(true) {
+                changed(&app);
+            }
+        },
+    );
 
     socket.on_disconnect(async |socket: SocketRef, State(app): State<Arc<App>>| {
         let sid = sid_of(&socket);
@@ -886,9 +918,10 @@ fn on_session_login(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSe
         .and_then(Value::as_str)
         .map(str::to_string);
     let sid = sid_of(&socket);
+    let now = Clock::system().now();
     let result = {
         let mut party = app.party.lock().expect("party");
-        party.sessions.login(name, &sid, player_id.as_deref())
+        party.sessions.login(name, &sid, player_id.as_deref(), now)
     };
     match result {
         Ok(login) => {
@@ -938,9 +971,10 @@ fn on_player_join(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSend
         };
         (session_id, session_name)
     } else {
+        let now = Clock::system().now();
         let login = {
             let mut party = app.party.lock().expect("party");
-            party.sessions.login(name, &sid, requested.as_deref())
+            party.sessions.login(name, &sid, requested.as_deref(), now)
         };
         match login {
             Ok(login) => {
@@ -961,6 +995,7 @@ fn on_player_join(app: Arc<App>, socket: SocketRef, payload: Value, ack: AckSend
     match joined {
         Ok(join) => {
             displace(&app, join.replaced_socket_id.as_deref());
+            touch_activity(&app, &sid);
             {
                 let mut meta = app.meta.lock().expect("meta");
                 let entry = meta.entry(sid).or_default();
@@ -2370,10 +2405,16 @@ fn admit_input(app: &App, socket: &SocketRef, ack: AckSender) -> Option<AckSende
     let sid = sid_of(socket);
     let decision = {
         let mut meta = app.meta.lock().expect("meta");
-        meta.entry(sid).or_default().input_rate.check(Instant::now())
+        meta.entry(sid.clone())
+            .or_default()
+            .input_rate
+            .check(Instant::now())
     };
     match decision {
-        RateDecision::Allow => Some(ack),
+        RateDecision::Allow => {
+            touch_activity(app, &sid);
+            Some(ack)
+        }
         RateDecision::Reject => {
             let _ = ack.send(&fail(RATE_LIMIT_MESSAGE));
             None
@@ -2383,6 +2424,38 @@ fn admit_input(app: &App, socket: &SocketRef, ack: AckSender) -> Option<AckSende
             let _ = socket.clone().disconnect();
             None
         }
+    }
+}
+
+fn touch_activity(app: &App, socket_id: &str) {
+    let now = Clock::system().now();
+    app.party
+        .lock()
+        .expect("party")
+        .sessions
+        .touch(socket_id, now);
+}
+
+/// Sign out connected players who have been idle past the host timeout.
+pub fn enforce_idle(app: &App) {
+    let now = Clock::system().now();
+    let socket_ids = {
+        let party = app.party.lock().expect("party");
+        party.idle_socket_ids(now)
+    };
+    if socket_ids.is_empty() {
+        return;
+    }
+    for socket_id in socket_ids {
+        let Some(target) = find_socket(app, &socket_id) else {
+            continue;
+        };
+        // Leave meta.player_id so on_disconnect can pause clocks and free the session.
+        let _ = target.emit(
+            "player:kicked",
+            &json!({ "reason": IDLE_TIMEOUT_REASON }),
+        );
+        let _ = target.disconnect();
     }
 }
 

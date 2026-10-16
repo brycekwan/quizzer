@@ -9,6 +9,7 @@ use crate::session::SessionRegistry;
 use crate::sudoku_engine::SudokuEngine;
 use crate::system::{
     build_system_leaderboard, PartyTheme, SystemAdminSnapshot, SystemScoreInput,
+    DEFAULT_IDLE_TIMEOUT_MS, MAX_IDLE_TIMEOUT_MS, MIN_IDLE_TIMEOUT_MS,
 };
 use crate::word_search_engine::WordSearchEngine;
 use crate::word_survivor_engine::WordSurvivorEngine;
@@ -22,6 +23,7 @@ pub struct SystemAdmin {
     pub maze: MazeEngine,
     pub word_survivor: WordSurvivorEngine,
     pub theme: PartyTheme,
+    pub idle_timeout_ms: i64,
 }
 
 impl SystemAdmin {
@@ -43,6 +45,7 @@ impl SystemAdmin {
             maze,
             word_survivor,
             theme: PartyTheme::Standard,
+            idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
         }
     }
 
@@ -50,6 +53,22 @@ impl SystemAdmin {
         let theme = PartyTheme::parse(theme)?;
         self.theme = theme;
         Ok(theme)
+    }
+
+    /// Whole minutes from 1 to 120. Connected players idle this long are signed out.
+    pub fn set_idle_timeout_minutes(&mut self, minutes: i64) -> Result<i64, String> {
+        let idle_timeout_ms = minutes.saturating_mul(60_000);
+        if !(MIN_IDLE_TIMEOUT_MS..=MAX_IDLE_TIMEOUT_MS).contains(&idle_timeout_ms) {
+            return Err("Choose between 1 and 120 minutes".into());
+        }
+        self.idle_timeout_ms = idle_timeout_ms;
+        Ok(idle_timeout_ms)
+    }
+
+    /// Socket ids for connected players past the configured idle timeout.
+    pub fn idle_socket_ids(&self, now: i64) -> Vec<String> {
+        self.sessions
+            .idle_socket_ids(now, self.idle_timeout_ms)
     }
 
     pub fn snapshot(&self) -> SystemAdminSnapshot {
@@ -126,6 +145,7 @@ impl SystemAdmin {
             .collect::<Vec<_>>();
         let mut snapshot = build_system_leaderboard(&inputs);
         snapshot.theme = self.theme;
+        snapshot.idle_timeout_ms = self.idle_timeout_ms;
         snapshot
     }
 
@@ -450,9 +470,9 @@ mod tests {
     #[test]
     fn ranks_connected_players_and_keeps_quiz_separate() {
         let mut admin = admin();
-        let ada = admin.sessions.login("Ada", "s-ada", None).unwrap();
-        let bea = admin.sessions.login("Bea", "s-bea", None).unwrap();
-        admin.sessions.login("Cal", "s-cal", None).unwrap();
+        let ada = admin.sessions.login("Ada", "s-ada", None, 0).unwrap();
+        let bea = admin.sessions.login("Bea", "s-bea", None, 0).unwrap();
+        admin.sessions.login("Cal", "s-cal", None, 0).unwrap();
         admin.sessions.mark_disconnected("s-cal");
         admin.crossword.ensure_player(&ada.session.id, "Ada");
         for (row, col, letter) in [
@@ -506,8 +526,8 @@ mod tests {
     #[test]
     fn removes_player_from_every_game() {
         let mut admin = admin();
-        let ada = admin.sessions.login("Ada", "s-ada", None).unwrap();
-        let bea = admin.sessions.login("Bea", "s-bea", None).unwrap();
+        let ada = admin.sessions.login("Ada", "s-ada", None, 0).unwrap();
+        let bea = admin.sessions.login("Bea", "s-bea", None, 0).unwrap();
         admin.crossword.ensure_player(&ada.session.id, "Ada");
         admin
             .crossword
@@ -544,7 +564,7 @@ mod tests {
     #[test]
     fn reset_all_clears_players_and_scores() {
         let mut admin = admin();
-        let ada = admin.sessions.login("Ada", "s-ada", None).unwrap();
+        let ada = admin.sessions.login("Ada", "s-ada", None, 0).unwrap();
         admin.crossword.ensure_player(&ada.session.id, "Ada");
         admin
             .crossword
@@ -582,6 +602,37 @@ mod tests {
         assert_eq!(admin.snapshot().theme, PartyTheme::Baby);
         assert!(admin.set_theme("neon").is_err());
         assert_eq!(admin.theme, PartyTheme::Baby);
+    }
+
+    #[test]
+    fn remembers_the_idle_timeout() {
+        let mut admin = admin();
+        assert_eq!(admin.snapshot().idle_timeout_ms, DEFAULT_IDLE_TIMEOUT_MS);
+        admin.set_idle_timeout_minutes(15).unwrap();
+        assert_eq!(admin.snapshot().idle_timeout_ms, 15 * 60_000);
+        assert_eq!(
+            admin.set_idle_timeout_minutes(0).unwrap_err(),
+            "Choose between 1 and 120 minutes"
+        );
+        assert_eq!(
+            admin.set_idle_timeout_minutes(121).unwrap_err(),
+            "Choose between 1 and 120 minutes"
+        );
+        assert_eq!(admin.idle_timeout_ms, 15 * 60_000);
+    }
+
+    #[test]
+    fn idle_socket_ids_respects_timeout() {
+        let mut admin = admin();
+        admin.sessions.login("Ada", "s-ada", None, 0).unwrap();
+        admin.sessions.login("Bea", "s-bea", None, 0).unwrap();
+        admin.sessions.touch("s-bea", 100);
+        admin.set_idle_timeout_minutes(10).unwrap();
+        assert_eq!(
+            admin.idle_socket_ids(10 * 60_000),
+            vec!["s-ada".to_string()]
+        );
+        assert!(admin.idle_socket_ids(9 * 60_000).is_empty());
     }
 
     #[test]

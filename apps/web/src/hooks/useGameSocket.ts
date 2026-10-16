@@ -5,6 +5,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import { isIdleTimeout, noteIdleTimeout } from '@/lib/idleTimeout';
 import { isQuizRemoval, noteQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
@@ -139,6 +140,13 @@ export function useGameSocket(
       }
       if (isSystemRemoval(payload)) {
         noteSystemRemoval();
+        setPlayerId(null);
+        setPlayerName(null);
+        setJoinedQuizzer(false);
+        return;
+      }
+      if (isIdleTimeout(payload)) {
+        noteIdleTimeout();
         setPlayerId(null);
         setPlayerName(null);
         setJoinedQuizzer(false);

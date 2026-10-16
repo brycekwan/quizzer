@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/button';
 import { useSystemSocket } from '@/hooks/useSystemSocket';
 import { useHostSecret } from '@/hooks/useHostSecret';
 import { HostPassphrasePrompt } from '@/components/HostPassphrasePrompt';
-import { PARTY_THEMES, type PartyTheme } from '@party/shared';
+import {
+  MAX_IDLE_TIMEOUT_MINUTES,
+  MIN_IDLE_TIMEOUT_MINUTES,
+  PARTY_THEMES,
+  type PartyTheme,
+} from '@party/shared';
 import { Label } from '@/components/ui/label';
 
 type PendingAction =
@@ -15,10 +20,20 @@ type PendingAction =
 
 export function SystemAdminPage() {
   const host = useHostSecret();
-  const { connected, adminState, error, setError, kick, resetAll, setTheme, hostReady } =
-    useSystemSocket(host.secret, host.attempt);
+  const {
+    connected,
+    adminState,
+    error,
+    setError,
+    kick,
+    resetAll,
+    setTheme,
+    setIdleTimeout,
+    hostReady,
+  } = useSystemSocket(host.secret, host.attempt);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [working, setWorking] = useState(false);
+  const [idleMinutes, setIdleMinutes] = useState<string | null>(null);
 
   if (!hostReady) {
     return (
@@ -59,6 +74,29 @@ export function SystemAdminPage() {
       return;
     }
     setPending(null);
+  };
+
+  const idleMinutesValue =
+    idleMinutes ?? String(Math.round(adminState.idleTimeoutMs / 60_000));
+
+  const commitIdleTimeout = async () => {
+    const value = Number(idleMinutesValue);
+    if (
+      !Number.isInteger(value) ||
+      value < MIN_IDLE_TIMEOUT_MINUTES ||
+      value > MAX_IDLE_TIMEOUT_MINUTES
+    ) {
+      setError(
+        `Choose between ${MIN_IDLE_TIMEOUT_MINUTES} and ${MAX_IDLE_TIMEOUT_MINUTES} minutes`
+      );
+      setIdleMinutes(String(Math.round(adminState.idleTimeoutMs / 60_000)));
+      return;
+    }
+    const result = await setIdleTimeout(value);
+    setIdleMinutes(null);
+    if (!result?.ok) {
+      setError(result?.error ?? 'Could not update the idle timeout');
+    }
   };
 
   return (
@@ -110,6 +148,34 @@ export function SystemAdminPage() {
             </Button>
           </div>
         </div>
+
+        <section className="space-y-3 rounded-[2rem] border-4 border-white/60 bg-white/75 p-5 shadow-pop backdrop-blur">
+          <h2 className="font-display text-2xl font-bold">Idle timeout</h2>
+          <div className="space-y-1">
+            <Label htmlFor="idle-minutes">Minutes before sign-out</Label>
+            <input
+              id="idle-minutes"
+              type="number"
+              min={MIN_IDLE_TIMEOUT_MINUTES}
+              max={MAX_IDLE_TIMEOUT_MINUTES}
+              step={1}
+              className="flex h-12 w-full max-w-xs rounded-2xl border-4 border-ink/15 bg-white px-4 text-base font-bold text-ink shadow-pop-sm outline-none focus-visible:ring-4 focus-visible:ring-sun/70"
+              value={idleMinutesValue}
+              onChange={(event) => setIdleMinutes(event.target.value)}
+              onBlur={() => void commitIdleTimeout()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.currentTarget.blur();
+                }
+              }}
+            />
+          </div>
+          <p className="text-sm font-semibold text-ink/55">
+            Whole minutes from {MIN_IDLE_TIMEOUT_MINUTES} to {MAX_IDLE_TIMEOUT_MINUTES}.
+            Players with an open connection but no gameplay input are signed out so the
+            name can be reused. Scores are kept.
+          </p>
+        </section>
 
         {error ? (
           <p role="alert" className="font-bold text-coral">

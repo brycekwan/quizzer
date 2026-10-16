@@ -66,6 +66,7 @@ describe('buildSystemLeaderboard', () => {
       player({ playerId: 'a', name: 'Ada', wordSearchScore: 100 }),
     ]);
     expect(board.theme).toBe('standard');
+    expect(board.idleTimeoutMs).toBe(30 * 60 * 1_000);
     expect(board.players.map((entry) => entry.name)).toEqual(['Ada', 'Bea']);
     expect(isPartyTheme('baby')).toBe(true);
     expect(isPartyTheme('neon')).toBe(false);

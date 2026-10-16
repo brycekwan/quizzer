@@ -32,6 +32,8 @@ use crate::state::App;
 
 /// How often host, system, and leaderboard views catch up with player input.
 const VIEW_FLUSH_INTERVAL: Duration = Duration::from_millis(300);
+/// How often to sign out players idle past the host-configured timeout.
+const IDLE_CHECK_INTERVAL: Duration = Duration::from_secs(20);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -80,6 +82,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             ticks.tick().await;
             socket::flush(&flush_app);
+        }
+    });
+
+    let idle_app = app.clone();
+    tokio::spawn(async move {
+        let mut ticks = tokio::time::interval(IDLE_CHECK_INTERVAL);
+        ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            ticks.tick().await;
+            socket::enforce_idle(&idle_app);
         }
     });
 

@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { returnPath } from '@/lib/returnPath';
 import { isValidPlayerName } from '@party/shared';
 import { useSession } from '@/hooks/useSession';
+import { readIdleTimeoutMessage } from '@/lib/idleTimeout';
 import { readSystemRemovalMessage } from '@/lib/systemRemoval';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,9 @@ export function LoginPage() {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [removalMessage] = useState(() => readSystemRemovalMessage());
+  const [removalMessage] = useState(
+    () => readSystemRemovalMessage() ?? readIdleTimeoutMessage()
+  );
 
   const joinUrl = useMemo(() => {
     if (typeof window === 'undefined') {

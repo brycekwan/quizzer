@@ -6,6 +6,11 @@ import {
 } from '@/lib/sessionStorage';
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import {
+  clearIdleTimeoutMessage,
+  isIdleTimeout,
+  noteIdleTimeout,
+} from '@/lib/idleTimeout';
+import {
   clearSystemRemovalMessage,
   isSystemRemoval,
   noteSystemRemoval,
@@ -84,6 +89,12 @@ export function useSession() {
         setPlayerName(null);
         return;
       }
+      if (isIdleTimeout(payload)) {
+        noteIdleTimeout();
+        setPlayerId(null);
+        setPlayerName(null);
+        return;
+      }
       if (isQuizRemoval(payload)) {
         return;
       }
@@ -115,6 +126,7 @@ export function useSession() {
               if (result.ok && result.playerId && result.name) {
                 writeStoredSession(result.playerId, result.name);
                 clearSystemRemovalMessage();
+                clearIdleTimeoutMessage();
                 setPlayerId(result.playerId);
                 setPlayerName(result.name);
                 setKicked(false);

@@ -4,6 +4,16 @@ export const SYSTEM_REMOVAL_REASON = 'Removed from the system by admin';
 /** Sent with `player:kicked` when the quiz host ejects someone from the quiz only. */
 export const QUIZ_REMOVAL_REASON = 'Removed from the quiz game';
 
+/** Sent with `player:kicked` when idle timeout signs a player out. */
+export const IDLE_TIMEOUT_REASON = 'Signed out due to inactivity';
+
+/** Default connected-but-idle disconnect (30 minutes). */
+export const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1_000;
+
+/** Host may set 1–120 whole minutes. */
+export const MIN_IDLE_TIMEOUT_MINUTES = 1;
+export const MAX_IDLE_TIMEOUT_MINUTES = 120;
+
 export interface SystemPlayerEntry {
   rank: number;
   playerId: string;
@@ -35,6 +45,8 @@ export function isPartyTheme(value: unknown): value is PartyTheme {
 export interface SystemAdminSnapshot {
   players: SystemPlayerEntry[];
   theme: PartyTheme;
+  /** Connected players with no gameplay input for this long are signed out. */
+  idleTimeoutMs: number;
 }
 
 export interface SystemScoreInput {
@@ -75,6 +87,7 @@ export function buildSystemLeaderboard(
 
   return {
     theme: 'standard',
+    idleTimeoutMs: DEFAULT_IDLE_TIMEOUT_MS,
     players: ranked.map((player, index) => ({
       rank: index + 1,
       playerId: player.playerId,

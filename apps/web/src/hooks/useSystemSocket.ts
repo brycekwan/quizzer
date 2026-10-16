@@ -77,6 +77,10 @@ export function useSystemSocket(hostSecret: string | null = null, hostAttempt = 
         new Promise<{ ok: boolean; error?: string; theme?: PartyTheme }>((resolve) => {
           socket.emit('system:admin:setTheme', { theme }, resolve);
         }),
+      setIdleTimeout: (minutes: number) =>
+        new Promise<{ ok: boolean; error?: string; idleTimeoutMs?: number }>((resolve) => {
+          socket.emit('system:admin:setIdleTimeout', { minutes }, resolve);
+        }),
     }),
     [socket]
   );

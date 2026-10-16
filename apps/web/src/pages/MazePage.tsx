@@ -105,45 +105,13 @@ export function MazePage() {
     subscription,
   } = useMazeSocket('player');
   const [instructionsOpen, setInstructionsOpen] = useState(false);
-  const [showSplash, setShowSplash] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const instructionsOpenRef = useRef(instructionsOpen);
   instructionsOpenRef.current = instructionsOpen;
-  const seen = useRef<{ phase: MazePhase; level: string } | null>(null);
 
-  useEffect(() => {
-    if (!playerState) {
-      return;
-    }
-    const previous = seen.current;
-    if (previous?.phase === 'playing' && playerState.phase === 'splash') {
-      setShowSplash(true);
-    }
-    seen.current = { phase: playerState.phase, level: playerState.level };
-  }, [playerState]);
-
-  useEffect(() => {
-    if (!showSplash || !playerState?.splashUntil) {
-      return;
-    }
-    const delay = Math.max(0, playerState.splashUntil - Date.now());
-    const id = window.setTimeout(() => setShowSplash(false), delay);
-    return () => window.clearTimeout(id);
-  }, [showSplash, playerState?.splashUntil]);
-
-  const [tick, setTick] = useState(() => Date.now());
-  useEffect(() => {
-    if (playerState?.phase !== 'splash') {
-      return;
-    }
-    const id = window.setInterval(() => setTick(Date.now()), 200);
-    return () => window.clearInterval(id);
-  }, [playerState?.phase]);
-
-  const splashBlocking =
-    playerState?.phase === 'splash' &&
-    (showSplash || (playerState.splashUntil != null && playerState.splashUntil > tick));
+  // The server ends the splash on its own clock and pushes the new phase.
+  const splashBlocking = playerState?.phase === 'splash';
 
   // Keyed on the hold itself: each pause or resume answers with new state,
   // so depending on `playerState` would send them in a loop.
@@ -175,10 +143,7 @@ export function MazePage() {
     if (!playerState) {
       return;
     }
-    if (playerState.phase !== 'playing' && playerState.phase !== 'splash') {
-      return;
-    }
-    if (instructionsOpenRef.current || showSplash || splashBlocking) {
+    if (playerState.phase !== 'playing' || instructionsOpenRef.current) {
       return;
     }
     const result = await move(direction);
@@ -253,9 +218,8 @@ export function MazePage() {
 
   const intro = playerState.phase === 'intro';
   const modalOpen = instructionsOpen || intro;
-  const splashVisible = Boolean(splashBlocking) && !modalOpen;
-  const controlsDisabled =
-    modalOpen || splashVisible || (playerState.phase !== 'playing' && playerState.phase !== 'splash');
+  const splashVisible = splashBlocking && !modalOpen;
+  const controlsDisabled = modalOpen || playerState.phase !== 'playing';
 
   const confirmInstructions = async () => {
     if (playerState.phase === 'intro') {
@@ -264,7 +228,6 @@ export function MazePage() {
         setError(result.error ?? 'Could not start');
         return;
       }
-      setShowSplash(true);
     }
     setInstructionsOpen(false);
   };

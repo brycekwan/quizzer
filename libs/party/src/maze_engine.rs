@@ -257,6 +257,33 @@ impl MazeEngine {
         player.active_since = Some(now);
     }
 
+    /// The earliest splash end across players, on this engine's clock.
+    pub fn next_deadline(&self) -> Option<i64> {
+        self.players
+            .values()
+            .filter(|player| player.phase == MazePhase::Splash)
+            .filter_map(|player| player.splash_until)
+            .min()
+    }
+
+    /// Ends every splash that is due and returns the players that changed.
+    pub fn fire_due(&mut self) -> Vec<String> {
+        let now = self.now();
+        let due: Vec<String> = self
+            .players
+            .iter()
+            .filter(|(_, player)| {
+                player.phase == MazePhase::Splash
+                    && player.splash_until.is_some_and(|until| now >= until)
+            })
+            .map(|(player_id, _)| player_id.clone())
+            .collect();
+        for player_id in &due {
+            self.sync_player(player_id, now);
+        }
+        due
+    }
+
     pub fn player_snapshot(&self, player_id: &str) -> Option<MazePlayerSnapshot> {
         self.player_snapshot_with(player_id, true)
     }
@@ -556,6 +583,23 @@ mod tests {
         assert_eq!(snap.score, 200);
         assert!(snap.active_since.is_none());
         assert!(snap.elapsed_ms >= 0);
+    }
+
+    #[test]
+    fn fire_due_ends_the_splash_on_the_server_clock() {
+        let mut engine = campaign(1_000);
+        engine.ensure_player("p1", "Ada");
+        engine.ensure_player("p2", "Bo");
+        assert_eq!(engine.next_deadline(), None);
+        engine.ack_intro("p1").unwrap();
+        assert_eq!(engine.next_deadline(), Some(1_000 + MAZE_SPLASH_MS));
+        engine.clock().set(1_000 + MAZE_SPLASH_MS - 1);
+        assert!(engine.fire_due().is_empty());
+        engine.clock().set(1_000 + MAZE_SPLASH_MS);
+        assert_eq!(engine.fire_due(), vec!["p1".to_string()]);
+        assert_eq!(engine.player_snapshot("p1").unwrap().phase, MazePhase::Playing);
+        assert_eq!(engine.player_snapshot("p2").unwrap().phase, MazePhase::Intro);
+        assert_eq!(engine.next_deadline(), None);
     }
 
     #[test]

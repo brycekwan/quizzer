@@ -54,18 +54,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let timer_app = app.clone();
     tokio::spawn(async move {
         loop {
-            let deadline = timer_app.party.lock().expect("party").quiz.next_deadline();
+            let wait = socket::next_timer_wait(&timer_app);
             let notified = timer_app.notify.notified();
             tokio::pin!(notified);
-            if let Some(deadline) = deadline {
-                let now = timer_app.party.lock().expect("party").quiz.clock().now();
-                let wait = (deadline - now).max(0) as u64;
+            if let Some(wait) = wait {
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_millis(wait)) => {
-                        let changed = timer_app.party.lock().expect("party").quiz.fire_due();
-                        if changed {
-                            socket::quiz_ticked(&timer_app);
-                        }
+                        socket::fire_timers(&timer_app);
                     }
                     _ = &mut notified => {}
                 }

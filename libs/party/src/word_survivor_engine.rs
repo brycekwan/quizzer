@@ -258,6 +258,34 @@ impl WordSurvivorEngine {
         player.active_since = Some(now);
     }
 
+    /// The earliest reveal or splash end across players, on this engine's clock.
+    pub fn next_deadline(&self) -> Option<i64> {
+        self.players.values().filter_map(Self::deadline).min()
+    }
+
+    /// Advances every reveal or splash that is due and returns the players that changed.
+    pub fn fire_due(&mut self) -> Vec<String> {
+        let now = self.now();
+        let due: Vec<String> = self
+            .players
+            .iter()
+            .filter(|(_, player)| Self::deadline(player).is_some_and(|until| now >= until))
+            .map(|(player_id, _)| player_id.clone())
+            .collect();
+        for player_id in &due {
+            self.sync_player(player_id, now);
+        }
+        due
+    }
+
+    fn deadline(player: &PlayerProgress) -> Option<i64> {
+        match player.phase {
+            WordSurvivorPhase::Reveal => player.reveal_until,
+            WordSurvivorPhase::Splash => player.splash_until,
+            _ => None,
+        }
+    }
+
     pub fn player_snapshot(&self, player_id: &str) -> Option<WordSurvivorPlayerSnapshot> {
         let now = self.now();
         let player = self.players.get(player_id)?;
@@ -615,6 +643,33 @@ mod tests {
             game.player_snapshot("p1").unwrap().phase,
             WordSurvivorPhase::Playing
         );
+    }
+
+    #[test]
+    fn fire_due_walks_reveal_then_splash_on_the_server_clock() {
+        let mut game = engine(2_000);
+        game.ensure_player("p1", "Ada");
+        game.ack_intro("p1").unwrap();
+        assert_eq!(game.next_deadline(), None);
+        let answer = game.campaign("p1").unwrap()[0].clone();
+        type_word(&mut game, "p1", &answer);
+        assert_eq!(game.next_deadline(), Some(2_000 + REVEAL_MS));
+        assert!(game.fire_due().is_empty());
+        game.clock().set(2_000 + REVEAL_MS);
+        assert_eq!(game.fire_due(), vec!["p1".to_string()]);
+        assert_eq!(
+            game.player_snapshot("p1").unwrap().phase,
+            WordSurvivorPhase::Splash
+        );
+        let splash_end = 2_000 + REVEAL_MS + DEFAULT_SPLASH_MS;
+        assert_eq!(game.next_deadline(), Some(splash_end));
+        game.clock().set(splash_end);
+        assert_eq!(game.fire_due(), vec!["p1".to_string()]);
+        assert_eq!(
+            game.player_snapshot("p1").unwrap().phase,
+            WordSurvivorPhase::Playing
+        );
+        assert_eq!(game.next_deadline(), None);
     }
 
     #[test]

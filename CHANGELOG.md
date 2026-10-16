@@ -1,3 +1,10 @@
+# [2.13.0](https://github.com/brycekwan/quizzer/compare/v2.12.1...v2.13.0) (2026-10-16)
+
+
+### Features
+
+* add baby quiz ([4922576](https://github.com/brycekwan/quizzer/commit/4922576a596b2704490326aad725af74681e09eb))
+
 ## [2.12.1](https://github.com/brycekwan/quizzer/compare/v2.12.0...v2.12.1) (2026-10-16)
 
 

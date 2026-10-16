@@ -169,3 +169,5 @@ pub struct GameStateSnapshot {
 
 pub const SYSTEM_REMOVAL_REASON: &str = "Removed from the system by admin";
 pub const QUIZ_REMOVAL_REASON: &str = "Removed from the quiz game";
+/// Emitted with `player:kicked` when the idle timeout drops a connected player.
+pub const IDLE_TIMEOUT_REASON: &str = "Signed out due to inactivity";

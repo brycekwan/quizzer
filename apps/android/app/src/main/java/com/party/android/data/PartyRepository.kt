@@ -6,6 +6,7 @@ import com.party.android.data.models.GameStateSnapshot
 import com.party.android.data.models.MazePlayerSnapshot
 import com.party.android.data.models.MazePuzzlePublic
 import com.party.android.data.models.PartyLeaderboardSnapshot
+import com.party.android.data.models.IDLE_TIMEOUT_REASON
 import com.party.android.data.models.QUIZ_REMOVAL_REASON
 import com.party.android.data.models.SYSTEM_REMOVAL_REASON
 import com.party.android.data.models.SudokuPlayerSnapshot
@@ -104,6 +105,17 @@ class PartyRepository(
                 QUIZ_REMOVAL_REASON -> {
                     // Leave quiz only; session kept.
                     _game.value = null
+                }
+                IDLE_TIMEOUT_REASON -> {
+                    scope.launch {
+                        sessionStore.clearSession()
+                        _session.value =
+                            _session.value.copy(
+                                playerId = null,
+                                playerName = null,
+                                kickedReason = IDLE_TIMEOUT_REASON,
+                            )
+                    }
                 }
                 else -> {
                     scope.launch {

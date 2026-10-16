@@ -8,6 +8,7 @@ import {
   readStoredSession,
   writeStoredSession,
 } from '@/lib/sessionStorage';
+import { isIdleTimeout, noteIdleTimeout } from '@/lib/idleTimeout';
 import { isQuizRemoval } from '@/lib/quizRemoval';
 import { isSystemRemoval, noteSystemRemoval } from '@/lib/systemRemoval';
 import { unlockHost } from '@/lib/hostSecret';
@@ -144,6 +145,12 @@ export function useWordSearchSocket(
       }
       if (isSystemRemoval(payload)) {
         noteSystemRemoval();
+        setPlayerId(null);
+        setPlayerName(null);
+        return;
+      }
+      if (isIdleTimeout(payload)) {
+        noteIdleTimeout();
         setPlayerId(null);
         setPlayerName(null);
         return;

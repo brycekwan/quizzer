@@ -35,11 +35,19 @@ impl PartyTheme {
     }
 }
 
+/// Default idle disconnect: 30 minutes.
+pub const DEFAULT_IDLE_TIMEOUT_MS: i64 = 30 * 60 * 1_000;
+/// Host may set 1–120 whole minutes.
+pub const MIN_IDLE_TIMEOUT_MS: i64 = 60 * 1_000;
+pub const MAX_IDLE_TIMEOUT_MS: i64 = 120 * 60 * 1_000;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemAdminSnapshot {
     pub players: Vec<SystemPlayerEntry>,
     pub theme: PartyTheme,
+    /// Connected players with no gameplay input for this long are signed out.
+    pub idle_timeout_ms: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +82,7 @@ pub fn build_system_leaderboard(players: &[SystemScoreInput]) -> SystemAdminSnap
 
     SystemAdminSnapshot {
         theme: PartyTheme::Standard,
+        idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
         players: ranked
             .into_iter()
             .enumerate()
@@ -148,6 +157,7 @@ mod tests {
         assert_eq!(quiz, [None, Some(5000), None]);
         assert_eq!(board.players[0].rank, 1);
         assert_eq!(board.players[2].rank, 3);
+        assert_eq!(board.idle_timeout_ms, DEFAULT_IDLE_TIMEOUT_MS);
     }
 
     #[test]

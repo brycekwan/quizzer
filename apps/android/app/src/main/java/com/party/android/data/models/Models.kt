@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonElement
 
 const val SYSTEM_REMOVAL_REASON = "Removed from the system by admin"
 const val QUIZ_REMOVAL_REASON = "Removed from the quiz game"
+const val IDLE_TIMEOUT_REASON = "Signed out due to inactivity"
 
 @Serializable
 data class AckResult(

@@ -1,3 +1,10 @@
+# [2.12.0](https://github.com/brycekwan/quizzer/compare/v2.11.0...v2.12.0) (2026-10-16)
+
+
+### Features
+
+* reskin android ([119e361](https://github.com/brycekwan/quizzer/commit/119e36123517b30f06302014f23bd8d442fc3dda))
+
 # [2.11.0](https://github.com/brycekwan/quizzer/compare/v2.10.2...v2.11.0) (2026-10-16)
 
 

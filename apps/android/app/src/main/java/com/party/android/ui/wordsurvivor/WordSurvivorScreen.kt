@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.ui.text.font.FontWeight
+import com.party.android.ui.components.PartyButton
+import com.party.android.ui.components.PartyButtonSize
+import com.party.android.ui.components.PartyButtonVariant
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -103,7 +106,7 @@ fun WordSurvivorScreen(
             when (snap.phase) {
                 "intro" -> {
                     Text("Guess ${snap.maxGuesses} times per word. Clear all 25 to win.")
-                    Button(onClick = {
+                    PartyButton(onClick = {
                         scope.launch {
                             val ack = repository.wordSurvivorAckIntro()
                             if (!ack.ok) error = ack.error
@@ -165,7 +168,7 @@ fun WordSurvivorScreen(
                                 horizontalArrangement = Arrangement.Center,
                             ) {
                                 row.forEach { ch ->
-                                    Button(
+                                    PartyButton(
                                         onClick = {
                                             scope.launch {
                                                 val ack = repository.wordSurvivorLetter(ch.toString())
@@ -173,23 +176,32 @@ fun WordSurvivorScreen(
                                             }
                                         },
                                         modifier = Modifier.padding(1.dp),
+                                        fillMaxWidth = false,
+                                        size = PartyButtonSize.Sm,
                                     ) { Text(ch.toString()) }
                                 }
                             }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = {
-                                scope.launch {
-                                    val ack = repository.wordSurvivorBackspace()
-                                    if (!ack.ok) error = ack.error
-                                }
-                            }) { Text("⌫") }
-                            Button(onClick = {
-                                scope.launch {
-                                    val ack = repository.wordSurvivorSubmit()
-                                    if (!ack.ok) error = ack.error
-                                }
-                            }) { Text("Enter") }
+                            PartyButton(
+                                onClick = {
+                                    scope.launch {
+                                        val ack = repository.wordSurvivorBackspace()
+                                        if (!ack.ok) error = ack.error
+                                    }
+                                },
+                                variant = PartyButtonVariant.Outline,
+                                fillMaxWidth = false,
+                            ) { Text("⌫") }
+                            PartyButton(
+                                onClick = {
+                                    scope.launch {
+                                        val ack = repository.wordSurvivorSubmit()
+                                        if (!ack.ok) error = ack.error
+                                    }
+                                },
+                                fillMaxWidth = false,
+                            ) { Text("Enter") }
                         }
                     }
                 }

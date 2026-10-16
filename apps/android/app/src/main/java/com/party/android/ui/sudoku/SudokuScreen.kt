@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.ui.text.font.FontWeight
+import com.party.android.ui.components.PartyButton
+import com.party.android.ui.components.PartyButtonSize
+import com.party.android.ui.components.PartyButtonVariant
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -155,9 +158,9 @@ fun SudokuScreen(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 (1..9).forEach { value ->
-                    Button(
+                    PartyButton(
                         onClick = {
-                            val sel = selected ?: return@Button
+                            val sel = selected ?: return@PartyButton
                             scope.launch {
                                 val ack =
                                     if (draftMode) {
@@ -169,6 +172,8 @@ fun SudokuScreen(
                             }
                         },
                         modifier = Modifier.weight(1f),
+                        fillMaxWidth = false,
+                        size = PartyButtonSize.Sm,
                         enabled = selected != null,
                     ) {
                         Text(alphabet[value - 1], fontSize = 12.sp)
@@ -176,17 +181,19 @@ fun SudokuScreen(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                PartyButton(
                     onClick = {
-                        val sel = selected ?: return@Button
+                        val sel = selected ?: return@PartyButton
                         scope.launch {
                             val ack = repository.sudokuErase(sel.first, sel.second)
                             if (!ack.ok) error = ack.error
                         }
                     },
                     enabled = selected != null,
+                    variant = PartyButtonVariant.Outline,
+                    fillMaxWidth = false,
                 ) { Text("Erase") }
-                Button(
+                PartyButton(
                     onClick = {
                         scope.launch {
                             val sel = selected
@@ -199,6 +206,8 @@ fun SudokuScreen(
                             if (!ack.ok) error = ack.error
                         }
                     },
+                    variant = PartyButtonVariant.Sun,
+                    fillMaxWidth = false,
                 ) { Text("Hint") }
             }
         }

@@ -3,13 +3,10 @@ package com.party.android.ui.quizzer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,13 +16,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.party.android.data.PartyRepository
 import com.party.android.ui.components.EmptyState
 import com.party.android.ui.components.ErrorText
+import com.party.android.ui.components.PartyButton
+import com.party.android.ui.components.PartyButtonVariant
 import com.party.android.ui.components.PartyScaffold
 import com.party.android.ui.components.StatusLine
+import com.party.android.ui.theme.PartyColors
 import kotlinx.coroutines.launch
 
 @Composable
@@ -50,8 +51,7 @@ fun QuizzerScreen(
             modifier =
                 padding
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                    .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             StatusLine(session.connected, "Q ${(game?.questionIndex ?: 0) + 1}/${game?.totalQuestions ?: 0}")
@@ -71,6 +71,7 @@ fun QuizzerScreen(
             Text(
                 "Players answered ${state.answeredPlayerCount}/${state.totalPlayerCount}",
                 style = MaterialTheme.typography.bodySmall,
+                color = PartyColors.Ink.copy(alpha = 0.6f),
             )
             when (state.phase) {
                 "multiplier" -> {
@@ -92,22 +93,24 @@ fun QuizzerScreen(
                                     if (state.phase == "reveal" && answer.correct == true) append(" ✓")
                                     if (selected) append(" (you)")
                                 }
-                            if (state.phase == "answering" && state.viewerAnswer == null) {
-                                Button(
-                                    onClick = {
-                                        scope.launch {
-                                            val ack = repository.answerQuiz(answer.id)
-                                            if (!ack.ok) error = ack.error
-                                        }
+                            val canAnswer = state.phase == "answering" && state.viewerAnswer == null
+                            PartyButton(
+                                onClick = {
+                                    if (!canAnswer) return@PartyButton
+                                    scope.launch {
+                                        val ack = repository.answerQuiz(answer.id)
+                                        if (!ack.ok) error = ack.error
+                                    }
+                                },
+                                enabled = canAnswer,
+                                variant =
+                                    if (canAnswer) {
+                                        PartyButtonVariant.Primary
+                                    } else {
+                                        PartyButtonVariant.Outline
                                     },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) { Text(label) }
-                            } else {
-                                OutlinedButton(
-                                    onClick = {},
-                                    enabled = false,
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) { Text(label) }
+                            ) {
+                                Text(label, fontWeight = FontWeight.Bold)
                             }
                         }
                         state.viewerAnswer?.let { va ->
@@ -118,6 +121,13 @@ fun QuizzerScreen(
                                     } else {
                                         "Incorrect"
                                     },
+                                    color =
+                                        if (va.correct == true) {
+                                            PartyColors.Mint
+                                        } else {
+                                            PartyColors.Coral
+                                        },
+                                    fontWeight = FontWeight.Bold,
                                 )
                             }
                         }

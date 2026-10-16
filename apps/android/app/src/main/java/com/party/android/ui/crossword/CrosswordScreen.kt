@@ -16,10 +16,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.party.android.ui.components.PartyTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.party.android.ui.components.PartyButton
+import com.party.android.ui.components.PartyButtonSize
+import com.party.android.ui.components.PartyButtonVariant
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -140,7 +142,7 @@ fun CrosswordScreen(
 
             selected?.let { (r, c) ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
+                    PartyTextField(
                         value = letterInput,
                         onValueChange = {
                             letterInput = it.takeLast(1).uppercase()
@@ -152,17 +154,22 @@ fun CrosswordScreen(
                                 }
                             }
                         },
-                        label = { Text("Letter at $r,$c") },
+                        label = "Letter at $r,$c",
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                     )
-                    TextButton(onClick = {
-                        scope.launch {
-                            val ack = repository.clearCrosswordLetter(r, c)
-                            if (!ack.ok) error = ack.error
-                        }
-                    }) { Text("Clear") }
+                    PartyButton(
+                        onClick = {
+                            scope.launch {
+                                val ack = repository.clearCrosswordLetter(r, c)
+                                if (!ack.ok) error = ack.error
+                            }
+                        },
+                        variant = PartyButtonVariant.Outline,
+                        size = PartyButtonSize.Sm,
+                        fillMaxWidth = false,
+                    ) { Text("Clear") }
                 }
             }
 

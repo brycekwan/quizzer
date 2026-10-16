@@ -4,9 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.party.android.ui.navigation.PartyNavHost
@@ -28,22 +25,15 @@ class MainActivity : ComponentActivity() {
                 }
 
                 override fun onStart(owner: LifecycleOwner) {
-                    val hidden = hiddenAt
                     hiddenAt = null
-                    if (hidden != null && System.currentTimeMillis() - hidden >= 2_000) {
-                        repository.refreshConnection()
-                    } else {
-                        repository.refreshConnection()
-                    }
+                    repository.refreshConnection()
                 }
             },
         )
 
         setContent {
             PartyTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    PartyNavHost(repository)
-                }
+                PartyNavHost(repository)
             }
         }
     }

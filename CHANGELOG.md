@@ -1,3 +1,10 @@
+# [2.11.0](https://github.com/brycekwan/quizzer/compare/v2.10.2...v2.11.0) (2026-10-16)
+
+
+### Features
+
+* add timeout ([1989b0d](https://github.com/brycekwan/quizzer/commit/1989b0dcfc5aadd7dce8e3c6041f045c54749d41))
+
 ## [2.10.2](https://github.com/brycekwan/quizzer/compare/v2.10.1...v2.10.2) (2026-10-15)
 
 
